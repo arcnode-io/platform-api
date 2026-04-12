@@ -1,5 +1,5 @@
 [project]
-name = "python-fastapi-tortoise"
+name = "platform-api"
 version = "1.0.0-beta"
 requires-python = "==3.13.2"
 dependencies = [
