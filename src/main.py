@@ -8,8 +8,8 @@ from src import config
 from src.app_module import AppModule
 
 app_module = AppModule()
+app_module.register_database()
 app = app_module.create_app()
-app_module.register_database(app)
 
 
 def main() -> None:

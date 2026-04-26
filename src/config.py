@@ -31,6 +31,14 @@ class Config(BaseModel):  # noqa: D101
     e2e: bool
     reload: bool
     postgres_host: PostgresHost
+    postgres_port: int = 5432
+    edp_api_url: str
+    s3_endpoint_url: (
+        str | None
+    )  # None in prod (real AWS); URL in test/local (LocalStack)
+    s3_bucket: str
+    ses_endpoint_url: str | None
+    ses_sender_email: str
 
 
 class _ConfigMap(BaseModel):

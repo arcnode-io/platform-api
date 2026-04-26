@@ -5,6 +5,11 @@ local:
   e2e: false
   reload: true
   postgres_host: 'localhost'
+  edp_api_url: 'http://localhost:8001'
+  s3_endpoint_url: 'http://localhost:4566'
+  s3_bucket: 'platform-api-artifacts'
+  ses_endpoint_url: 'http://localhost:4566'
+  ses_sender_email: 'noreply@arcnode.io'
 
 beta:
   log_level: INFO
@@ -13,3 +18,8 @@ beta:
   e2e: true
   reload: false
   postgres_host: 'postgres'
+  edp_api_url: 'http://edp-api:8000'
+  s3_endpoint_url: null
+  s3_bucket: 'arcnode-platform-artifacts'
+  ses_endpoint_url: null
+  ses_sender_email: 'noreply@arcnode.io'

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
+from testcontainers.localstack import LocalStackContainer
 from testcontainers.postgres import PostgresContainer
 
 
@@ -81,4 +82,50 @@ def start_postgres(
             host="localhost",
             port=port,
             url=f"postgres://{username}:{password}@localhost:{port}/{dbname}",
+        )
+
+
+@contextmanager
+def start_localstack(
+    image: str = "localstack/localstack:3.7",
+) -> Generator[Container]:
+    """Start LocalStack with ONLY S3 + SES. Yields the dynamic edge URL.
+
+    `with_services` sets `SERVICES=s3,ses` (the documented LocalStack env var) so
+    we don't init Lambda/SNS/etc. Combined with the default `EAGER_SERVICE_LOADING=0`,
+    even s3 + ses only spin up on first use — fastest possible startup.
+
+    Pinned to `:3.7` — the last image tag where SES is freely available without a
+    Pro license. `:latest` started gating SES behind LocalStack Pro mid-2024.
+    """
+    container = LocalStackContainer(image=image).with_services("s3", "ses")
+    with container as ls:
+        url = ls.get_url()
+        port = int(url.rsplit(":", 1)[-1])
+        yield Container(host="localhost", port=port, url=url)
+
+
+@contextmanager
+def start_edp_api(
+    image: str = "edp-api:test",
+    port: int = 8000,
+) -> Generator[Container]:
+    """Run the published `edp-api:test` Docker image. Caller supplies the built tag.
+
+    The image is built by edp-api's own `tests/test_edp_api_container.py`. CI shares
+    the build cache between repos; locally, run `docker build -t edp-api:test ../edp-api`
+    once before integration tests.
+    """
+    container = (
+        DockerContainer(image)
+        .with_exposed_ports(port)
+        .with_env("ENV", "beta")
+        .waiting_for(LogMessageWaitStrategy("Application startup complete"))
+    )
+    with container as c:
+        mapped = int(c.get_exposed_port(port))
+        yield Container(
+            host="localhost",
+            port=mapped,
+            url=f"http://localhost:{mapped}",
         )
