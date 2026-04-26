@@ -3,7 +3,8 @@
 Validates the rendered yaml against the CloudFormation spec via cfn-lint
 (AST + spec check, no AWS creds) and asserts the structural shape we
 need: VPC + IAM + EC2 + UserData that boots docker-compose with the EMS
-core triplet (device-api + hmi + industrial-gateway).
+core triplet (device-api + hmi + industrial-gateway) wired to the three
+managed-service connection strings the operator must supply.
 
 Server-side validation (live image pulls, IAM evaluation, real launch)
 happens when the operator actually runs the stack — out of scope here.
@@ -11,7 +12,8 @@ happens when the operator actually runs the stack — out of scope here.
 
 from cfnlint import api as cfnlint_api
 
-from src.cfn.cfn_service import EMS_REGISTRY, EMS_SERVICES, CfnService
+from src.cfn.cfn_resources import EMS_REGISTRY, EMS_SERVICES
+from src.cfn.cfn_service import CfnService
 
 DEPLOYMENT_UUID: str = "abcd1234-5678-90ef-1234-567890abcdef"
 DTM_URL: str = "https://platform-api-artifacts.example/orders/o1/dtm.json"
@@ -105,3 +107,47 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     assert f"Value: {DTM_URL}" in rendered
     assert f"Value: {EMS_MODE}" in rendered
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
+
+
+def test_render_template_requires_three_persistence_connection_strings() -> None:
+    """Three required no-default CFN parameters, NoEcho true, MinLength 1.
+
+    PM contract: operator must paste Neon + Neo4j Aura + TimescaleDB connection
+    strings at create-stack time. CFN hard-fails if any is missing because none
+    have a Default.
+    """
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — each parameter named + sensitive-marked + non-empty constraint
+    assert "NeonConnectionString:" in rendered
+    assert "Neo4jConnectionString:" in rendered
+    assert "TimescaleConnectionString:" in rendered
+    assert rendered.count("NoEcho: true") == 3
+    assert rendered.count("MinLength: 1") == 3
+    # No `Default:` lines anywhere = stack creation fails without all three
+    assert "Default:" not in rendered
+
+
+def test_render_template_userdata_substitutes_connection_strings_via_sub() -> None:
+    """UserData uses Fn::Sub so the three params land as docker-compose env vars."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — CFN does the substitution server-side
+    assert "Fn::Sub" in rendered
+    assert "${NeonConnectionString}" in rendered
+    assert "${Neo4jConnectionString}" in rendered
+    assert "${TimescaleConnectionString}" in rendered
+
+
+def test_render_template_each_ems_service_gets_all_three_db_envs() -> None:
+    """All 3 EMS services receive all 3 connection strings as env vars."""
+    # Arrange + Act
+    rendered = _render()
+    n = len(EMS_SERVICES)
+
+    # Assert — once per service for each env var key
+    assert rendered.count("NEON_DATABASE_URL:") == n
+    assert rendered.count("NEO4J_URI:") == n
+    assert rendered.count("TIMESCALE_DATABASE_URL:") == n

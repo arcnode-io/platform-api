@@ -177,7 +177,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert portal_url.endswith(f"orders/{order_id}/index.html")
         assert ls.url in portal_url
 
-        # Assert — portal HTML at that URL lists artifacts + download CTA + APK
+        # Assert — portal HTML lists artifacts + prereqs + download CTA + APK
         html_resp = httpx.get(portal_url)
         assert html_resp.status_code == 200, html_resp.text
         html = html_resp.text
@@ -185,3 +185,11 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert bom_url in html
         assert "Download CFN template" in html
         assert template_url in html
+        # Prereqs section names all three managed-service signups
+        assert "neon.tech" in html
+        assert "neo4j.com/cloud/aura" in html
+        assert "timescale.com/cloud" in html
+        # Per PM contract: prereqs must appear *before* the download link
+        prereqs_pos = html.find("Prerequisites")
+        download_pos = html.find("Download CFN template")
+        assert 0 <= prereqs_pos < download_pos, (prereqs_pos, download_pos)

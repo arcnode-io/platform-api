@@ -4,9 +4,30 @@ Pure string builder; no I/O. Caller uploads the result to S3 and emails the URL.
 """
 
 import html
+from typing import Final
 
 from src.edp_client.edp_artifacts import EdpArtifact
 from src.orders.orders_record import OrderEmsDelivery
+
+# Three managed-service signups the operator must complete before launching
+# the CFN stack — paste each connection string into the matching CFN param.
+PREREQ_SIGNUPS: Final[tuple[tuple[str, str, str], ...]] = (
+    (
+        "Neon",
+        "https://neon.tech",
+        "Postgres for relational config + pgvector store (one URL, both DBs)",
+    ),
+    (
+        "Neo4j Aura",
+        "https://neo4j.com/cloud/aura/",
+        "Managed graph database for the chatbot",
+    ),
+    (
+        "Timescale Cloud",
+        "https://www.timescale.com/cloud",
+        "Time-series telemetry store",
+    ),
+)
 
 
 class PortalService:
@@ -22,8 +43,9 @@ class PortalService:
         artifacts: list[EdpArtifact],
         delivery: OrderEmsDelivery,
     ) -> str:
-        """Return the HTML body listing artifacts + EMS launch link + APK link."""
+        """Return the HTML body: artifacts + prereqs + download CTA + APK."""
         artifact_html = "\n".join(self._render_artifact(a) for a in artifacts)
+        prereqs_html = self._render_prereqs()
         launch_html = self._render_launch(delivery)
         apk = html.escape(self._apk_url, quote=True)
         return (
@@ -38,6 +60,7 @@ class PortalService:
             f"<p>Order: <code>{html.escape(order_id)}</code></p>\n"
             "<h2>EDP Artifacts</h2>\n"
             f"<ul>\n{artifact_html}\n</ul>\n"
+            f"{prereqs_html}\n"
             "<h2>EMS Deployment</h2>\n"
             f"{launch_html}\n"
             "<h2>EMS Mobile App (Android)</h2>\n"
@@ -59,6 +82,27 @@ class PortalService:
                 rows.append(f"    {fmt} (pending {html.escape(u.pending)})")
         body = "<br>\n".join(rows)
         return f"<li><strong>{html.escape(artifact.name)}</strong><br>\n{body}</li>"
+
+    @staticmethod
+    def _render_prereqs() -> str:
+        """Three managed-service signups required *before* launching the CFN stack."""
+        items = "\n".join(
+            f"  <li><strong>{html.escape(name)}</strong> — "
+            f'<a href="{html.escape(url, quote=True)}">sign up</a> — '
+            f"{html.escape(desc)}.</li>"
+            for name, url, desc in PREREQ_SIGNUPS
+        )
+        return (
+            "<h2>Prerequisites — sign up before launching</h2>\n"
+            "<p>The CFN stack requires three managed-service connection strings as "
+            "<strong>required parameters with no defaults</strong>. CloudFormation "
+            "will refuse to deploy if any are missing.</p>\n"
+            f"<ol>\n{items}\n</ol>\n"
+            "<p>Paste each connection string into the matching CFN parameter "
+            "(<code>NeonConnectionString</code>, <code>Neo4jConnectionString</code>, "
+            "<code>TimescaleConnectionString</code>) when running "
+            "<code>aws cloudformation create-stack</code> or via Console.</p>"
+        )
 
     @staticmethod
     def _render_launch(delivery: OrderEmsDelivery) -> str:
