@@ -2,6 +2,7 @@
 
 ![](https://img.shields.io/gitlab/pipeline-status/arcnode-io/platform-api?branch=main&logo=gitlab)
 ![](https://gitlab.com/arcnode-io/platform-api/badges/main/coverage.svg)
+![](https://img.shields.io/badge/ty_checked-gray?logo=astral)
 ![](https://img.shields.io/badge/3.13-gray?logo=python)
 ![](https://img.shields.io/badge/web_framework-fastapi-27a699)
 
@@ -30,19 +31,19 @@ database platform_s3
 database platform_db
 cloud ses
 
-customer -r- website
-website -r- orchestrator
-orchestrator -r- platform_db
-orchestrator -- edp_api
-orchestrator -- cfn
-orchestrator -- iso
-orchestrator -- delivery
-cfn -- platform_s3
-iso -- platform_s3
-apk_build -r- platform_s3
-delivery -u- platform_s3
-delivery -l- ses
-ses -u- customer
+customer -r-> website
+website -r--> orchestrator: http
+orchestrator -r- platform_db: sql
+orchestrator --> edp_api: http
+orchestrator --> cfn 
+orchestrator --> iso
+orchestrator --> delivery
+cfn --> platform_s3: s3
+iso --> platform_s3: s3
+apk_build -r-> platform_s3: s3
+delivery <-u-> platform_s3: s3
+delivery -l-> ses: http
+ses -u-> customer: email
 ```
 ### Sequence
 ```plantuml
