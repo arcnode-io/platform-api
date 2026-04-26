@@ -4,8 +4,21 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from src.edp_client.edp_artifacts import EdpArtifact, EdpEmsDelivery
+from src.edp_client.edp_artifacts import EdpArtifact, EdpDeliveryPath
 from src.orders.order_entity import Order, OrderStatus
+
+
+class OrderEmsDelivery(BaseModel):
+    """Platform-api's enriched delivery shape — adds a clickable `launch_url`.
+
+    edp-api emits the routing decision (`path` + `ems_mode`); platform-api owns
+    URL construction. For CFN paths this is the AWS Console deep link;
+    ISO path leaves `launch_url=None` until the v1 ISO build lands.
+    """
+
+    path: EdpDeliveryPath
+    ems_mode: str
+    launch_url: Optional[str] = None
 
 
 class PostOrderResponse(BaseModel):
@@ -24,7 +37,7 @@ class GetOrderResponse(BaseModel):
     submitted_at: str
     completed_at: Optional[str] = None
     edp_artifacts: list[EdpArtifact] = []
-    ems_delivery: Optional[EdpEmsDelivery] = None
+    ems_delivery: Optional[OrderEmsDelivery] = None
     flags: list[dict[str, object]] = []
 
     @classmethod
@@ -37,7 +50,7 @@ class GetOrderResponse(BaseModel):
             completed_at=order.completed_at.isoformat() if order.completed_at else None,
             edp_artifacts=[EdpArtifact.model_validate(a) for a in order.edp_artifacts],
             ems_delivery=(
-                EdpEmsDelivery.model_validate(order.ems_delivery)
+                OrderEmsDelivery.model_validate(order.ems_delivery)
                 if order.ems_delivery
                 else None
             ),

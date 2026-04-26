@@ -1,13 +1,14 @@
 """Orchestrator module — DI assembly.
 
-Imports `EdpClientModule` + `AwsModule` and wires their services into
-`OrchestratorService`. `OrdersModule` imports this and consumes
-`module.service`.
+Imports `EdpClientModule`, `AwsModule`, `CfnModule`, and `PortalModule` and wires
+their services into `OrchestratorService`. `OrdersModule` consumes `module.service`.
 """
 
 from src.aws.aws_module import AwsModule
+from src.cfn.cfn_module import CfnModule
 from src.edp_client.edp_client_module import EdpClientModule
 from src.orchestrator.orchestrator_service import OrchestratorService
+from src.portal.portal_module import PortalModule
 
 
 class OrchestratorModule:
@@ -18,11 +19,13 @@ class OrchestratorModule:
         *,
         edp: EdpClientModule,
         aws: AwsModule,
-        ems_hmi_apk_url: str,
+        cfn: CfnModule,
+        portal: PortalModule,
     ) -> None:
         self.service = OrchestratorService(
             edp_client=edp.service,
             s3=aws.s3,
             ses=aws.ses,
-            ems_hmi_apk_url=ems_hmi_apk_url,
+            cfn=cfn.service,
+            portal=portal.service,
         )

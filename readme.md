@@ -6,7 +6,7 @@
 ![](https://img.shields.io/badge/3.13-gray?logo=python)
 ![](https://img.shields.io/badge/web_framework-fastapi-27a699)
 
-> Order intake, delivery orchestration ad versioned artifact portal
+> Order intake, delivery orchestration, and versioned artifact portal
 
 
 

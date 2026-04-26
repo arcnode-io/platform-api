@@ -10,8 +10,8 @@ Walks the walking-skeleton path:
 1. POST /platform-api/orders → 202 with order_id
 2. GET /platform-api/orders/{id} polled until status == "complete"
 3. Artifact bytes archived to platform-api's S3 bucket (re-archived FROM edp-api)
-4. SES captured a single delivery email to the operator's contact_email
-5. Email body advertises the EMS HMI Android APK URL
+4. Portal index.html uploaded to S3 listing artifacts + EMS launch + APK
+5. SES captured a single delivery email — body advertises the portal URL
 """
 
 import time
@@ -35,6 +35,13 @@ POSTGRES_PASSWORD: str = "test"  # noqa: S105 — testcontainer credential
 S3_BUCKET: str = "platform-api-artifacts-test"
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
 SENDER_EMAIL: str = "noreply@arcnode.test"
+CFN_TEMPLATE_URL_STANDARD: str = (
+    "https://arcnode-public.s3.amazonaws.com/cfn/ems-stack.yaml"
+)
+CFN_TEMPLATE_URL_GOVCLOUD: str = (
+    "https://arcnode-public.s3.us-gov-west-1.amazonaws.com/cfn/ems-stack.yaml"
+)
+AWS_REGION: str = "us-east-1"
 
 VALID_PAYLOAD: dict[str, object] = {
     "operator_org": "acme",
@@ -72,8 +79,16 @@ def _poll_until_complete(client: TestClient, order_id: str) -> GetOrderResponse:
     )
 
 
-def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
-    """POST → poll → assert S3 bytes + SES email captured + APK link in body."""
+def _extract_portal_url(email_body: str) -> str:
+    """Pull the portal URL out of the plain-text email body."""
+    for line in email_body.splitlines():
+        if line.startswith("Portal: "):
+            return line.removeprefix("Portal: ").strip()
+    pytest.fail(f"no Portal: line in email body: {email_body!r}")
+
+
+def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
+    """POST → poll → assert portal HTML lists artifacts + launch link + APK."""
     with (
         start_postgres(password=POSTGRES_PASSWORD) as pg,
         start_localstack() as ls,
@@ -94,6 +109,9 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
             s3_bucket=S3_BUCKET,
             ses_endpoint_url=ls.url,
             ses_sender_email=SENDER_EMAIL,
+            aws_region=AWS_REGION,
+            cfn_template_url_standard=CFN_TEMPLATE_URL_STANDARD,
+            cfn_template_url_govcloud=CFN_TEMPLATE_URL_GOVCLOUD,
             ems_hmi_apk_url=APK_URL,
         )
         module = AppModule(config=cfg)
@@ -121,11 +139,11 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
             ls.url in bom_url
         ), f"expected platform-api to re-archive into LocalStack S3; got {bom_url}"
 
-        # Assert — bytes actually landed in the bucket
+        # Assert — bytes actually landed in the bucket (artifacts + portal)
         s3 = boto3.client(
             "s3",
             endpoint_url=ls.url,
-            region_name="us-east-1",
+            region_name=AWS_REGION,
             aws_access_key_id="test",
             aws_secret_access_key="test",  # noqa: S106
         )
@@ -134,8 +152,16 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
         assert any(k.endswith("bom.json") for k in keys), keys
         assert any(k.endswith("dtm.json") for k in keys), keys
         assert any(k.endswith("cable_hose_schedule.json") for k in keys), keys
+        assert f"orders/{order_id}/index.html" in keys, keys
 
-        # Assert — SES received the delivery email + email body advertises the APK URL
+        # Assert — CFN launch URL was built into the persisted delivery
+        assert final.ems_delivery is not None
+        launch_url = final.ems_delivery.launch_url
+        assert launch_url is not None
+        assert "console.aws.amazon.com" in launch_url
+        assert final.ems_delivery.path.value == "cfn_standard"
+
+        # Assert — SES email captured + body points at the portal URL
         sent = httpx.get(f"{ls.url}/_aws/ses").json()
         delivery_emails = [
             m
@@ -147,4 +173,15 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
             len(delivery_emails) == 1
         ), f"expected one delivery email; got {len(delivery_emails)}"
         body = delivery_emails[0].get("Body", {}).get("text_part", "")
-        assert APK_URL in body, f"expected APK URL in email body; got: {body!r}"
+        portal_url = _extract_portal_url(body)
+        assert portal_url.endswith(f"orders/{order_id}/index.html")
+        assert ls.url in portal_url
+
+        # Assert — portal HTML at that URL lists artifacts + launch link + APK
+        html_resp = httpx.get(portal_url)
+        assert html_resp.status_code == 200, html_resp.text
+        html = html_resp.text
+        assert APK_URL in html
+        assert bom_url in html
+        assert "Launch EMS stack" in html
+        assert "console.aws.amazon.com" in html

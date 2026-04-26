@@ -14,10 +14,12 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from src.app_controller import AppController
 from src.aws.aws_module import AwsModule
+from src.cfn.cfn_module import CfnModule
 from src.config import Config, load_config
 from src.edp_client.edp_client_module import EdpClientModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
 from src.orders.orders_module import OrdersModule
+from src.portal.portal_module import PortalModule
 
 
 class AppModule:
@@ -32,10 +34,17 @@ class AppModule:
             ses_endpoint_url=self.config.ses_endpoint_url,
             ses_sender_email=self.config.ses_sender_email,
         )
+        self.cfn_module = CfnModule(
+            template_url_standard=self.config.cfn_template_url_standard,
+            template_url_govcloud=self.config.cfn_template_url_govcloud,
+            region=self.config.aws_region,
+        )
+        self.portal_module = PortalModule(ems_hmi_apk_url=self.config.ems_hmi_apk_url)
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,
-            ems_hmi_apk_url=self.config.ems_hmi_apk_url,
+            cfn=self.cfn_module,
+            portal=self.portal_module,
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self._db_lifespan_enabled = False

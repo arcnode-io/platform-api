@@ -34,6 +34,11 @@ class Config(BaseModel):  # noqa: D101
     s3_bucket: str
     ses_endpoint_url: str | None
     ses_sender_email: str
+    aws_region: str = "us-east-1"
+    cfn_template_url_standard: (
+        str  # public S3 URL of the standard-partition CFN template
+    )
+    cfn_template_url_govcloud: str  # public S3 URL of the GovCloud CFN template
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
 
 

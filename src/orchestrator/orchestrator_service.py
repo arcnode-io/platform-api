@@ -1,10 +1,10 @@
-"""OrchestratorService — composes EdpClient + S3 + SES into the order flow.
+"""OrchestratorService — composes EdpClient + S3 + SES + CFN + Portal.
 
 Per NestJS clean-orchestrator conventions:
 - public method = business intent (`execute`)
-- private steps named for their responsibility (`_run_pipeline`, `_archive`, `_notify`)
-- state transitions extracted into `_mark_*` helpers so the public method
-  reads as a try/except over the work, not a try/except mixed with bookkeeping
+- private steps named for their responsibility (`_run_pipeline`, `_archive`,
+  `_publish_portal`, `_notify`)
+- state transitions extracted into `_mark_*` helpers
 """
 
 import logging
@@ -13,10 +13,15 @@ from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
 from src.aws.ses_service import SesService
+from src.cfn.cfn_service import CfnService
 from src.edp_client.edp_artifacts import EdpArtifact, EdpArtifactUrl, EdpGetJobResponse
 from src.edp_client.edp_client_service import EdpClientService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
+from src.orders.orders_record import OrderEmsDelivery
+from src.portal.portal_service import PortalService
+
+DTM_ARTIFACT_NAME: str = "Device Topology Manifest"
 
 
 @dataclass(frozen=True)
@@ -25,6 +30,7 @@ class _PipelineResult:
 
     edp: EdpGetJobResponse
     archived: list[EdpArtifact]
+    delivery: OrderEmsDelivery
 
 
 class OrchestratorService:
@@ -36,12 +42,14 @@ class OrchestratorService:
         edp_client: EdpClientService,
         s3: S3Service,
         ses: SesService,
-        ems_hmi_apk_url: str,
+        cfn: CfnService,
+        portal: PortalService,
     ) -> None:
         self._edp = edp_client
         self._s3 = s3
         self._ses = ses
-        self._ems_hmi_apk_url = ems_hmi_apk_url
+        self._cfn = cfn
+        self._portal = portal
 
     # Public — business intent
 
@@ -59,13 +67,15 @@ class OrchestratorService:
     # Pipeline
 
     async def _run_pipeline(self, order: Order) -> _PipelineResult:
-        """Setup → submit → archive → notify. One sequential pass."""
+        """Setup → submit → archive → publish portal → notify."""
         await self._setup_aws()
         payload = ConfiguratorPayload.model_validate(order.payload)
         edp = await self._edp.submit_and_wait(payload)
         archived = await self._archive(str(order.id), edp)
-        await self._notify(payload.contact_email, archived)
-        return _PipelineResult(edp=edp, archived=archived)
+        delivery = self._build_delivery(edp, archived)
+        portal_url = await self._publish_portal(str(order.id), archived, delivery)
+        await self._notify(payload.contact_email, portal_url)
+        return _PipelineResult(edp=edp, archived=archived, delivery=delivery)
 
     async def _setup_aws(self) -> None:
         """Ensure S3 bucket exists + SES sender is verified. Idempotent."""
@@ -95,12 +105,45 @@ class OrchestratorService:
         new_url = await self._s3.archive_from_url(source, key=key)
         return EdpArtifactUrl(format=url_entry.format, url=new_url)
 
-    async def _notify(self, to: str, archived: list[EdpArtifact]) -> None:
-        """Send the operator the delivery email with archived artifact URLs + APK link."""
+    def _build_delivery(
+        self, edp: EdpGetJobResponse, archived: list[EdpArtifact]
+    ) -> OrderEmsDelivery:
+        """Combine edp-api's routing decision with platform-api's CFN launch URL."""
+        assert edp.ems_delivery is not None, "edp-api must emit ems_delivery"
+        dtm_url = self._find_dtm_url(archived)
+        launch_url = self._cfn.build_link(
+            path=edp.ems_delivery.path,
+            deployment_uuid=edp.deployment_uuid,
+            dtm_url=dtm_url,
+            ems_mode=edp.ems_delivery.ems_mode,
+        )
+        return OrderEmsDelivery(
+            path=edp.ems_delivery.path,
+            ems_mode=edp.ems_delivery.ems_mode,
+            launch_url=launch_url,
+        )
+
+    async def _publish_portal(
+        self,
+        order_id: str,
+        archived: list[EdpArtifact],
+        delivery: OrderEmsDelivery,
+    ) -> str:
+        """Render index.html and upload to S3; return its public URL."""
+        body = self._portal.render(
+            order_id=order_id, artifacts=archived, delivery=delivery
+        )
+        return await self._s3.upload_html(f"orders/{order_id}/index.html", body)
+
+    async def _notify(self, to: str, portal_url: str) -> None:
+        """Email the operator a one-line link to the portal page."""
         await self._ses.send_delivery_email(
             to=to,
             subject="ARCNODE deployment package ready",
-            body_text=self._format_email_body(archived),
+            body_text=(
+                "Your ARCNODE deployment package is ready.\n\n"
+                f"Portal: {portal_url}\n"
+            ),
         )
 
     # Status transitions
@@ -123,9 +166,7 @@ class OrchestratorService:
         order.edp_job_id = result.edp.job_id
         order.deployment_uuid = result.edp.deployment_uuid
         order.edp_artifacts = [a.model_dump() for a in result.archived]
-        order.ems_delivery = (
-            result.edp.ems_delivery.model_dump() if result.edp.ems_delivery else None
-        )
+        order.ems_delivery = result.delivery.model_dump()
         order.flags = list(result.edp.flags)
         await order.save()
         logging.info(
@@ -142,15 +183,12 @@ class OrchestratorService:
             return url
         return f"{self._edp._base_url.rstrip('/')}{url}"
 
-    def _format_email_body(self, archived: list[EdpArtifact]) -> str:
-        """Plain-text body listing artifact URLs + the EMS HMI Android app link."""
-        lines = ["Your ARCNODE deployment package is ready.", "", "Artifacts:"]
-        for artifact in archived:
-            lines.append(f"- {artifact.name}")
-            for u in artifact.urls:
-                if u.url is not None:
-                    lines.append(f"    {u.format}: {u.url}")
-                elif u.pending:
-                    lines.append(f"    {u.format}: (pending {u.pending})")
-        lines.extend(["", "EMS Mobile App (Android):", f"  {self._ems_hmi_apk_url}"])
-        return "\n".join(lines)
+    @staticmethod
+    def _find_dtm_url(archived: list[EdpArtifact]) -> str:
+        """Locate the DTM's archived URL — required for the CFN launch link."""
+        for a in archived:
+            if a.name == DTM_ARTIFACT_NAME:
+                for u in a.urls:
+                    if u.url:
+                        return u.url
+        raise ValueError(f"{DTM_ARTIFACT_NAME} url missing in archived artifacts")

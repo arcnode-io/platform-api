@@ -55,6 +55,19 @@ class S3Service:
         logging.info("archived %d bytes %s → %s", len(body), source_url, url)
         return url
 
+    async def upload_html(self, key: str, body: str) -> str:
+        """Upload an HTML body under `key`, return the S3 URL."""
+        async with self._client() as s3:
+            await s3.put_object(
+                Bucket=self._bucket,
+                Key=key,
+                Body=body.encode("utf-8"),
+                ContentType="text/html; charset=utf-8",
+            )
+        url = self._public_url(key)
+        logging.info("uploaded %d bytes html → %s", len(body), url)
+        return url
+
     def _client(self):  # noqa: ANN202 — async context manager type is ugly to spell
         # LocalStack ignores credentials but boto3 still requires non-empty values;
         # in prod we pass nothing so the standard credential chain takes over.
