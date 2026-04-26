@@ -9,16 +9,17 @@ from src.orders.order_entity import Order, OrderStatus
 
 
 class OrderEmsDelivery(BaseModel):
-    """Platform-api's enriched delivery shape — adds a clickable `launch_url`.
+    """Platform-api's enriched delivery shape.
 
-    edp-api emits the routing decision (`path` + `ems_mode`); platform-api owns
-    URL construction. For CFN paths this is the AWS Console deep link;
-    ISO path leaves `launch_url=None` until the v1 ISO build lands.
+    edp-api emits the routing decision (`path` + `ems_mode`); platform-api
+    renders a per-order CFN template and exposes its S3 URL as `template_url`.
+    Operators download + run it from any partition. ISO path leaves
+    `template_url=None` until the v1 ISO build lands.
     """
 
     path: EdpDeliveryPath
     ems_mode: str
-    launch_url: Optional[str] = None
+    template_url: Optional[str] = None
 
 
 class PostOrderResponse(BaseModel):

@@ -34,7 +34,6 @@ class Config(BaseModel):  # noqa: D101
     s3_bucket: str
     ses_endpoint_url: str | None
     ses_sender_email: str
-    aws_region: str = "us-east-1"
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
 
 

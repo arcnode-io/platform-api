@@ -14,7 +14,12 @@ from datetime import UTC, datetime
 from src.aws.s3_service import S3Service
 from src.aws.ses_service import SesService
 from src.cfn.cfn_service import CfnService
-from src.edp_client.edp_artifacts import EdpArtifact, EdpArtifactUrl, EdpGetJobResponse
+from src.edp_client.edp_artifacts import (
+    EdpArtifact,
+    EdpArtifactUrl,
+    EdpDeliveryPath,
+    EdpGetJobResponse,
+)
 from src.edp_client.edp_client_service import EdpClientService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
@@ -111,8 +116,18 @@ class OrchestratorService:
         edp: EdpGetJobResponse,
         archived: list[EdpArtifact],
     ) -> OrderEmsDelivery:
-        """Render per-order CFN template, upload it, and build the deep link."""
+        """Render + upload per-order CFN template; expose its S3 URL for download.
+
+        ISO path: skip CFN bits entirely (air-gapped delivery is a future build).
+        CFN paths (standard + govcloud): same yaml — operator downloads and runs
+        from their own partition.
+        """
         assert edp.ems_delivery is not None, "edp-api must emit ems_delivery"
+        if edp.ems_delivery.path == EdpDeliveryPath.ISO:
+            return OrderEmsDelivery(
+                path=edp.ems_delivery.path,
+                ems_mode=edp.ems_delivery.ems_mode,
+            )
         dtm_url = self._find_dtm_url(archived)
         template = self._cfn.render_template(
             deployment_uuid=edp.deployment_uuid,
@@ -122,15 +137,10 @@ class OrchestratorService:
         template_url = await self._s3.upload_yaml(
             f"orders/{order_id}/ems-stack.yaml", template
         )
-        launch_url = self._cfn.build_link(
-            path=edp.ems_delivery.path,
-            template_url=template_url,
-            deployment_uuid=edp.deployment_uuid,
-        )
         return OrderEmsDelivery(
             path=edp.ems_delivery.path,
             ems_mode=edp.ems_delivery.ems_mode,
-            launch_url=launch_url,
+            template_url=template_url,
         )
 
     async def _publish_portal(

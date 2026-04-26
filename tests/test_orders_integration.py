@@ -35,7 +35,6 @@ POSTGRES_PASSWORD: str = "test"  # noqa: S105 — testcontainer credential
 S3_BUCKET: str = "platform-api-artifacts-test"
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
 SENDER_EMAIL: str = "noreply@arcnode.test"
-AWS_REGION: str = "us-east-1"
 
 VALID_PAYLOAD: dict[str, object] = {
     "operator_org": "acme",
@@ -103,7 +102,6 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             s3_bucket=S3_BUCKET,
             ses_endpoint_url=ls.url,
             ses_sender_email=SENDER_EMAIL,
-            aws_region=AWS_REGION,
             ems_hmi_apk_url=APK_URL,
         )
         module = AppModule(config=cfg)
@@ -135,7 +133,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         s3 = boto3.client(
             "s3",
             endpoint_url=ls.url,
-            region_name=AWS_REGION,
+            region_name="us-east-1",
             aws_access_key_id="test",
             aws_secret_access_key="test",  # noqa: S106
         )
@@ -147,20 +145,20 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert f"orders/{order_id}/index.html" in keys, keys
         assert f"orders/{order_id}/ems-stack.yaml" in keys, keys
 
-        # Assert — per-order CFN template was uploaded + referenced by the deep link
+        # Assert — per-order CFN template was uploaded + exposed for download
         assert final.ems_delivery is not None
-        launch_url = final.ems_delivery.launch_url
-        assert launch_url is not None
-        assert "console.aws.amazon.com" in launch_url
-        assert f"orders%2F{order_id}%2Fems-stack.yaml" in launch_url, launch_url
+        template_url = final.ems_delivery.template_url
+        assert template_url is not None
+        assert template_url.endswith(f"orders/{order_id}/ems-stack.yaml")
         assert final.ems_delivery.path.value == "cfn_standard"
 
-        # Assert — per-order yaml at that URL has DTM URL baked into Outputs
+        # Assert — per-order yaml at that URL is real CFN (deeper structural
+        # checks live in src/cfn/cfn_service_test.py)
         yaml_resp = httpx.get(f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml")
         assert yaml_resp.status_code == 200, yaml_resp.text
         yaml_body = yaml_resp.text
         assert "AWSTemplateFormatVersion" in yaml_body
-        assert "DeploymentMarker" in yaml_body
+        assert "AWS::EC2::Instance" in yaml_body
         assert "dtm.json" in yaml_body, yaml_body
 
         # Assert — SES email captured + body points at the portal URL
@@ -179,11 +177,11 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert portal_url.endswith(f"orders/{order_id}/index.html")
         assert ls.url in portal_url
 
-        # Assert — portal HTML at that URL lists artifacts + launch link + APK
+        # Assert — portal HTML at that URL lists artifacts + download CTA + APK
         html_resp = httpx.get(portal_url)
         assert html_resp.status_code == 200, html_resp.text
         html = html_resp.text
         assert APK_URL in html
         assert bom_url in html
-        assert "Launch EMS stack" in html
-        assert "console.aws.amazon.com" in html
+        assert "Download CFN template" in html
+        assert template_url in html

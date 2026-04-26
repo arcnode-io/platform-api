@@ -31,11 +31,12 @@ dev = [
     "deptry>=0.23.0",
     "pip>=25.1.1",
     "testcontainers[postgres,localstack]>=4.8.1",
+    "cfn-lint>=1.49.3",
 ]
 
 [tool.poe.tasks]
 dev = "python -m src.main"
-depcheck = "deptry . --per-rule-ignores DEP004=pytest,DEP002=asyncpg"
+depcheck = "deptry . --per-rule-ignores DEP004=pytest|cfnlint,DEP002=asyncpg"
 format = "black ."
 lint = "ruff check"
 typecheck = "ty check"

@@ -34,7 +34,7 @@ class AppModule:
             ses_endpoint_url=self.config.ses_endpoint_url,
             ses_sender_email=self.config.ses_sender_email,
         )
-        self.cfn_module = CfnModule(region=self.config.aws_region)
+        self.cfn_module = CfnModule()
         self.portal_module = PortalModule(ems_hmi_apk_url=self.config.ems_hmi_apk_url)
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,

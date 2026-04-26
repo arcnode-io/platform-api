@@ -4,7 +4,7 @@ from src.cfn.cfn_service import CfnService
 
 
 class CfnModule:
-    """Single point of DI for CFN template rendering + deep-link construction."""
+    """Single point of DI for CFN template rendering."""
 
-    def __init__(self, *, region: str) -> None:
-        self.service = CfnService(region=region)
+    def __init__(self) -> None:
+        self.service = CfnService()

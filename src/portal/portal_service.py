@@ -62,10 +62,16 @@ class PortalService:
 
     @staticmethod
     def _render_launch(delivery: OrderEmsDelivery) -> str:
-        """CFN deep link or ISO placeholder, depending on delivery path."""
+        """Download CTA for the per-order CFN yaml. ISO path: placeholder."""
         path = html.escape(delivery.path.value)
         mode = html.escape(delivery.ems_mode)
-        if delivery.launch_url:
-            href = html.escape(delivery.launch_url, quote=True)
-            return f'<p><a href="{href}">Launch EMS stack</a> ' f"({mode}, {path})</p>"
-        return f"<p>Path: {path} — link not yet available.</p>"
+        if not delivery.template_url:
+            return f"<p>Path: {path} — link not yet available.</p>"
+        download = html.escape(delivery.template_url, quote=True)
+        return (
+            f"<p>Path: {path}, mode: {mode}</p>\n"
+            f'<p><a href="{download}" download>Download CFN template '
+            "(ems-stack.yaml)</a> — run from any partition with "
+            "<code>aws cloudformation create-stack</code> or upload via "
+            "your AWS Console.</p>"
+        )
