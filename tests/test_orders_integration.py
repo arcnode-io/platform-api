@@ -117,16 +117,16 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
         bom = next(a for a in final.edp_artifacts if a.name == "Bill of Materials")
         bom_url = bom.urls[0].url
         assert bom_url is not None
-        assert ls.url in bom_url, (
-            f"expected platform-api to re-archive into LocalStack S3; got {bom_url}"
-        )
+        assert (
+            ls.url in bom_url
+        ), f"expected platform-api to re-archive into LocalStack S3; got {bom_url}"
 
         # Assert — bytes actually landed in the bucket
         s3 = boto3.client(
             "s3",
             endpoint_url=ls.url,
             region_name="us-east-1",
-            aws_access_key_id="test",  # noqa: S106 — LocalStack
+            aws_access_key_id="test",
             aws_secret_access_key="test",  # noqa: S106
         )
         objs = s3.list_objects_v2(Bucket=S3_BUCKET)
@@ -143,8 +143,8 @@ def test_order_full_pipeline_archives_artifacts_and_sends_email() -> None:
             if VALID_PAYLOAD["contact_email"]
             in m.get("Destination", {}).get("ToAddresses", [])
         ]
-        assert len(delivery_emails) == 1, (
-            f"expected one delivery email; got {len(delivery_emails)}"
-        )
+        assert (
+            len(delivery_emails) == 1
+        ), f"expected one delivery email; got {len(delivery_emails)}"
         body = delivery_emails[0].get("Body", {}).get("text_part", "")
         assert APK_URL in body, f"expected APK URL in email body; got: {body!r}"

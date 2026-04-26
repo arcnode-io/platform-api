@@ -23,7 +23,9 @@ class Config(BaseModel):  # noqa: D101
     host: IPv4Address
     e2e: bool
     reload: bool
-    postgres_host: str  # "localhost" for dev/test, "postgres" for the docker-compose svc
+    postgres_host: (
+        str  # "localhost" for dev/test, "postgres" for the docker-compose svc
+    )
     postgres_port: int = 5432
     edp_api_url: str
     s3_endpoint_url: (
