@@ -1,15 +1,18 @@
-"""CfnService — builds CloudFormation create-stack deep links.
+"""CfnService — renders per-order CFN templates + builds the console deep link.
 
-The operator clicks the link in their email, lands on AWS Console with the
-template + parameters pre-filled, and confirms the stack launch from their own
-AWS account. ARCNODE never touches their AWS — we only construct the URL.
+Each order gets its own `ems-stack.yaml` with deployment_uuid / dtm_url / ems_mode
+baked in (no CFN `Parameters:` block needed — values are known at render time).
+The orchestrator uploads it to S3 and passes the resulting URL into `build_link`.
 
-Standard partition vs GovCloud is a different console host. ISO path returns
-None; the orchestrator emits a stub URL for that case (pending v1 ISO build).
+The link itself opens the AWS Console "Create stack (review)" page in the
+operator's *own* AWS account; ARCNODE never holds AWS credentials. ISO path
+returns None.
 """
 
 from typing import Final
 from urllib.parse import urlencode
+
+import yaml
 
 from src.edp_client.edp_artifacts import EdpDeliveryPath
 
@@ -18,43 +21,60 @@ CONSOLE_HOST: Final[dict[EdpDeliveryPath, str]] = {
     EdpDeliveryPath.CFN_GOVCLOUD: "https://console.amazonaws-us-gov.com",
 }
 
+STUB_NOTE: Final[str] = (
+    "Stub template — real EMS provisioning lands in a future iteration."
+)
+
 
 class CfnService:
-    """Pure URL builder. No I/O, no AWS calls — operators do the launch themselves."""
+    """Per-order template renderer + console deep-link builder."""
 
-    def __init__(
-        self,
-        *,
-        template_url_standard: str,
-        template_url_govcloud: str,
-        region: str,
-    ) -> None:
-        self._template_urls = {
-            EdpDeliveryPath.CFN_STANDARD: template_url_standard,
-            EdpDeliveryPath.CFN_GOVCLOUD: template_url_govcloud,
-        }
+    def __init__(self, *, region: str) -> None:
         self._region = region
+
+    def render_template(
+        self, *, deployment_uuid: str, dtm_url: str, ems_mode: str
+    ) -> str:
+        """Return a stub CFN template (yaml) with the order's params baked in."""
+        short = deployment_uuid.split("-", 1)[0]
+        template = {
+            "AWSTemplateFormatVersion": "2010-09-09",
+            "Description": (
+                f"ARCNODE EMS deployment marker (stub) — {deployment_uuid}"
+            ),
+            "Resources": {
+                "DeploymentMarker": {
+                    "Type": "AWS::SNS::Topic",
+                    "Properties": {
+                        "TopicName": f"arcnode-{short}",
+                        "DisplayName": "ARCNODE EMS deployment marker",
+                    },
+                },
+            },
+            "Outputs": {
+                "DeploymentUuid": {"Value": deployment_uuid},
+                "DtmUrl": {"Value": dtm_url},
+                "EmsMode": {"Value": ems_mode},
+                "Note": {"Value": STUB_NOTE},
+            },
+        }
+        return yaml.safe_dump(template, sort_keys=False)
 
     def build_link(
         self,
         *,
         path: EdpDeliveryPath,
+        template_url: str,
         deployment_uuid: str,
-        dtm_url: str,
-        ems_mode: str,
     ) -> str | None:
         """Return the CFN deep link, or None for ISO path (handled elsewhere)."""
         if path == EdpDeliveryPath.ISO:
             return None
         host = CONSOLE_HOST[path]
-        template_url = self._template_urls[path]
         params = urlencode(
             {
                 "templateURL": template_url,
                 "stackName": f"arcnode-{deployment_uuid[:8]}",
-                "param_DeploymentUuid": deployment_uuid,
-                "param_DtmUrl": dtm_url,
-                "param_EmsMode": ems_mode,
             }
         )
         return (

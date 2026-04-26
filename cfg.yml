@@ -11,8 +11,6 @@ local:
   ses_endpoint_url: 'http://localhost:4566'
   ses_sender_email: 'noreply@arcnode.io'
   aws_region: 'us-east-1'
-  cfn_template_url_standard: 'https://arcnode-public.s3.amazonaws.com/cfn/ems-stack.yaml'
-  cfn_template_url_govcloud: 'https://arcnode-public.s3.us-gov-west-1.amazonaws.com/cfn/ems-stack.yaml'
   ems_hmi_apk_url: 'https://f-droid.org/packages/io.arcnode.ems-hmi/'
 
 beta:
@@ -28,6 +26,4 @@ beta:
   ses_endpoint_url: null
   ses_sender_email: 'noreply@arcnode.io'
   aws_region: 'us-east-1'
-  cfn_template_url_standard: 'https://arcnode-public.s3.amazonaws.com/cfn/ems-stack.yaml'
-  cfn_template_url_govcloud: 'https://arcnode-public.s3.us-gov-west-1.amazonaws.com/cfn/ems-stack.yaml'
   ems_hmi_apk_url: 'https://f-droid.org/packages/io.arcnode.ems-hmi/'

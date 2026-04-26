@@ -72,7 +72,7 @@ class OrchestratorService:
         payload = ConfiguratorPayload.model_validate(order.payload)
         edp = await self._edp.submit_and_wait(payload)
         archived = await self._archive(str(order.id), edp)
-        delivery = self._build_delivery(edp, archived)
+        delivery = await self._build_delivery(str(order.id), edp, archived)
         portal_url = await self._publish_portal(str(order.id), archived, delivery)
         await self._notify(payload.contact_email, portal_url)
         return _PipelineResult(edp=edp, archived=archived, delivery=delivery)
@@ -105,17 +105,27 @@ class OrchestratorService:
         new_url = await self._s3.archive_from_url(source, key=key)
         return EdpArtifactUrl(format=url_entry.format, url=new_url)
 
-    def _build_delivery(
-        self, edp: EdpGetJobResponse, archived: list[EdpArtifact]
+    async def _build_delivery(
+        self,
+        order_id: str,
+        edp: EdpGetJobResponse,
+        archived: list[EdpArtifact],
     ) -> OrderEmsDelivery:
-        """Combine edp-api's routing decision with platform-api's CFN launch URL."""
+        """Render per-order CFN template, upload it, and build the deep link."""
         assert edp.ems_delivery is not None, "edp-api must emit ems_delivery"
         dtm_url = self._find_dtm_url(archived)
-        launch_url = self._cfn.build_link(
-            path=edp.ems_delivery.path,
+        template = self._cfn.render_template(
             deployment_uuid=edp.deployment_uuid,
             dtm_url=dtm_url,
             ems_mode=edp.ems_delivery.ems_mode,
+        )
+        template_url = await self._s3.upload_yaml(
+            f"orders/{order_id}/ems-stack.yaml", template
+        )
+        launch_url = self._cfn.build_link(
+            path=edp.ems_delivery.path,
+            template_url=template_url,
+            deployment_uuid=edp.deployment_uuid,
         )
         return OrderEmsDelivery(
             path=edp.ems_delivery.path,

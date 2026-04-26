@@ -57,15 +57,23 @@ class S3Service:
 
     async def upload_html(self, key: str, body: str) -> str:
         """Upload an HTML body under `key`, return the S3 URL."""
+        return await self._upload_text(key, body, "text/html; charset=utf-8")
+
+    async def upload_yaml(self, key: str, body: str) -> str:
+        """Upload a YAML body under `key`, return the S3 URL."""
+        return await self._upload_text(key, body, "application/yaml")
+
+    async def _upload_text(self, key: str, body: str, content_type: str) -> str:
+        """Common path for text-body uploads. Returns the public URL."""
         async with self._client() as s3:
             await s3.put_object(
                 Bucket=self._bucket,
                 Key=key,
                 Body=body.encode("utf-8"),
-                ContentType="text/html; charset=utf-8",
+                ContentType=content_type,
             )
         url = self._public_url(key)
-        logging.info("uploaded %d bytes html → %s", len(body), url)
+        logging.info("uploaded %d bytes %s → %s", len(body), content_type, url)
         return url
 
     def _client(self):  # noqa: ANN202 — async context manager type is ugly to spell

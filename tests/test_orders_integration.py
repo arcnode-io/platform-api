@@ -35,12 +35,6 @@ POSTGRES_PASSWORD: str = "test"  # noqa: S105 — testcontainer credential
 S3_BUCKET: str = "platform-api-artifacts-test"
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
 SENDER_EMAIL: str = "noreply@arcnode.test"
-CFN_TEMPLATE_URL_STANDARD: str = (
-    "https://arcnode-public.s3.amazonaws.com/cfn/ems-stack.yaml"
-)
-CFN_TEMPLATE_URL_GOVCLOUD: str = (
-    "https://arcnode-public.s3.us-gov-west-1.amazonaws.com/cfn/ems-stack.yaml"
-)
 AWS_REGION: str = "us-east-1"
 
 VALID_PAYLOAD: dict[str, object] = {
@@ -110,8 +104,6 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             ses_endpoint_url=ls.url,
             ses_sender_email=SENDER_EMAIL,
             aws_region=AWS_REGION,
-            cfn_template_url_standard=CFN_TEMPLATE_URL_STANDARD,
-            cfn_template_url_govcloud=CFN_TEMPLATE_URL_GOVCLOUD,
             ems_hmi_apk_url=APK_URL,
         )
         module = AppModule(config=cfg)
@@ -153,13 +145,23 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert any(k.endswith("dtm.json") for k in keys), keys
         assert any(k.endswith("cable_hose_schedule.json") for k in keys), keys
         assert f"orders/{order_id}/index.html" in keys, keys
+        assert f"orders/{order_id}/ems-stack.yaml" in keys, keys
 
-        # Assert — CFN launch URL was built into the persisted delivery
+        # Assert — per-order CFN template was uploaded + referenced by the deep link
         assert final.ems_delivery is not None
         launch_url = final.ems_delivery.launch_url
         assert launch_url is not None
         assert "console.aws.amazon.com" in launch_url
+        assert f"orders%2F{order_id}%2Fems-stack.yaml" in launch_url, launch_url
         assert final.ems_delivery.path.value == "cfn_standard"
+
+        # Assert — per-order yaml at that URL has DTM URL baked into Outputs
+        yaml_resp = httpx.get(f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml")
+        assert yaml_resp.status_code == 200, yaml_resp.text
+        yaml_body = yaml_resp.text
+        assert "AWSTemplateFormatVersion" in yaml_body
+        assert "DeploymentMarker" in yaml_body
+        assert "dtm.json" in yaml_body, yaml_body
 
         # Assert — SES email captured + body points at the portal URL
         sent = httpx.get(f"{ls.url}/_aws/ses").json()
