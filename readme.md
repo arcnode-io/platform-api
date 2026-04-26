@@ -78,10 +78,14 @@ end
 
 ems_hmi_cicd -> platform_s3 : put apk
 
-orchestrator -> edp_api : POST /generate { cfg_id, sizing_params }
-edp_api --> orchestrator : { asset_urls[] }
+orchestrator -> edp_api : POST /edp-api/jobs (ConfiguratorPayload)
+edp_api --> orchestrator : 202 { job_id, status_url }
+loop until status == complete
+    orchestrator -> edp_api : GET /edp-api/jobs/{job_id}
+    edp_api --> orchestrator : { status, edp_artifacts[], ems_delivery, flags }
+end
 
-orchestrator -> delivery : create({ asset_urls[], cfn_url, iso_url, apk_url })
+orchestrator -> delivery : create({ edp_artifacts[], ems_delivery, apk_url })
 delivery -> platform_s3 : put manifest.json + index.html
 platform_s3 --> delivery : page_url
 delivery -> ses : send email { page_url }

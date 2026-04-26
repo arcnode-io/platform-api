@@ -1,25 +1,22 @@
-from src import config
+"""Uvicorn entry point. Loads config, sets up logging, mounts the app."""
+
 import logging
+
 import uvicorn
 
-from src.app_module import AppWithDatabaseModule
+from src import config
+from src.app_module import AppModule
 
-app_module = AppWithDatabaseModule()
+app_module = AppModule()
 app = app_module.create_app()
+app_module.register_database(app)
 
 
 def main() -> None:
-    """Execute the main entry point of the application.
-
-    Load configuration, set up logging, and run the FastAPI app.
-
-    Example:
-        >>> main()  # Loads config and runs FastAPI server
-
-    """
+    """Boot the platform-api uvicorn server."""
     cfg = config.load_config()
     config.setup_logger(cfg)
-    logging.info(f"Running with: Config( {cfg} )")
+    logging.info("Running with: Config( %s )", cfg)
     uvicorn.run(
         "src.main:app",
         host=str(cfg.host),
