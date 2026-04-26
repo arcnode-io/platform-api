@@ -185,10 +185,12 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert bom_url in html
         assert "Download CFN template" in html
         assert template_url in html
-        # Prereqs section names all three managed-service signups
-        assert "neon.tech" in html
-        assert "neo4j.com/cloud/aura" in html
-        assert "timescale.com/cloud" in html
+        # Prereqs checklist links to all three vendor docs (per PM contract)
+        assert "neon.tech/docs" in html
+        assert "neo4j.com/docs/aura" in html
+        assert "docs.timescale.com" in html
+        assert "[setup guide]" in html
+        assert "&#9744;" in html  # □ checkbox char
         # Per PM contract: prereqs must appear *before* the download link
         prereqs_pos = html.find("Prerequisites")
         download_pos = html.find("Download CFN template")

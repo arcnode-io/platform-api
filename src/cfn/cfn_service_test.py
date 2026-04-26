@@ -121,8 +121,8 @@ def test_render_template_requires_three_persistence_connection_strings() -> None
 
     # Assert — each parameter named + sensitive-marked + non-empty constraint
     assert "NeonConnectionString:" in rendered
-    assert "Neo4jConnectionString:" in rendered
-    assert "TimescaleConnectionString:" in rendered
+    assert "AuraConnectionString:" in rendered
+    assert "TimeseriesConnectionString:" in rendered
     assert rendered.count("NoEcho: true") == 3
     assert rendered.count("MinLength: 1") == 3
     # No `Default:` lines anywhere = stack creation fails without all three
@@ -137,8 +137,8 @@ def test_render_template_userdata_substitutes_connection_strings_via_sub() -> No
     # Assert — CFN does the substitution server-side
     assert "Fn::Sub" in rendered
     assert "${NeonConnectionString}" in rendered
-    assert "${Neo4jConnectionString}" in rendered
-    assert "${TimescaleConnectionString}" in rendered
+    assert "${AuraConnectionString}" in rendered
+    assert "${TimeseriesConnectionString}" in rendered
 
 
 def test_render_template_each_ems_service_gets_all_three_db_envs() -> None:
@@ -149,5 +149,5 @@ def test_render_template_each_ems_service_gets_all_three_db_envs() -> None:
 
     # Assert — once per service for each env var key
     assert rendered.count("NEON_DATABASE_URL:") == n
-    assert rendered.count("NEO4J_URI:") == n
-    assert rendered.count("TIMESCALE_DATABASE_URL:") == n
+    assert rendered.count("AURA_URI:") == n
+    assert rendered.count("TIMESERIES_URL:") == n

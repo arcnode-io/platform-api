@@ -9,24 +9,13 @@ from typing import Final
 from src.edp_client.edp_artifacts import EdpArtifact
 from src.orders.orders_record import OrderEmsDelivery
 
-# Three managed-service signups the operator must complete before launching
-# the CFN stack — paste each connection string into the matching CFN param.
-PREREQ_SIGNUPS: Final[tuple[tuple[str, str, str], ...]] = (
-    (
-        "Neon",
-        "https://neon.tech",
-        "Postgres for relational config + pgvector store (one URL, both DBs)",
-    ),
-    (
-        "Neo4j Aura",
-        "https://neo4j.com/cloud/aura/",
-        "Managed graph database for the chatbot",
-    ),
-    (
-        "Timescale Cloud",
-        "https://www.timescale.com/cloud",
-        "Time-series telemetry store",
-    ),
+# Three managed-service connection strings the operator must collect before
+# launching the CFN stack — links go to vendor docs (setup guides), not to
+# signup pages, so customers find their own onboarding path.
+PREREQ_DOCS: Final[tuple[tuple[str, str], ...]] = (
+    ("Neon connection string", "https://neon.tech/docs"),
+    ("Neo4j Aura connection string", "https://neo4j.com/docs/aura/"),
+    ("TimescaleDB connection string", "https://docs.timescale.com/"),
 )
 
 
@@ -85,23 +74,21 @@ class PortalService:
 
     @staticmethod
     def _render_prereqs() -> str:
-        """Three managed-service signups required *before* launching the CFN stack."""
+        """Checklist of three connection strings the operator collects up front.
+
+        Per PM contract: links go to vendor *docs* (setup guides), not signup
+        pages — operators find their own onboarding path.
+        """
         items = "\n".join(
-            f"  <li><strong>{html.escape(name)}</strong> — "
-            f'<a href="{html.escape(url, quote=True)}">sign up</a> — '
-            f"{html.escape(desc)}.</li>"
-            for name, url, desc in PREREQ_SIGNUPS
+            f"  <li>&#9744; {html.escape(name)} "
+            f'&nbsp;&nbsp;<a href="{html.escape(url, quote=True)}">[setup guide]</a></li>'
+            for name, url in PREREQ_DOCS
         )
         return (
-            "<h2>Prerequisites — sign up before launching</h2>\n"
-            "<p>The CFN stack requires three managed-service connection strings as "
-            "<strong>required parameters with no defaults</strong>. CloudFormation "
-            "will refuse to deploy if any are missing.</p>\n"
-            f"<ol>\n{items}\n</ol>\n"
-            "<p>Paste each connection string into the matching CFN parameter "
-            "(<code>NeonConnectionString</code>, <code>Neo4jConnectionString</code>, "
-            "<code>TimescaleConnectionString</code>) when running "
-            "<code>aws cloudformation create-stack</code> or via Console.</p>"
+            "<h2>Prerequisites</h2>\n"
+            "<p>Before deploying this stack:</p>\n"
+            f"<ul>\n{items}\n</ul>\n"
+            "<p>The stack will hard fail on deploy without these.</p>"
         )
 
     @staticmethod

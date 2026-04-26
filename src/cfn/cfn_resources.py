@@ -25,12 +25,12 @@ PERSISTENCE_PARAMETERS: Final[tuple[tuple[str, str], ...]] = (
         "relational config and the pgvector vector store.",
     ),
     (
-        "Neo4jConnectionString",
+        "AuraConnectionString",
         "Neo4j Aura URI (neo4j+s://...). Used by the chatbot.",
     ),
     (
-        "TimescaleConnectionString",
-        "TimescaleDB URL (postgres://...). Time-series telemetry store.",
+        "TimeseriesConnectionString",
+        "Time-series store URL (postgres://...). Telemetry persistence.",
     ),
 )
 
@@ -193,8 +193,8 @@ def _compose_block(*, svc: str, deployment_uuid: str, ems_mode: str) -> str:
         f"      ARCNODE_DEPLOYMENT_UUID: '{deployment_uuid}'\n"
         f"      ARCNODE_EMS_MODE: '{ems_mode}'\n"
         f"      NEON_DATABASE_URL: '${{NeonConnectionString}}'\n"
-        f"      NEO4J_URI: '${{Neo4jConnectionString}}'\n"
-        f"      TIMESCALE_DATABASE_URL: '${{TimescaleConnectionString}}'\n"
+        f"      AURA_URI: '${{AuraConnectionString}}'\n"
+        f"      TIMESERIES_URL: '${{TimeseriesConnectionString}}'\n"
         f"    volumes:\n"
         f"      - /opt/arcnode/dtm.json:/etc/arcnode/dtm.json:ro\n"
     )
