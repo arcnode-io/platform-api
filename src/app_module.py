@@ -33,7 +33,9 @@ class AppModule:
             ses_sender_email=self.config.ses_sender_email,
         )
         self.orchestrator_module = OrchestratorModule(
-            edp=self.edp_client_module, aws=self.aws_module
+            edp=self.edp_client_module,
+            aws=self.aws_module,
+            ems_hmi_apk_url=self.config.ems_hmi_apk_url,
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self._db_lifespan_enabled = False
@@ -66,7 +68,7 @@ class AppModule:
         password = os.environ["POSTGRES_PASSWORD"]
         db_url = (
             f"postgres://postgres:{password}"
-            f"@{self.config.postgres_host.value}:{self.config.postgres_port}/postgres"
+            f"@{self.config.postgres_host}:{self.config.postgres_port}/postgres"
         )
 
         @asynccontextmanager

@@ -10,26 +10,23 @@ from typing import Final
 
 import aioboto3
 import httpx
-from pydantic import BaseModel
 
 DEFAULT_REGION: Final[str] = "us-east-1"
-
-
-class S3ServiceConfig(BaseModel):
-    """Just the bits the S3 client needs."""
-
-    endpoint_url: str | None
-    bucket: str
-    region: str = DEFAULT_REGION
 
 
 class S3Service:
     """aioboto3 S3 client — fetches edp-api artifacts and re-archives to our bucket."""
 
-    def __init__(self, *, config: S3ServiceConfig) -> None:
-        self._endpoint_url = config.endpoint_url
-        self._bucket = config.bucket
-        self._region = config.region
+    def __init__(
+        self,
+        *,
+        endpoint_url: str | None,
+        bucket: str,
+        region: str = DEFAULT_REGION,
+    ) -> None:
+        self._endpoint_url = endpoint_url
+        self._bucket = bucket
+        self._region = region
         self._session = aioboto3.Session()
 
     async def ensure_bucket(self) -> None:
@@ -59,9 +56,8 @@ class S3Service:
         return url
 
     def _client(self):  # noqa: ANN202 — async context manager type is ugly to spell
-        # Reason: LocalStack ignores credentials but boto3 still requires non-empty
-        # values; in prod we pass nothing so the standard credential chain (IAM role,
-        # env vars, ~/.aws/credentials) takes over.
+        # LocalStack ignores credentials but boto3 still requires non-empty values;
+        # in prod we pass nothing so the standard credential chain takes over.
         kwargs: dict[str, object] = {
             "endpoint_url": self._endpoint_url,
             "region_name": self._region,
@@ -72,16 +68,7 @@ class S3Service:
         return self._session.client("s3", **kwargs)
 
     def _public_url(self, key: str) -> str:
-        """Build the public S3 URL for the bucket+key.
-
-        Production uses the real S3 path-style URL; tests use the LocalStack endpoint
-        with the bucket as the path prefix (so the URL is reachable from the host).
-        """
-        base = (
-            self._endpoint_url
-            or f"https://{self._bucket}.s3.{self._region}.amazonaws.com"
-        )
+        """Path-style URL for LocalStack; virtual-host style for real S3."""
         if self._endpoint_url:
-            # LocalStack path-style: http://localhost:4566/<bucket>/<key>
-            return f"{base.rstrip('/')}/{self._bucket}/{key}"
-        return f"{base}/{key}"
+            return f"{self._endpoint_url.rstrip('/')}/{self._bucket}/{key}"
+        return f"https://{self._bucket}.s3.{self._region}.amazonaws.com/{key}"

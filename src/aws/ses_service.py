@@ -9,26 +9,23 @@ import logging
 from typing import Final
 
 import aioboto3
-from pydantic import BaseModel
 
 DEFAULT_REGION: Final[str] = "us-east-1"
-
-
-class SesServiceConfig(BaseModel):
-    """Just the bits the SES client needs."""
-
-    endpoint_url: str | None
-    sender_email: str
-    region: str = DEFAULT_REGION
 
 
 class SesService:
     """aioboto3 SES client — sends the operator delivery email."""
 
-    def __init__(self, *, config: SesServiceConfig) -> None:
-        self._endpoint_url = config.endpoint_url
-        self._sender = config.sender_email
-        self._region = config.region
+    def __init__(
+        self,
+        *,
+        endpoint_url: str | None,
+        sender_email: str,
+        region: str = DEFAULT_REGION,
+    ) -> None:
+        self._endpoint_url = endpoint_url
+        self._sender = sender_email
+        self._region = region
         self._session = aioboto3.Session()
 
     async def verify_sender(self) -> None:
@@ -58,7 +55,7 @@ class SesService:
         return message_id
 
     def _client(self):  # noqa: ANN202
-        # Reason: same as S3Service — pass test creds to LocalStack only.
+        # Same as S3Service — pass test creds to LocalStack only.
         kwargs: dict[str, object] = {
             "endpoint_url": self._endpoint_url,
             "region_name": self._region,

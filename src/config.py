@@ -17,20 +17,13 @@ class LogLevel(enum.StrEnum):
     DEBUG = "DEBUG"
 
 
-class PostgresHost(enum.StrEnum):
-    """PostgreSQL host options."""
-
-    LOCALHOST = "localhost"
-    POSTGRES = "postgres"
-
-
 class Config(BaseModel):  # noqa: D101
     log_level: LogLevel
     port: int
     host: IPv4Address
     e2e: bool
     reload: bool
-    postgres_host: PostgresHost
+    postgres_host: str  # "localhost" for dev/test, "postgres" for the docker-compose svc
     postgres_port: int = 5432
     edp_api_url: str
     s3_endpoint_url: (
@@ -39,6 +32,7 @@ class Config(BaseModel):  # noqa: D101
     s3_bucket: str
     ses_endpoint_url: str | None
     ses_sender_email: str
+    ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
 
 
 class _ConfigMap(BaseModel):

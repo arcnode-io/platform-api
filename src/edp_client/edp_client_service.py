@@ -9,7 +9,6 @@ import logging
 from typing import Final
 
 import httpx
-from pydantic import BaseModel
 
 from src.edp_client.edp_artifacts import (
     EdpGetJobResponse,
@@ -26,17 +25,11 @@ class EdpJobFailedError(Exception):
     """Raised when edp-api returns status=failed (system-level error in the EDP pipeline)."""
 
 
-class EdpClientConfig(BaseModel):
-    """Just the URL — wider config sliced down for the client."""
-
-    base_url: str
-
-
 class EdpClientService:
     """Async client for edp-api. Stateless aside from the base URL."""
 
-    def __init__(self, *, config: EdpClientConfig) -> None:
-        self._base_url = config.base_url
+    def __init__(self, *, base_url: str) -> None:
+        self._base_url = base_url
 
     async def submit_and_wait(self, payload: ConfiguratorPayload) -> EdpGetJobResponse:
         """POST a job, poll until terminal state, return the final response."""

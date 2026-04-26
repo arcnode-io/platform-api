@@ -27,19 +27,19 @@ class GetOrderResponse(BaseModel):
     ems_delivery: Optional[EdpEmsDelivery] = None
     flags: list[dict[str, object]] = []
 
-
-def order_to_response(order: Order) -> GetOrderResponse:
-    """Project a Tortoise `Order` row onto the public GET-response schema."""
-    return GetOrderResponse(
-        order_id=str(order.id),
-        status=order.status,
-        submitted_at=order.submitted_at.isoformat(),
-        completed_at=order.completed_at.isoformat() if order.completed_at else None,
-        edp_artifacts=[EdpArtifact.model_validate(a) for a in order.edp_artifacts],
-        ems_delivery=(
-            EdpEmsDelivery.model_validate(order.ems_delivery)
-            if order.ems_delivery
-            else None
-        ),
-        flags=order.flags,
-    )
+    @classmethod
+    def from_order(cls, order: Order) -> "GetOrderResponse":
+        """Project a Tortoise `Order` row onto the public GET-response schema."""
+        return cls(
+            order_id=str(order.id),
+            status=order.status,
+            submitted_at=order.submitted_at.isoformat(),
+            completed_at=order.completed_at.isoformat() if order.completed_at else None,
+            edp_artifacts=[EdpArtifact.model_validate(a) for a in order.edp_artifacts],
+            ems_delivery=(
+                EdpEmsDelivery.model_validate(order.ems_delivery)
+                if order.ems_delivery
+                else None
+            ),
+            flags=order.flags,
+        )

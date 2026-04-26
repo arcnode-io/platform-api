@@ -12,11 +12,7 @@ from datetime import UTC, datetime
 from src.orchestrator.orchestrator_service import OrchestratorService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
-from src.orders.orders_record import (
-    GetOrderResponse,
-    PostOrderResponse,
-    order_to_response,
-)
+from src.orders.orders_record import GetOrderResponse, PostOrderResponse
 
 
 class OrdersService:
@@ -56,4 +52,4 @@ class OrdersService:
     async def get(self, order_id: str) -> GetOrderResponse | None:
         """Read one order by id; None if unknown."""
         order = await Order.get_or_none(id=order_id)
-        return order_to_response(order) if order else None
+        return GetOrderResponse.from_order(order) if order else None

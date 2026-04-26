@@ -13,7 +13,16 @@ from src.orchestrator.orchestrator_service import OrchestratorService
 class OrchestratorModule:
     """Single point of DI for the order orchestrator."""
 
-    def __init__(self, *, edp: EdpClientModule, aws: AwsModule) -> None:
+    def __init__(
+        self,
+        *,
+        edp: EdpClientModule,
+        aws: AwsModule,
+        ems_hmi_apk_url: str,
+    ) -> None:
         self.service = OrchestratorService(
-            edp_client=edp.service, s3=aws.s3, ses=aws.ses
+            edp_client=edp.service,
+            s3=aws.s3,
+            ses=aws.ses,
+            ems_hmi_apk_url=ems_hmi_apk_url,
         )

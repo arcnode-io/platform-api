@@ -24,10 +24,12 @@ class OrchestratorService:
         edp_client: EdpClientService,
         s3: S3Service,
         ses: SesService,
+        ems_hmi_apk_url: str,
     ) -> None:
         self._edp = edp_client
         self._s3 = s3
         self._ses = ses
+        self._ems_hmi_apk_url = ems_hmi_apk_url
 
     async def execute(self, order: Order) -> None:
         """Full pipeline. Caller (OrdersService) schedules this in BackgroundTasks."""
@@ -91,7 +93,7 @@ class OrchestratorService:
         return f"orders/{order_id}/{filename}"
 
     async def _send_delivery_email(self, to: str, archived: list[EdpArtifact]) -> None:
-        """Plain-text body listing the archived artifact URLs."""
+        """Plain-text body listing artifacts + the EMS HMI Android app link."""
         lines = ["Your ARCNODE deployment package is ready.", "", "Artifacts:"]
         for artifact in archived:
             lines.append(f"- {artifact.name}")
@@ -100,6 +102,11 @@ class OrchestratorService:
                     lines.append(f"    {u.format}: {u.url}")
                 elif u.pending:
                     lines.append(f"    {u.format}: (pending {u.pending})")
+        lines.extend([
+            "",
+            "EMS Mobile App (Android):",
+            f"  {self._ems_hmi_apk_url}",
+        ])
         body = "\n".join(lines)
         await self._ses.send_delivery_email(
             to=to, subject="ARCNODE deployment package ready", body_text=body
