@@ -18,7 +18,7 @@ localhost) is out of v1 scope.
 import yaml
 
 from src.cfn.cfn_resources import (
-    AMI_US_EAST_1,
+    AMI_SSM_PARAMETER,
     build_userdata,
     iam_resources,
     network_resources,
@@ -43,7 +43,6 @@ class CfnService:
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": f"ARCNODE EMS deployment — {deployment_uuid}",
             "Parameters": persistence_parameters(),
-            "Mappings": {"RegionAmi": {"us-east-1": {"Ami": AMI_US_EAST_1}}},
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short),
@@ -51,13 +50,7 @@ class CfnService:
                     "Type": "AWS::EC2::Instance",
                     "Properties": {
                         "InstanceType": "t3.medium",
-                        "ImageId": {
-                            "Fn::FindInMap": [
-                                "RegionAmi",
-                                {"Ref": "AWS::Region"},
-                                "Ami",
-                            ]
-                        },
+                        "ImageId": AMI_SSM_PARAMETER,
                         "IamInstanceProfile": {"Ref": "EmsInstanceProfile"},
                         "SubnetId": {"Ref": "EmsSubnet"},
                         "SecurityGroupIds": [{"Ref": "EmsSecurityGroup"}],

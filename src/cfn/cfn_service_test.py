@@ -12,7 +12,6 @@ happens when the operator actually runs the stack — out of scope here.
 
 from cfnlint import api as cfnlint_api
 
-from src.cfn.cfn_resources import EMS_REGISTRY, EMS_SERVICES
 from src.cfn.cfn_service import CfnService
 
 DEPLOYMENT_UUID: str = "abcd1234-5678-90ef-1234-567890abcdef"
@@ -71,8 +70,8 @@ def test_render_template_provisions_instance_role_for_dtm_fetch() -> None:
     assert "s3:GetObject" in rendered
 
 
-def test_render_template_ec2_instance_wires_to_subnet_iam_and_ami_map() -> None:
-    """EmsInstance refs the subnet, IAM profile, security group, and region→AMI map."""
+def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
+    """EmsInstance refs the subnet, IAM profile, security group, and SSM AMI lookup."""
     # Arrange + Act
     rendered = _render()
 
@@ -81,20 +80,28 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ami_map() -> None:
     assert "EmsInstanceProfile" in rendered
     assert "EmsSubnet" in rendered
     assert "EmsSecurityGroup" in rendered
-    assert "RegionAmi" in rendered  # Mappings entry the EC2 looks up
+    # SSM resolve syntax — CFN looks up the latest AL2023 AMI in --region
+    assert "resolve:ssm:/aws/service/ami-amazon-linux-latest" in rendered
+    # No stale Mappings table
+    assert "Mappings:" not in rendered
 
 
-def test_render_template_userdata_pulls_each_ems_service_image() -> None:
-    """UserData boots docker-compose pulling each EMS core service from GitLab CR."""
+def test_render_template_userdata_drops_marker_files() -> None:
+    """Pre-launch UserData touches /opt/arcnode/ marker files (no docker yet)."""
     # Arrange + Act
     rendered = _render()
 
-    # Assert — each EMS service image is referenced
-    for svc in EMS_SERVICES:
-        assert f"{EMS_REGISTRY}/{svc}:latest" in rendered, svc
+    # Assert — bash shell + dummy-file scaffolding
     assert "#!/bin/bash" in rendered
-    assert "docker compose up -d" in rendered
+    assert "/opt/arcnode/deployment.env" in rendered
+    assert "/opt/arcnode/userdata.done" in rendered
+    assert "/opt/arcnode/neon.url" in rendered
+    assert "/opt/arcnode/aura.url" in rendered
+    assert "/opt/arcnode/timeseries.url" in rendered
     assert DTM_URL in rendered  # curl line bakes the DTM URL in directly
+    # No docker bits — those land when registry images are published
+    assert "docker compose" not in rendered
+    assert "registry.gitlab.com" not in rendered
 
 
 def test_render_template_outputs_echo_per_order_inputs() -> None:
@@ -141,13 +148,12 @@ def test_render_template_userdata_substitutes_connection_strings_via_sub() -> No
     assert "${TimeseriesConnectionString}" in rendered
 
 
-def test_render_template_each_ems_service_gets_all_three_db_envs() -> None:
-    """All 3 EMS services receive all 3 connection strings as env vars."""
+def test_render_template_writes_each_connection_string_to_disk() -> None:
+    """Each of the 3 connection strings lands in its own marker file via Fn::Sub."""
     # Arrange + Act
     rendered = _render()
-    n = len(EMS_SERVICES)
 
-    # Assert — once per service for each env var key
-    assert rendered.count("NEON_DATABASE_URL:") == n
-    assert rendered.count("AURA_URI:") == n
-    assert rendered.count("TIMESERIES_URL:") == n
+    # Assert — one redirect per connection string
+    assert '"${NeonConnectionString}" > /opt/arcnode/neon.url' in rendered
+    assert '"${AuraConnectionString}" > /opt/arcnode/aura.url' in rendered
+    assert '"${TimeseriesConnectionString}" > /opt/arcnode/timeseries.url' in rendered

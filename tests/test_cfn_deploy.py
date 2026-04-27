@@ -29,7 +29,7 @@ TIMESERIES_URL: str = "postgres://user:pass@timescale.example/telemetry"
 
 def test_cfn_template_deploys_cleanly_against_localstack() -> None:
     """create-stack → CREATE_COMPLETE → outputs match → delete-stack."""
-    with start_localstack(services=("cloudformation", "ec2", "iam")) as ls:
+    with start_localstack(services=("cloudformation", "ec2", "iam", "ssm")) as ls:
         cfn = boto3.client(
             "cloudformation",
             endpoint_url=ls.url,
@@ -81,7 +81,7 @@ def test_cfn_template_deploys_cleanly_against_localstack() -> None:
 
 def test_cfn_create_fails_when_required_params_missing() -> None:
     """No defaults → CFN refuses to deploy if any of the 3 connection strings are absent."""
-    with start_localstack(services=("cloudformation", "ec2", "iam")) as ls:
+    with start_localstack(services=("cloudformation", "ec2", "iam", "ssm")) as ls:
         cfn = boto3.client(
             "cloudformation",
             endpoint_url=ls.url,
