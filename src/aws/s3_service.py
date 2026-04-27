@@ -63,27 +63,17 @@ class S3Service:
         """Upload a YAML body under `key`, return the S3 URL."""
         return await self._upload_text(key, body, "application/yaml")
 
-    def generate_presigned_url(
+    async def generate_presigned_url(
         self, key: str, expiration_seconds: int = 86400
     ) -> str:
         """Generate a presigned GET URL for `key`. Valid for `expiration_seconds` (default: 24h)."""
-        # Create a synchronous client for presigned URL generation (boto3 limitation).
-        import boto3
-
-        kwargs: dict[str, object] = {
-            "endpoint_url": self._endpoint_url,
-            "region_name": self._region,
-        }
-        if self._endpoint_url is not None:
-            kwargs["aws_access_key_id"] = "test"  # nosec B105 — LocalStack
-            kwargs["aws_secret_access_key"] = "test"  # noqa: S105  # nosec B105
-        client = boto3.client("s3", **kwargs)  # type: ignore[var-annotated]
-        url = client.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": self._bucket, "Key": key},
-            ExpiresIn=expiration_seconds,
-        )
-        logging.info("generated presigned URL for %s (expires in %ds)", key, expiration_seconds)
+        async with self._client() as s3:
+            url: str = await s3.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self._bucket, "Key": key},
+                ExpiresIn=expiration_seconds,
+            )
+        logging.info("presigned %s (expires in %ds)", key, expiration_seconds)
         return url
 
     async def _upload_text(self, key: str, body: str, content_type: str) -> str:

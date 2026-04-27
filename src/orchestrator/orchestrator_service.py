@@ -131,7 +131,7 @@ class OrchestratorService:
             )
         self._find_dtm_url(archived)  # Validate it exists
         dtm_key = f"orders/{order_id}/dtm.json"
-        dtm_presigned_url = self._s3.generate_presigned_url(dtm_key)
+        dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
         template = self._cfn.render_template(
             deployment_uuid=edp.deployment_uuid,
             dtm_url=dtm_presigned_url,
