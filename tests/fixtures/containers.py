@@ -88,17 +88,18 @@ def start_postgres(
 @contextmanager
 def start_localstack(
     image: str = "localstack/localstack:3.7",
+    services: tuple[str, ...] = ("s3", "ses"),
 ) -> Generator[Container]:
-    """Start LocalStack with ONLY S3 + SES. Yields the dynamic edge URL.
+    """Start LocalStack with the given services. Yields the dynamic edge URL.
 
-    `with_services` sets `SERVICES=s3,ses` (the documented LocalStack env var) so
-    we don't init Lambda/SNS/etc. Combined with the default `EAGER_SERVICE_LOADING=0`,
-    even s3 + ses only spin up on first use — fastest possible startup.
+    `with_services` sets `SERVICES=...` (the documented LocalStack env var) so
+    only listed services init. Combined with the default `EAGER_SERVICE_LOADING=0`,
+    services only spin up on first use — fastest possible startup.
 
     Pinned to `:3.7` — the last image tag where SES is freely available without a
     Pro license. `:latest` started gating SES behind LocalStack Pro mid-2024.
     """
-    container = LocalStackContainer(image=image).with_services("s3", "ses")
+    container = LocalStackContainer(image=image).with_services(*services)
     with container as ls:
         url = ls.get_url()
         port = int(url.rsplit(":", 1)[-1])
