@@ -10,7 +10,8 @@ local:
   s3_bucket: 'platform-api-artifacts'
   ses_endpoint_url: 'http://localhost:4566'
   ses_sender_email: 'noreply@arcnode.io'
-  ems_hmi_apk_url: 'https://f-droid.org/packages/io.arcnode.ems-hmi/'
+  # CI overwrites latest.apk at this fixed key on each ems-hmi release.
+  ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
 
 beta:
   log_level: INFO
@@ -24,4 +25,5 @@ beta:
   s3_bucket: 'arcnode-platform-artifacts'
   ses_endpoint_url: null
   ses_sender_email: 'noreply@arcnode.io'
-  ems_hmi_apk_url: 'https://f-droid.org/packages/io.arcnode.ems-hmi/'
+  # CI overwrites latest.apk at this fixed key on each ems-hmi release.
+  ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
