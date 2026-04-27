@@ -120,7 +120,8 @@ class OrchestratorService:
 
         ISO path: skip CFN bits entirely (air-gapped delivery is a future build).
         CFN paths (standard + govcloud): same yaml — operator downloads and runs
-        from their own partition.
+        from their own partition. DTM is fetched via presigned URL so the operator's
+        instance doesn't need AWS credentials.
         """
         assert edp.ems_delivery is not None, "edp-api must emit ems_delivery"
         if edp.ems_delivery.path == EdpDeliveryPath.ISO:
@@ -128,10 +129,12 @@ class OrchestratorService:
                 path=edp.ems_delivery.path,
                 ems_mode=edp.ems_delivery.ems_mode,
             )
-        dtm_url = self._find_dtm_url(archived)
+        self._find_dtm_url(archived)  # Validate it exists
+        dtm_key = f"orders/{order_id}/dtm.json"
+        dtm_presigned_url = self._s3.generate_presigned_url(dtm_key)
         template = self._cfn.render_template(
             deployment_uuid=edp.deployment_uuid,
-            dtm_url=dtm_url,
+            dtm_url=dtm_presigned_url,
             ems_mode=edp.ems_delivery.ems_mode,
         )
         template_url = await self._s3.upload_yaml(
