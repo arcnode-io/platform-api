@@ -35,6 +35,7 @@ class Config(BaseModel):  # noqa: D101
     ses_endpoint_url: str | None
     ses_sender_email: str
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
+    cors_origins: list[str]  # Allowed origins for browser fetches (e.g. arcnode.io)
 
 
 class _ConfigMap(BaseModel):

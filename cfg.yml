@@ -12,6 +12,8 @@ local:
   ses_sender_email: 'noreply@arcnode.io'
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
+  cors_origins:
+    - '*'  # local dev — any origin
 
 beta:
   log_level: INFO
@@ -27,3 +29,6 @@ beta:
   ses_sender_email: 'noreply@arcnode.io'
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
+  cors_origins:
+    - 'https://arcnode.io'
+    - 'https://www.arcnode.io'

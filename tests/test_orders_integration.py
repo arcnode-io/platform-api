@@ -103,6 +103,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             ses_endpoint_url=ls.url,
             ses_sender_email=SENDER_EMAIL,
             ems_hmi_apk_url=APK_URL,
+            cors_origins=["*"],
         )
         module = AppModule(config=cfg)
         module.register_database()

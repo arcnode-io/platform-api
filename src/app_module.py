@@ -10,6 +10,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import RegisterTortoise
 
 from src.app_controller import AppController
@@ -65,6 +66,13 @@ class AppModule:
             title="platform-api",
             description="Order intake + delivery orchestration",
             lifespan=lifespan,
+        )
+        # arcnode.io's static configurator hits /platform-api/orders cross-origin.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=self.config.cors_origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type"],
         )
         self.import_module(app)
         return app
