@@ -35,8 +35,17 @@ class GpuVariant(StrEnum):
     B200 = "b200"
 
 
+class BessCoupling(StrEnum):
+    """External BESS coupling at the grid container boundary."""
+
+    AC_COUPLED = "ac_coupled"
+    DC_INTEGRATED_PCS = "dc_integrated_pcs"
+    DC_EXTERNAL_PCS = "dc_external_pcs"
+    NONE = "none"
+
+
 class GridConnection(StrEnum):
-    """Grid coupling. `none` = no PCS, BESS-only deployment."""
+    """Grid coupling. `none` = no utility tie (off-grid; grid container still present)."""
 
     NONE = "none"
     GRID_TIED = "grid_tied"
@@ -46,9 +55,9 @@ class GridConnection(StrEnum):
 class ClimateZone(StrEnum):
     """Site climate zone; selects coolant glycol concentration + dry-cooler ambient."""
 
+    SUBARCTIC = "subarctic"
     TEMPERATE = "temperate"
-    DESERT = "desert"
-    ARCTIC = "arctic"
+    ARID_HOT = "arid_hot"
     TROPICAL = "tropical"
 
 
@@ -59,13 +68,6 @@ class DeploymentContext(StrEnum):
     RESEARCH = "research"
     SOVEREIGN_GOVERNMENT = "sovereign_government"
     DEFENSE_FORWARD = "defense_forward"
-
-
-class EmsMode(StrEnum):
-    """EMS runtime mode. `sim` uses fixtures; `live` requires real protocol connections."""
-
-    SIM = "sim"
-    LIVE = "live"
 
 
 class AwsPartition(StrEnum):
@@ -87,9 +89,9 @@ class ConfiguratorPayload(BaseModel):
     primary_workload: PrimaryWorkload
     gpu_variant: GpuVariant
     target_gpu_count: int = Field(gt=0)
-    bess_autonomy_hr: float = Field(gt=0)
+    bess_coupling: BessCoupling
+    bess_capacity_mwh: float = Field(ge=0)
     grid_connection: GridConnection
     climate_zone: ClimateZone
     deployment_context: DeploymentContext
-    ems_mode: EmsMode
     aws_partition: AwsPartition

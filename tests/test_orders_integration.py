@@ -45,11 +45,11 @@ VALID_PAYLOAD: dict[str, object] = {
     "primary_workload": "ai_training",
     "gpu_variant": "h100_sxm",
     "target_gpu_count": 64,
-    "bess_autonomy_hr": 2.0,
+    "bess_coupling": "ac_coupled",
+    "bess_capacity_mwh": 10.0,
     "grid_connection": "grid_tied",
     "climate_zone": "temperate",
     "deployment_context": "commercial",
-    "ems_mode": "sim",
     "aws_partition": "standard",
 }
 

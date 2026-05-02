@@ -21,11 +21,11 @@ JS_PAYLOAD: dict[str, object] = {
     "primary_workload": "ai_training",
     "gpu_variant": "h100_sxm",
     "target_gpu_count": 512,
-    "bess_autonomy_hr": 4.0,
+    "bess_coupling": "ac_coupled",
+    "bess_capacity_mwh": 20.0,
     "grid_connection": "grid_tied",
     "climate_zone": "temperate",
     "deployment_context": "commercial",
-    "ems_mode": "sim",
     "aws_partition": "standard",
 }
 
@@ -39,10 +39,10 @@ def test_configurator_js_payload_validates_against_pydantic_schema() -> None:
     assert payload.energy_source.value == "nuclear"
     assert payload.primary_workload.value == "ai_training"
     assert payload.gpu_variant.value == "h100_sxm"
+    assert payload.bess_coupling.value == "ac_coupled"
     assert payload.grid_connection.value == "grid_tied"
     assert payload.climate_zone.value == "temperate"
     assert payload.deployment_context.value == "commercial"
-    assert payload.ems_mode.value == "sim"
     assert payload.aws_partition.value == "standard"
 
 
@@ -59,15 +59,20 @@ def test_configurator_js_payload_covers_every_select_enum_value() -> None:
         "energy_source": {"nuclear", "solar", "grid_hybrid", "off_grid"},
         "primary_workload": {"ai_training", "ai_inference", "mixed"},
         "gpu_variant": {"h100_sxm", "b200"},
+        "bess_coupling": {
+            "ac_coupled",
+            "dc_integrated_pcs",
+            "dc_external_pcs",
+            "none",
+        },
         "grid_connection": {"none", "grid_tied", "grid_backup"},
-        "climate_zone": {"temperate", "desert", "arctic", "tropical"},
+        "climate_zone": {"subarctic", "temperate", "arid_hot", "tropical"},
         "deployment_context": {
             "commercial",
             "research",
             "sovereign_government",
             "defense_forward",
         },
-        "ems_mode": {"sim", "live"},
         "aws_partition": {"standard", "govcloud", "none"},
     }
 
