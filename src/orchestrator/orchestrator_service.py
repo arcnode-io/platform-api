@@ -15,27 +15,29 @@ from src.aws.s3_service import S3Service
 from src.aws.ses_service import SesService
 from src.cfn.cfn_service import CfnService
 from src.edp_client.edp_artifacts import (
-    EdpArtifact,
-    EdpArtifactUrl,
-    EdpDeliveryPath,
-    EdpGetJobResponse,
+    ArtifactKind,
+    ArtifactRef,
+    JobResult,
 )
 from src.edp_client.edp_client_service import EdpClientService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
-from src.orders.orders_record import OrderEmsDelivery
+from src.orders.orders_record import (
+    DeliveryPath,
+    OrderEmsDelivery,
+    derive_delivery_path,
+)
 from src.portal.portal_service import PortalService
-
-DTM_ARTIFACT_NAME: str = "Device Topology Manifest"
 
 
 @dataclass(frozen=True)
 class _PipelineResult:
     """Output of `_run_pipeline` — what `_mark_complete` needs to persist."""
 
-    edp: EdpGetJobResponse
-    archived: list[EdpArtifact]
+    edp: JobResult
+    archived: list[ArtifactRef]
     delivery: OrderEmsDelivery
+    deployment_uuid: str
 
 
 class OrchestratorService:
@@ -75,12 +77,17 @@ class OrchestratorService:
         """Setup → submit → archive → publish portal → notify."""
         await self._setup_aws()
         payload = ConfiguratorPayload.model_validate(order.payload)
-        edp = await self._edp.submit_and_wait(payload)
+        edp = await self._edp.submit_and_wait(payload, deployment_id=order.id)
         archived = await self._archive(str(order.id), edp)
-        delivery = await self._build_delivery(str(order.id), edp, archived)
+        delivery = await self._build_delivery(str(order.id), payload, archived)
         portal_url = await self._publish_portal(str(order.id), archived, delivery)
         await self._notify(payload.contact_email, portal_url)
-        return _PipelineResult(edp=edp, archived=archived, delivery=delivery)
+        return _PipelineResult(
+            edp=edp,
+            archived=archived,
+            delivery=delivery,
+            deployment_uuid=str(order.id),
+        )
 
     async def _setup_aws(self) -> None:
         """Ensure S3 bucket exists + SES sender is verified. Idempotent."""
@@ -88,68 +95,56 @@ class OrchestratorService:
         await self._ses.verify_sender()
 
     async def _archive(
-        self, order_id: str, edp: EdpGetJobResponse
-    ) -> list[EdpArtifact]:
-        """Re-archive every real (non-stub) edp-api artifact into platform-api S3."""
-        return [
-            EdpArtifact(
-                name=artifact.name,
-                urls=[await self._archive_url(order_id, u) for u in artifact.urls],
-            )
-            for artifact in edp.edp_artifacts
-        ]
+        self, order_id: str, edp: JobResult
+    ) -> list[ArtifactRef]:
+        """Re-archive every edp-api artifact into platform-api S3."""
+        return [await self._archive_ref(order_id, a) for a in edp.edp_artifact_urls]
 
-    async def _archive_url(
-        self, order_id: str, url_entry: EdpArtifactUrl
-    ) -> EdpArtifactUrl:
-        """Stream one URL slot's bytes to S3 — or pass through if it's a stub."""
-        if url_entry.url is None:
-            return url_entry
-        source = self._to_absolute_url(url_entry.url)
-        key = f"orders/{order_id}/{source.rsplit('/', 1)[-1]}"
+    async def _archive_ref(
+        self, order_id: str, ref: ArtifactRef
+    ) -> ArtifactRef:
+        """Stream one artifact's bytes into platform-api S3, return a new ref."""
+        source = self._to_absolute_url(ref.url)
+        filename = source.rsplit("/", 1)[-1]
+        key = f"orders/{order_id}/{filename}"
         new_url = await self._s3.archive_from_url(source, key=key)
-        return EdpArtifactUrl(format=url_entry.format, url=new_url)
+        return ArtifactRef(
+            kind=ref.kind, format=ref.format, url=new_url, plate_id=ref.plate_id
+        )
 
     async def _build_delivery(
         self,
         order_id: str,
-        edp: EdpGetJobResponse,
-        archived: list[EdpArtifact],
+        payload: ConfiguratorPayload,
+        archived: list[ArtifactRef],
     ) -> OrderEmsDelivery:
-        """Render + upload per-order CFN template; expose its S3 URL for download.
+        """Render + upload per-order CFN template; expose its S3 URL.
 
         ISO path: skip CFN bits entirely (air-gapped delivery is a future build).
-        CFN paths (standard + govcloud): same yaml — operator downloads and runs
-        from their own partition. DTM is fetched via presigned URL so the operator's
-        instance doesn't need AWS credentials.
+        CFN paths: same yaml — operator downloads and runs from their partition.
+        DTM is fetched via presigned URL so the operator's instance doesn't need
+        AWS credentials.
         """
-        assert edp.ems_delivery is not None, "edp-api must emit ems_delivery"
-        if edp.ems_delivery.path == EdpDeliveryPath.ISO:
-            return OrderEmsDelivery(
-                path=edp.ems_delivery.path,
-                ems_mode=edp.ems_delivery.ems_mode,
-            )
-        self._find_dtm_url(archived)  # Validate it exists
+        path = derive_delivery_path(payload.aws_partition)
+        if path == DeliveryPath.ISO:
+            return OrderEmsDelivery(path=path)
+        self._find_dtm_url(archived)  # validate it exists
         dtm_key = f"orders/{order_id}/dtm.json"
         dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
         template = self._cfn.render_template(
-            deployment_uuid=edp.deployment_uuid,
+            deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
-            ems_mode=edp.ems_delivery.ems_mode,
+            ems_mode="sim",   # edp-api always emits SIM; ems-device-api flips post-deploy
         )
         template_url = await self._s3.upload_yaml(
             f"orders/{order_id}/ems-stack.yaml", template
         )
-        return OrderEmsDelivery(
-            path=edp.ems_delivery.path,
-            ems_mode=edp.ems_delivery.ems_mode,
-            template_url=template_url,
-        )
+        return OrderEmsDelivery(path=path, template_url=template_url)
 
     async def _publish_portal(
         self,
         order_id: str,
-        archived: list[EdpArtifact],
+        archived: list[ArtifactRef],
         delivery: OrderEmsDelivery,
     ) -> str:
         """Render index.html and upload to S3; return its public URL."""
@@ -186,32 +181,31 @@ class OrchestratorService:
     async def _mark_complete(order: Order, result: _PipelineResult) -> None:
         order.status = OrderStatus.COMPLETE
         order.completed_at = datetime.now(UTC)
-        order.edp_job_id = result.edp.job_id
-        order.deployment_uuid = result.edp.deployment_uuid
-        order.edp_artifacts = [a.model_dump() for a in result.archived]
-        order.ems_delivery = result.delivery.model_dump()
-        order.flags = list(result.edp.flags)
+        order.deployment_uuid = result.deployment_uuid
+        order.edp_artifacts = [a.model_dump(mode="json") for a in result.archived]
+        order.ems_delivery = result.delivery.model_dump(mode="json")
         await order.save()
         logging.info(
             "order %s -> complete (deployment=%s)",
             order.id,
-            result.edp.deployment_uuid,
+            result.deployment_uuid,
         )
 
     # Helpers
 
     def _to_absolute_url(self, url: str) -> str:
-        """edp-api emits relative URLs; expand against the configured base URL."""
-        if url.startswith(("http://", "https://")):
+        """edp-api emits absolute s3:// or https:// URLs; pass through.
+
+        Kept as a hook for the case where edp-api emits relative paths in tests.
+        """
+        if url.startswith(("http://", "https://", "s3://")):
             return url
         return f"{self._edp._base_url.rstrip('/')}{url}"
 
     @staticmethod
-    def _find_dtm_url(archived: list[EdpArtifact]) -> str:
+    def _find_dtm_url(archived: list[ArtifactRef]) -> str:
         """Locate the DTM's archived URL — required for the CFN launch link."""
         for a in archived:
-            if a.name == DTM_ARTIFACT_NAME:
-                for u in a.urls:
-                    if u.url:
-                        return u.url
-        raise ValueError(f"{DTM_ARTIFACT_NAME} url missing in archived artifacts")
+            if a.kind == ArtifactKind.DTM:
+                return a.url
+        raise ValueError("DTM url missing in archived artifacts")

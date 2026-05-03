@@ -1,24 +1,49 @@
 """Pydantic DTOs for the Orders HTTP layer."""
 
+from enum import StrEnum
 from typing import Optional
 
 from pydantic import BaseModel
 
-from src.edp_client.edp_artifacts import EdpArtifact, EdpDeliveryPath
+from src.edp_client.edp_artifacts import ArtifactRef
+from src.orders.configurator_payload import AwsPartition
 from src.orders.order_entity import Order, OrderStatus
 
 
-class OrderEmsDelivery(BaseModel):
-    """Platform-api's enriched delivery shape.
+class DeliveryPath(StrEnum):
+    """Platform-api routing decision — derived from `aws_partition`."""
 
-    edp-api emits the routing decision (`path` + `ems_mode`); platform-api
-    renders a per-order CFN template and exposes its S3 URL as `template_url`.
-    Operators download + run it from any partition. ISO path leaves
-    `template_url=None` until the v1 ISO build lands.
+    CFN_STANDARD = "cfn_standard"
+    CFN_GOVCLOUD = "cfn_govcloud"
+    ISO = "iso"
+
+
+# Reason: edp-api no longer emits routing — platform-api derives it from the
+# customer's AWS partition choice. ISO path covers air-gapped (no AWS).
+_PARTITION_TO_PATH: dict[AwsPartition, DeliveryPath] = {
+    AwsPartition.STANDARD: DeliveryPath.CFN_STANDARD,
+    AwsPartition.GOVCLOUD: DeliveryPath.CFN_GOVCLOUD,
+    AwsPartition.NONE:     DeliveryPath.ISO,
+}
+
+
+def derive_delivery_path(partition: AwsPartition) -> DeliveryPath:
+    """1:1 partition -> path mapping."""
+    return _PARTITION_TO_PATH[partition]
+
+
+class OrderEmsDelivery(BaseModel):
+    """Platform-api's per-order delivery shape.
+
+    Path derived from `aws_partition`. `ems_mode` is always `"sim"` at delivery
+    time — ems-device-api flips to live post-deploy via DTM revision. Platform-api
+    renders a per-order CFN template (CFN paths) and exposes its S3 URL as
+    `template_url`. ISO path leaves `template_url=None` until the v1 ISO build
+    lands.
     """
 
-    path: EdpDeliveryPath
-    ems_mode: str
+    path: DeliveryPath
+    ems_mode: str = "sim"
     template_url: Optional[str] = None
 
 
@@ -37,9 +62,8 @@ class GetOrderResponse(BaseModel):
     status: OrderStatus
     submitted_at: str
     completed_at: Optional[str] = None
-    edp_artifacts: list[EdpArtifact] = []
+    edp_artifacts: list[ArtifactRef] = []
     ems_delivery: Optional[OrderEmsDelivery] = None
-    flags: list[dict[str, object]] = []
 
     @classmethod
     def from_order(cls, order: Order) -> "GetOrderResponse":
@@ -49,11 +73,10 @@ class GetOrderResponse(BaseModel):
             status=order.status,
             submitted_at=order.submitted_at.isoformat(),
             completed_at=order.completed_at.isoformat() if order.completed_at else None,
-            edp_artifacts=[EdpArtifact.model_validate(a) for a in order.edp_artifacts],
+            edp_artifacts=[ArtifactRef.model_validate(a) for a in order.edp_artifacts],
             ems_delivery=(
                 OrderEmsDelivery.model_validate(order.ems_delivery)
                 if order.ems_delivery
                 else None
             ),
-            flags=order.flags,
         )

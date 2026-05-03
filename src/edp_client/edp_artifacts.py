@@ -1,69 +1,58 @@
 """DTOs mirroring edp-api response shapes.
 
-Shape matches `edp-api/src/jobs/job_record.py` + `edp-api/src/generators/artifact_models.py`.
-Kept narrow to what platform-api actually consumes from the response.
+Source of truth: edp-api/readme.md `Core Types` section. Hand-mirrored for now;
+codegen from edp-api's OpenAPI export is the planned next step.
 """
 
 from enum import StrEnum
-from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel
 
 
-class EdpJobStatus(StrEnum):
+class JobStatus(StrEnum):
     """Mirrors edp-api JobStatus."""
 
-    PENDING = "pending"
     RUNNING = "running"
     COMPLETE = "complete"
     FAILED = "failed"
 
 
-class EdpDeliveryPath(StrEnum):
-    """Mirrors edp-api DeliveryPath."""
+class ArtifactKind(StrEnum):
+    """Mirrors edp-api ArtifactKind."""
 
-    CFN_STANDARD = "cfn_standard"
-    CFN_GOVCLOUD = "cfn_govcloud"
-    ISO = "iso"
-
-
-class EdpEmsDelivery(BaseModel):
-    """edp-api emits routing decision only; URLs filled by platform-api."""
-
-    path: EdpDeliveryPath
-    ems_mode: str
-
-
-class EdpArtifactUrl(BaseModel):
-    """One format/URL slot per artifact."""
-
-    format: str
-    url: Optional[str] = None
-    pending: Optional[str] = None
+    BOM = "bom"
+    COMPUTE_CONTAINER_3D = "compute_container_3d"
+    GRID_CONTAINER_3D = "grid_container_3d"
+    INTERFACE_PLATE = "interface_plate"
+    SLD = "sld"
+    PID_COOLING = "pid_cooling"
+    COMMS_DIAGRAM = "comms_diagram"
+    CABLE_HOSE_SCHEDULE = "cable_hose_schedule"
+    INSTALLATION_GRAPH = "installation_graph"
+    DTM = "dtm"
 
 
-class EdpArtifact(BaseModel):
-    """One EDP artifact entry — has 1+ format/URL pairs."""
+class ArtifactRef(BaseModel):
+    """One artifact entry — flat, one per (kind, format[, plate_id])."""
 
-    name: str
-    urls: list[EdpArtifactUrl]
+    kind: ArtifactKind
+    format: str                 # json | xlsx | dxf | pdf | step | glb
+    url: str
+    plate_id: str | None = None   # only when kind=INTERFACE_PLATE
 
 
-class EdpPostJobResponse(BaseModel):
-    """edp-api POST /edp-api/jobs immediate 202 body."""
+class JobCreated(BaseModel):
+    """edp-api POST /edp-api/jobs 202 body. URLs known up front (deterministic keys)."""
 
-    job_id: str
+    job_id: UUID
     status_url: str
-    submitted_at: str
+    edp_artifact_urls: list[ArtifactRef]
 
 
-class EdpGetJobResponse(BaseModel):
-    """edp-api GET /edp-api/jobs/{id} response on completion."""
+class JobResult(BaseModel):
+    """edp-api GET /edp-api/jobs/{id} body."""
 
-    job_id: str
-    status: EdpJobStatus
-    deployment_uuid: str
-    edp_artifacts: list[EdpArtifact]
-    ems_delivery: Optional[EdpEmsDelivery] = None
-    completed_at: Optional[str] = None
-    flags: list[dict[str, object]] = []
+    status: JobStatus
+    edp_artifact_urls: list[ArtifactRef]
+    error: str | None = None   # set when status=failed

@@ -4,9 +4,10 @@ Pure string builder; no I/O. Caller uploads the result to S3 and emails the URL.
 """
 
 import html
+from collections import defaultdict
 from typing import Final
 
-from src.edp_client.edp_artifacts import EdpArtifact
+from src.edp_client.edp_artifacts import ArtifactKind, ArtifactRef
 from src.orders.orders_record import OrderEmsDelivery
 
 # Three managed-service connection strings the operator must collect before
@@ -16,6 +17,20 @@ PREREQ_DOCS: Final[tuple[tuple[str, str], ...]] = (
     ("Neon connection string", "https://neon.tech/docs"),
     ("Neo4j Aura connection string", "https://neo4j.com/docs/aura/"),
     ("TimescaleDB connection string", "https://docs.timescale.com/"),
+)
+
+# Display labels for ArtifactKind. Order = display order in portal.
+KIND_LABELS: Final[tuple[tuple[ArtifactKind, str], ...]] = (
+    (ArtifactKind.BOM,                  "Bill of Materials"),
+    (ArtifactKind.COMPUTE_CONTAINER_3D, "Compute Container 3D"),
+    (ArtifactKind.GRID_CONTAINER_3D,    "Grid Container 3D"),
+    (ArtifactKind.INTERFACE_PLATE,      "Interface Plates"),
+    (ArtifactKind.SLD,                  "Single Line Diagram"),
+    (ArtifactKind.PID_COOLING,          "P&ID — Cooling System"),
+    (ArtifactKind.COMMS_DIAGRAM,        "Communication Network Diagram"),
+    (ArtifactKind.CABLE_HOSE_SCHEDULE,  "Cable and Hose Schedule"),
+    (ArtifactKind.INSTALLATION_GRAPH,   "Installation Graph"),
+    (ArtifactKind.DTM,                  "Device Topology Manifest"),
 )
 
 
@@ -29,11 +44,11 @@ class PortalService:
         self,
         *,
         order_id: str,
-        artifacts: list[EdpArtifact],
+        artifacts: list[ArtifactRef],
         delivery: OrderEmsDelivery,
     ) -> str:
         """Return the HTML body: artifacts + prereqs + download CTA + APK."""
-        artifact_html = "\n".join(self._render_artifact(a) for a in artifacts)
+        artifact_html = self._render_artifacts(artifacts)
         prereqs_html = self._render_prereqs()
         launch_html = self._render_launch(delivery)
         apk = html.escape(self._apk_url, quote=True)
@@ -48,7 +63,7 @@ class PortalService:
             "<h1>ARCNODE deployment package</h1>\n"
             f"<p>Order: <code>{html.escape(order_id)}</code></p>\n"
             "<h2>EDP Artifacts</h2>\n"
-            f"<ul>\n{artifact_html}\n</ul>\n"
+            f"{artifact_html}\n"
             f"{prereqs_html}\n"
             "<h2>EMS Deployment</h2>\n"
             f"{launch_html}\n"
@@ -59,18 +74,49 @@ class PortalService:
         )
 
     @staticmethod
-    def _render_artifact(artifact: EdpArtifact) -> str:
-        """One <li> per artifact with a link per format slot."""
-        rows: list[str] = []
-        for u in artifact.urls:
-            fmt = html.escape(u.format)
-            if u.url:
-                href = html.escape(u.url, quote=True)
-                rows.append(f'    <a href="{href}">{fmt}</a>')
-            elif u.pending:
-                rows.append(f"    {fmt} (pending {html.escape(u.pending)})")
-        body = "<br>\n".join(rows)
-        return f"<li><strong>{html.escape(artifact.name)}</strong><br>\n{body}</li>"
+    def _render_artifacts(artifacts: list[ArtifactRef]) -> str:
+        """Group flat ArtifactRef list by kind, render in canonical order."""
+        by_kind: dict[ArtifactKind, list[ArtifactRef]] = defaultdict(list)
+        for a in artifacts:
+            by_kind[a.kind].append(a)
+        sections: list[str] = []
+        for kind, label in KIND_LABELS:
+            refs = by_kind.get(kind, [])
+            if not refs:
+                continue
+            sections.append(PortalService._render_kind_section(label, kind, refs))
+        return "\n".join(sections)
+
+    @staticmethod
+    def _render_kind_section(
+        label: str, kind: ArtifactKind, refs: list[ArtifactRef]
+    ) -> str:
+        """Render one kind block. Plates get sub-grouped by plate_id."""
+        if kind == ArtifactKind.INTERFACE_PLATE:
+            by_plate: dict[str, list[ArtifactRef]] = defaultdict(list)
+            for r in refs:
+                by_plate[r.plate_id or "(unknown)"].append(r)
+            plate_blocks = "\n".join(
+                f"  <li><strong>{html.escape(pid)}</strong><br>\n"
+                f"    {PortalService._render_format_links(plate_refs)}\n"
+                "  </li>"
+                for pid, plate_refs in by_plate.items()
+            )
+            return (
+                f"<h3>{html.escape(label)}</h3>\n<ul>\n{plate_blocks}\n</ul>"
+            )
+        return (
+            f"<h3>{html.escape(label)}</h3>\n"
+            f"<p>{PortalService._render_format_links(refs)}</p>"
+        )
+
+    @staticmethod
+    def _render_format_links(refs: list[ArtifactRef]) -> str:
+        """One `<a>` per format, joined with ` · `."""
+        return " · ".join(
+            f'<a href="{html.escape(r.url, quote=True)}">{html.escape(r.format)}</a>'
+            for r in refs
+        )
 
     @staticmethod
     def _render_prereqs() -> str:

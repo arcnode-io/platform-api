@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 from src.app_module import AppModule
 from src.config import Config, LogLevel
+from src.edp_client.edp_artifacts import ArtifactKind
 from src.orders.orders_record import GetOrderResponse
 from tests.fixtures.containers import (
     start_edp_api,
@@ -120,15 +121,17 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
 
         # Assert — order completed with re-archived platform-api S3 URLs
         assert final.status.value == "complete"
-        artifact_names = {a.name for a in final.edp_artifacts}
-        assert "Bill of Materials" in artifact_names
-        assert "Device Topology Manifest" in artifact_names
-        bom = next(a for a in final.edp_artifacts if a.name == "Bill of Materials")
-        bom_url = bom.urls[0].url
-        assert bom_url is not None
+        kinds = {a.kind for a in final.edp_artifacts}
+        assert ArtifactKind.BOM in kinds
+        assert ArtifactKind.DTM in kinds
+        bom_json = next(
+            a
+            for a in final.edp_artifacts
+            if a.kind == ArtifactKind.BOM and a.format == "json"
+        )
         assert (
-            ls.url in bom_url
-        ), f"expected platform-api to re-archive into LocalStack S3; got {bom_url}"
+            ls.url in bom_json.url
+        ), f"expected platform-api to re-archive into LocalStack S3; got {bom_json.url}"
 
         # Assert — bytes actually landed in the bucket (artifacts + portal)
         s3 = boto3.client(
@@ -183,7 +186,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert html_resp.status_code == 200, html_resp.text
         html = html_resp.text
         assert APK_URL in html
-        assert bom_url in html
+        assert bom_json.url in html
         assert "Download CFN template" in html
         assert template_url in html
         # Prereqs checklist links to all three vendor docs (per PM contract)

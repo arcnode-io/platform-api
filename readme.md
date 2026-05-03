@@ -27,7 +27,7 @@ rectangle ems_hmi_cicd {
   rectangle apk_build
 }
 
-database platform_s3
+database artifact_s3
 database platform_db
 cloud ses
 
@@ -38,10 +38,10 @@ orchestrator --> edp_api: http
 orchestrator --> cfn 
 orchestrator --> iso
 orchestrator --> delivery
-cfn --> platform_s3: s3
-iso --> platform_s3: s3
-apk_build -r-> platform_s3: s3
-delivery <-u-> platform_s3: s3
+cfn --> artifact_s3: s3
+iso --> artifact_s3: s3
+apk_build -r-> artifact_s3: s3
+delivery <-u-> artifact_s3: s3
 delivery -l-> ses: http
 ses -u-> customer: email
 ```
@@ -52,42 +52,42 @@ participant website
 participant orchestrator
 participant cfn
 participant iso
-participant edp_api
 participant delivery
 database platform_db
-database platform_s3
+database artifact_s3
+participant edp_api
 participant ses
 participant ems_hmi_cicd
 
 customer -> website : submit form
 website -> orchestrator : POST /submit
-orchestrator --> website : 200 "check your inbox"
+orchestrator --> website : 200 "form submitted"
 orchestrator -> platform_db : store config
 platform_db --> orchestrator : cfg_id
+loop until status == complete
+    orchestrator -> edp_api : GET /edp-api/jobs/{job_id}
+    edp_api --> orchestrator : { status, edp_artifacts[],  flags }
+end
+
 alt cloud
-    orchestrator -> cfn : compose()
-    cfn -> platform_s3 : put cfn.yaml
-    platform_s3 --> cfn : cfn_url
+    orchestrator -> cfn : compose(dtm.json)
+    cfn -> artifact_s3 : put cfn.yaml
+    artifact_s3 --> cfn : cfn_url
     cfn --> orchestrator : cfn_url
 else onprem
-    orchestrator -> iso : build()
-    iso -> platform_s3 : put iso.img
-    platform_s3 --> iso : iso_url
+    orchestrator -> iso : build(dtm.json))
+    iso -> artifact_s3 : put iso.img
+    artifact_s3 --> iso : iso_url
     iso --> orchestrator : iso_url
 end
 
-ems_hmi_cicd -> platform_s3 : put apk
+ems_hmi_cicd -> artifact_s3 : put apk
 
 orchestrator -> edp_api : POST /edp-api/jobs (ConfiguratorPayload)
-edp_api --> orchestrator : 202 { job_id, status_url }
-loop until status == complete
-    orchestrator -> edp_api : GET /edp-api/jobs/{job_id}
-    edp_api --> orchestrator : { status, edp_artifacts[], ems_delivery, flags }
-end
-
-orchestrator -> delivery : create({ edp_artifacts[], ems_delivery, apk_url })
-delivery -> platform_s3 : put manifest.json + index.html
-platform_s3 --> delivery : page_url
+edp_api --> orchestrator : 202 { job_id, edp_artifact_urls[] }
+orchestrator -> delivery : create({ edp_artifact_urls[], iso_url|cfn_url, apk_url })
+delivery -> artifact_s3 : put manifest.json + index.html
+artifact_s3 --> delivery : page_url
 delivery -> ses : send email { page_url }
 ses -> customer : delivery email
 ```
