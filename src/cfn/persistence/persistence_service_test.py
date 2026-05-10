@@ -31,9 +31,9 @@ def test_build_resources_merges_aurora_tiger_and_aura() -> None:
     resources = service.build_resources()
 
     # Assert — pick one representative key from each block
-    assert "AuroraCluster" in resources       # Aurora
+    assert "AuroraCluster" in resources  # Aurora
     assert "TigerCustomResource" in resources  # Tiger
-    assert "AuraCustomResource" in resources   # Aura
+    assert "AuraCustomResource" in resources  # Aura
 
 
 def test_build_resources_keys_are_unique() -> None:

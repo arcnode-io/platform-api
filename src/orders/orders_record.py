@@ -23,7 +23,7 @@ class DeliveryPath(StrEnum):
 _PARTITION_TO_PATH: dict[AwsPartition, DeliveryPath] = {
     AwsPartition.STANDARD: DeliveryPath.CFN_STANDARD,
     AwsPartition.GOVCLOUD: DeliveryPath.CFN_GOVCLOUD,
-    AwsPartition.NONE:     DeliveryPath.ISO,
+    AwsPartition.NONE: DeliveryPath.ISO,
 }
 
 

@@ -89,7 +89,7 @@ def test_create_provisions_tiger_service_and_writes_secret_to_localstack() -> No
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106 — LocalStack credential
+            aws_secret_access_key="test",
         )
 
         # The Lambda creates its own boto3 client at module level (boto3.client
@@ -163,35 +163,35 @@ def test_create_provisions_tiger_service_and_writes_secret_to_localstack() -> No
 def test_create_failure_sends_failed_callback_to_cfn() -> None:
     """If the vendor API errors, Lambda must FAIL the custom resource cleanly."""
     # Arrange
-    with start_localstack(services=("secretsmanager",)) as ls:
-        with (
-            patch.dict(
-                "os.environ",
-                {
-                    "AWS_ENDPOINT_URL": ls.url,
-                    "AWS_DEFAULT_REGION": "us-east-1",
-                    "AWS_ACCESS_KEY_ID": "test",
-                    "AWS_SECRET_ACCESS_KEY": "test",
-                },
-            ),
-            patch("urllib.request.urlopen") as urlopen,
-        ):
-            # Vendor create returns an HTTPError → Lambda FAILED + CFN callback
-            urlopen.side_effect = [
-                Exception("vendor API returned 401"),
-                _ctx(_FakeResp(b"")),  # CFN callback
-            ]
+    with (
+        start_localstack(services=("secretsmanager",)) as ls,
+        patch.dict(
+            "os.environ",
+            {
+                "AWS_ENDPOINT_URL": ls.url,
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_ACCESS_KEY_ID": "test",
+                "AWS_SECRET_ACCESS_KEY": "test",
+            },
+        ),
+        patch("urllib.request.urlopen") as urlopen,
+    ):
+        # Vendor create returns an HTTPError → Lambda FAILED + CFN callback
+        urlopen.side_effect = [
+            Exception("vendor API returned 401"),
+            _ctx(_FakeResp(b"")),  # CFN callback
+        ]
 
-            mod = _load_module()
+        mod = _load_module()
 
-            # Act — should not raise; Lambda always responds to CFN
-            mod.handler(_make_event(), context=None)
+        # Act — should not raise; Lambda always responds to CFN
+        mod.handler(_make_event(), context=None)
 
-            # Assert: CFN callback indicates FAILED
-            cfn_call = urlopen.call_args_list[1]
-            cfn_body = json.loads(cfn_call.args[0].data)
-            assert cfn_body["Status"] == "FAILED"
-            assert "401" in cfn_body["Reason"]
+        # Assert: CFN callback indicates FAILED
+        cfn_call = urlopen.call_args_list[1]
+        cfn_body = json.loads(cfn_call.args[0].data)
+        assert cfn_body["Status"] == "FAILED"
+        assert "401" in cfn_body["Reason"]
 
 
 def _ctx(resp: _FakeResp) -> MagicMock:

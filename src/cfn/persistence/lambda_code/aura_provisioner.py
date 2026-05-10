@@ -37,7 +37,7 @@ def handler(event: dict, context: object) -> None:
             _respond(event, "SUCCESS", physical_id, {})
         else:
             _respond(event, "SUCCESS", physical_id, {})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
@@ -53,7 +53,7 @@ def _token(client_id: str, client_secret: str) -> str:
             "Content-Type": "application/x-www-form-urlencoded",
         },
     )
-    with urllib.request.urlopen(req) as resp:  # noqa: S310
+    with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read())["access_token"]
 
 
@@ -76,9 +76,12 @@ def _create(event: dict) -> tuple[str, dict]:
         f"{API_BASE}/v1/instances",
         data=body,
         method="POST",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
     )
-    with urllib.request.urlopen(req) as resp:  # noqa: S310
+    with urllib.request.urlopen(req) as resp:
         created = json.loads(resp.read())["data"]
     instance_id = created["id"]
     # Aura returns initial credentials in the create response; conn URL only
@@ -99,7 +102,7 @@ def _wait_running(token: str, instance_id: str) -> None:
             f"{API_BASE}/v1/instances/{instance_id}",
             headers={"Authorization": f"Bearer {token}"},
         )
-        with urllib.request.urlopen(req) as resp:  # noqa: S310
+        with urllib.request.urlopen(req) as resp:
             status = json.loads(resp.read())["data"]["status"]
         if status == "running":
             return
@@ -118,7 +121,7 @@ def _delete(event: dict, instance_id: str) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     try:
-        urllib.request.urlopen(req)  # noqa: S310
+        urllib.request.urlopen(req)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return
@@ -152,4 +155,4 @@ def _respond(event: dict, status: str, physical_id: str, data: dict) -> None:
         method="PUT",
         headers={"content-type": "", "content-length": str(len(body))},
     )
-    urllib.request.urlopen(req)  # noqa: S310
+    urllib.request.urlopen(req)

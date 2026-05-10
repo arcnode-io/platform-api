@@ -13,7 +13,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import boto3
-import psycopg2
 
 from tests.fixtures.containers import start_localstack, start_postgres
 
@@ -62,7 +61,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
     """
     # Arrange — pgvector image (master pw + db = "test")
     with (
-        start_postgres(password="test", image="pgvector/pgvector:pg16") as pg,  # noqa: S106
+        start_postgres(password="test", image="pgvector/pgvector:pg16") as pg,
         start_localstack(services=("secretsmanager",)) as ls,
     ):
         # First: write the Aurora master secret to LocalStack (the bootstrap
@@ -72,7 +71,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
         )
         master_secret = sm_client.create_secret(
             Name="aurora-master-secret-test",
@@ -126,26 +125,38 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
             # Sanity: handler must have sent SUCCESS to CFN, otherwise the
             # databases never got created and downstream asserts are misleading.
             cfn_body = json.loads(urlopen.call_args.args[0].data)
-            assert cfn_body["Status"] == "SUCCESS", (
-                f"Lambda failed: {cfn_body.get('Reason', 'unknown')}"
-            )
+            assert (
+                cfn_body["Status"] == "SUCCESS"
+            ), f"Lambda failed: {cfn_body.get('Reason', 'unknown')}"
 
             # Assert: databases exist
             with real_connect(
-                host=pg.host, port=pg.port, user="postgres", password="test", dbname="postgres"
+                host=pg.host,
+                port=pg.port,
+                user="postgres",
+                password="test",
+                dbname="postgres",
             ) as conn:
                 with conn.cursor() as cur:
-                    cur.execute("SELECT datname FROM pg_database WHERE datname IN ('ems_document', 'ems_vector')")
+                    cur.execute(
+                        "SELECT datname FROM pg_database WHERE datname IN ('ems_document', 'ems_vector')"
+                    )
                     dbs = {row[0] for row in cur.fetchall()}
             assert dbs == {"ems_document", "ems_vector"}
 
             # Assert: vector extension installed on ems_vector
-            with real_connect(
-                host=pg.host, port=pg.port, user="postgres", password="test", dbname="ems_vector"
-            ) as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
-                    rows = cur.fetchall()
+            with (
+                real_connect(
+                    host=pg.host,
+                    port=pg.port,
+                    user="postgres",
+                    password="test",
+                    dbname="ems_vector",
+                ) as conn,
+                conn.cursor() as cur,
+            ):
+                cur.execute("SELECT extname FROM pg_extension WHERE extname = 'vector'")
+                rows = cur.fetchall()
             assert rows == [("vector",)]
 
             # Assert: secrets landed in LocalStack

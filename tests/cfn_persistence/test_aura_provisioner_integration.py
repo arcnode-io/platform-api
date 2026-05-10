@@ -73,7 +73,7 @@ def test_create_provisions_aura_instance_and_writes_secret_to_localstack() -> No
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106 — LocalStack credential
+            aws_secret_access_key="test",
         )
 
         with (
@@ -106,11 +106,7 @@ def test_create_provisions_aura_instance_and_writes_secret_to_localstack() -> No
                         ).encode()
                     )
                 ),
-                _ctx(
-                    _FakeResp(
-                        json.dumps({"data": {"status": "running"}}).encode()
-                    )
-                ),
+                _ctx(_FakeResp(json.dumps({"data": {"status": "running"}}).encode())),
                 _ctx(_FakeResp(b"")),  # CFN callback PUT
             ]
 

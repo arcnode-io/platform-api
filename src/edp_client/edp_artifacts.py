@@ -37,9 +37,9 @@ class ArtifactRef(BaseModel):
     """One artifact entry — flat, one per (kind, format[, plate_id])."""
 
     kind: ArtifactKind
-    format: str                 # json | xlsx | dxf | pdf | step | glb
+    format: str  # json | xlsx | dxf | pdf | step | glb
     url: str
-    plate_id: str | None = None   # only when kind=INTERFACE_PLATE
+    plate_id: str | None = None  # only when kind=INTERFACE_PLATE
 
 
 class JobCreated(BaseModel):
@@ -55,4 +55,4 @@ class JobResult(BaseModel):
 
     status: JobStatus
     edp_artifact_urls: list[ArtifactRef]
-    error: str | None = None   # set when status=failed
+    error: str | None = None  # set when status=failed

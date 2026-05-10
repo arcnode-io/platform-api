@@ -30,7 +30,7 @@ def handler(event: dict, context: object) -> None:
             # Update + Delete are no-ops; databases persist across stack updates,
             # and stack-delete drops the entire cluster anyway.
             _respond(event, "SUCCESS", physical_id, {})
-    except Exception as e:  # noqa: BLE001 — Lambda must always reply
+    except Exception as e:
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
@@ -119,4 +119,4 @@ def _respond(event: dict, status: str, physical_id: str, data: dict) -> None:
         method="PUT",
         headers={"content-type": "", "content-length": str(len(body))},
     )
-    urllib.request.urlopen(req)  # noqa: S310 — CFN-signed presigned URL
+    urllib.request.urlopen(req)

@@ -21,16 +21,16 @@ PREREQ_DOCS: Final[tuple[tuple[str, str], ...]] = (
 
 # Display labels for ArtifactKind. Order = display order in portal.
 KIND_LABELS: Final[tuple[tuple[ArtifactKind, str], ...]] = (
-    (ArtifactKind.BOM,                  "Bill of Materials"),
+    (ArtifactKind.BOM, "Bill of Materials"),
     (ArtifactKind.COMPUTE_CONTAINER_3D, "Compute Container 3D"),
-    (ArtifactKind.GRID_CONTAINER_3D,    "Grid Container 3D"),
-    (ArtifactKind.INTERFACE_PLATE,      "Interface Plates"),
-    (ArtifactKind.SLD,                  "Single Line Diagram"),
-    (ArtifactKind.PID_COOLING,          "P&ID — Cooling System"),
-    (ArtifactKind.COMMS_DIAGRAM,        "Communication Network Diagram"),
-    (ArtifactKind.CABLE_HOSE_SCHEDULE,  "Cable and Hose Schedule"),
-    (ArtifactKind.INSTALLATION_GRAPH,   "Installation Graph"),
-    (ArtifactKind.DTM,                  "Device Topology Manifest"),
+    (ArtifactKind.GRID_CONTAINER_3D, "Grid Container 3D"),
+    (ArtifactKind.INTERFACE_PLATE, "Interface Plates"),
+    (ArtifactKind.SLD, "Single Line Diagram"),
+    (ArtifactKind.PID_COOLING, "P&ID — Cooling System"),
+    (ArtifactKind.COMMS_DIAGRAM, "Communication Network Diagram"),
+    (ArtifactKind.CABLE_HOSE_SCHEDULE, "Cable and Hose Schedule"),
+    (ArtifactKind.INSTALLATION_GRAPH, "Installation Graph"),
+    (ArtifactKind.DTM, "Device Topology Manifest"),
 )
 
 
@@ -102,9 +102,7 @@ class PortalService:
                 "  </li>"
                 for pid, plate_refs in by_plate.items()
             )
-            return (
-                f"<h3>{html.escape(label)}</h3>\n<ul>\n{plate_blocks}\n</ul>"
-            )
+            return f"<h3>{html.escape(label)}</h3>\n<ul>\n{plate_blocks}\n</ul>"
         return (
             f"<h3>{html.escape(label)}</h3>\n"
             f"<p>{PortalService._render_format_links(refs)}</p>"

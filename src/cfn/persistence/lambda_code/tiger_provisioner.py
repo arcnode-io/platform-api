@@ -36,7 +36,7 @@ def handler(event: dict, context: object) -> None:
         else:
             # Update — recreate-on-change handled by CFN replacing PhysicalResourceId
             _respond(event, "SUCCESS", physical_id, {})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
@@ -66,7 +66,7 @@ def _create(event: dict) -> tuple[str, str]:
         method="POST",
         headers={"Authorization": auth, "Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req) as resp:  # noqa: S310
+    with urllib.request.urlopen(req) as resp:
         created = json.loads(resp.read())
 
     service_id = created["service_id"]
@@ -80,7 +80,7 @@ def _wait_and_fetch_conn(auth: str, project_id: str, service_id: str) -> str:
             f"{API_BASE}/projects/{project_id}/services/{service_id}",
             headers={"Authorization": auth},
         )
-        with urllib.request.urlopen(req) as resp:  # noqa: S310
+        with urllib.request.urlopen(req) as resp:
             svc = json.loads(resp.read())
         if svc.get("status") == "READY":
             return _build_conn_url(svc)
@@ -114,7 +114,7 @@ def _delete(event: dict, service_id: str) -> None:
         headers={"Authorization": auth},
     )
     try:
-        urllib.request.urlopen(req)  # noqa: S310
+        urllib.request.urlopen(req)
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return  # already deleted
@@ -148,4 +148,4 @@ def _respond(event: dict, status: str, physical_id: str, data: dict) -> None:
         method="PUT",
         headers={"content-type": "", "content-length": str(len(body))},
     )
-    urllib.request.urlopen(req)  # noqa: S310
+    urllib.request.urlopen(req)

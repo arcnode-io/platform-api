@@ -14,6 +14,7 @@ import boto3
 import pytest
 
 from src.cfn.cfn_service import CfnService
+from src.cfn.persistence.persistence_service import PersistenceService
 from tests.fixtures.containers import start_localstack
 
 STACK_NAME: str = "arcnode-cfn-deploy-test"
@@ -35,11 +36,11 @@ def test_cfn_template_deploys_cleanly_against_localstack() -> None:
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
         )
 
         # Arrange — render the per-order template
-        template_body = CfnService().render_template(
+        template_body = CfnService(persistence=PersistenceService()).render_template(
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
             ems_mode=EMS_MODE,
@@ -87,9 +88,9 @@ def test_cfn_create_fails_when_required_params_missing() -> None:
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
         )
-        template_body = CfnService().render_template(
+        template_body = CfnService(persistence=PersistenceService()).render_template(
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
             ems_mode=EMS_MODE,

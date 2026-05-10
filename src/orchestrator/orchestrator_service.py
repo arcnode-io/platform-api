@@ -94,15 +94,11 @@ class OrchestratorService:
         await self._s3.ensure_bucket()
         await self._ses.verify_sender()
 
-    async def _archive(
-        self, order_id: str, edp: JobResult
-    ) -> list[ArtifactRef]:
+    async def _archive(self, order_id: str, edp: JobResult) -> list[ArtifactRef]:
         """Re-archive every edp-api artifact into platform-api S3."""
         return [await self._archive_ref(order_id, a) for a in edp.edp_artifact_urls]
 
-    async def _archive_ref(
-        self, order_id: str, ref: ArtifactRef
-    ) -> ArtifactRef:
+    async def _archive_ref(self, order_id: str, ref: ArtifactRef) -> ArtifactRef:
         """Stream one artifact's bytes into platform-api S3, return a new ref."""
         source = self._to_absolute_url(ref.url)
         filename = source.rsplit("/", 1)[-1]
@@ -134,7 +130,7 @@ class OrchestratorService:
         template = self._cfn.render_template(
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
-            ems_mode="sim",   # edp-api always emits SIM; ems-device-api flips post-deploy
+            ems_mode="sim",  # edp-api always emits SIM; ems-device-api flips post-deploy
         )
         template_url = await self._s3.upload_yaml(
             f"orders/{order_id}/ems-stack.yaml", template

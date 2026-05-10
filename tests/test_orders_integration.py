@@ -32,7 +32,7 @@ from tests.fixtures.containers import (
     start_postgres,
 )
 
-POSTGRES_PASSWORD: str = "test"  # noqa: S105 — testcontainer credential
+POSTGRES_PASSWORD: str = "test"
 S3_BUCKET: str = "platform-api-artifacts-test"
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
 SENDER_EMAIL: str = "noreply@arcnode.test"
@@ -139,7 +139,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             endpoint_url=ls.url,
             region_name="us-east-1",
             aws_access_key_id="test",
-            aws_secret_access_key="test",  # noqa: S106
+            aws_secret_access_key="test",
         )
         objs = s3.list_objects_v2(Bucket=S3_BUCKET)
         keys = {o["Key"] for o in objs.get("Contents", [])}

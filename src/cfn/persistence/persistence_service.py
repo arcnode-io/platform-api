@@ -8,7 +8,7 @@ from src.cfn.persistence.tiger_resources import tiger_provisioning_resources
 class PersistenceService:
     """Single entry point for building the persistence section of the CFN template."""
 
-    def build_resources(self) -> dict[str, object]:
+    def build_resources(self) -> dict[str, dict]:
         """Return the merged Aurora + Tiger + Aura resource dict (CFN `Resources:`)."""
         return {
             **aurora_cluster_resources(),

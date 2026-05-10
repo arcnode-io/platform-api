@@ -60,9 +60,7 @@ class EdpClientService:
                 logging.info("edp-api job complete: %s", job_id)
                 return body
             if body.status == JobStatus.FAILED:
-                raise EdpJobFailedError(
-                    f"edp-api job {job_id} failed: {body.error}"
-                )
+                raise EdpJobFailedError(f"edp-api job {job_id} failed: {body.error}")
             await asyncio.sleep(POLL_INTERVAL_SECONDS)
         raise TimeoutError(
             f"edp-api job {job_id} did not reach terminal state in {POLL_TIMEOUT_SECONDS}s"

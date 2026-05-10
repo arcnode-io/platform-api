@@ -10,7 +10,7 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def aura_provisioning_resources() -> dict[str, object]:
+def aura_provisioning_resources() -> dict[str, dict]:
     """CFN resources that provision a Neo4j Aura instance via REST API."""
     return {
         "AuraLambdaRole": {

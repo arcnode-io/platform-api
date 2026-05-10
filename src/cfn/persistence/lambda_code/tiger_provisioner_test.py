@@ -82,7 +82,10 @@ def test_build_conn_url_assembles_postgres_url_with_sslmode() -> None:
     url = mod._build_conn_url(svc)
 
     # Assert
-    assert url == "postgres://tsdbadmin:s3cret-pw@tsdb-1.cloud.tigerdata.com:5432/tsdb?sslmode=require"
+    assert (
+        url
+        == "postgres://tsdbadmin:s3cret-pw@tsdb-1.cloud.tigerdata.com:5432/tsdb?sslmode=require"
+    )
 
 
 def test_build_conn_url_uses_default_port_when_missing() -> None:

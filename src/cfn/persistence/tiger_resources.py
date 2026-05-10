@@ -10,7 +10,7 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def tiger_provisioning_resources() -> dict[str, object]:
+def tiger_provisioning_resources() -> dict[str, dict]:
     """CFN resources that provision a Tiger Cloud service via REST API."""
     return {
         "TigerLambdaRole": {

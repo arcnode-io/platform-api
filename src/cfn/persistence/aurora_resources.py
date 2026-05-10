@@ -26,7 +26,7 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def aurora_cluster_resources() -> dict[str, object]:
+def aurora_cluster_resources() -> dict[str, dict]:
     """CFN resources for a scale-to-0 Aurora serverless PG cluster."""
     return {
         "AuroraMasterSecret": {
@@ -151,7 +151,9 @@ def aurora_cluster_resources() -> dict[str, object]:
             "DependsOn": "AuroraInstance",
             "Properties": {
                 "ServiceToken": {"Fn::GetAtt": ["AuroraBootstrapLambda", "Arn"]},
-                "ClusterEndpoint": {"Fn::GetAtt": ["AuroraCluster", "Endpoint.Address"]},
+                "ClusterEndpoint": {
+                    "Fn::GetAtt": ["AuroraCluster", "Endpoint.Address"]
+                },
                 "MasterSecretArn": {"Ref": "AuroraMasterSecret"},
                 "DeploymentUuid": {"Ref": "AWS::StackName"},
             },
