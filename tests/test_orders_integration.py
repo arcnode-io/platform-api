@@ -189,13 +189,28 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         assert bom_json.url in html
         assert "Download CFN template" in html
         assert template_url in html
-        # Prereqs checklist links to all three vendor docs (per PM contract)
-        assert "neon.tech/docs" in html
+        # Prereqs checklist names the vendor tokens the operator pastes into
+        # CFN at create-stack time (Tiger access+secret+project, Aura
+        # client_id+secret+tenant). Aurora is provisioned natively by CFN —
+        # no operator action needed for that one.
+        assert "Tiger Cloud" in html
+        assert "Neo4j Aura" in html
+        assert "Project ID" in html
+        assert "Tenant ID" in html
+        assert "Aurora Postgres is provisioned automatically" in html
+        # Vendor doc links (not signup pages) per PM contract
+        assert "tigerdata.com" in html
         assert "neo4j.com/docs/aura" in html
-        assert "docs.timescale.com" in html
+        # Neon is gone — replaced by Aurora native CFN provisioning
+        assert "neon.tech" not in html
         assert "[setup guide]" in html
         assert "&#9744;" in html  # □ checkbox char
         # Per PM contract: prereqs must appear *before* the download link
         prereqs_pos = html.find("Prerequisites")
         download_pos = html.find("Download CFN template")
         assert 0 <= prereqs_pos < download_pos, (prereqs_pos, download_pos)
+
+        # Email body mentions prereq-collection step before the portal link
+        assert "Tiger Cloud" in body
+        assert "Neo4j Aura" in body
+        assert "six API tokens" in body

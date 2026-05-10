@@ -150,13 +150,21 @@ class OrchestratorService:
         return await self._s3.upload_html(f"orders/{order_id}/index.html", body)
 
     async def _notify(self, to: str, portal_url: str) -> None:
-        """Email the operator a one-line link to the portal page."""
+        """Email the operator the portal link + a brief prereq pointer.
+
+        Body deliberately short — full prereq detail (token names, where to
+        find them, doc links) lives in the portal page so this email stays
+        plain-text-friendly and survives email-client mangling.
+        """
         await self._ses.send_delivery_email(
             to=to,
             subject="ARCNODE deployment package ready",
             body_text=(
                 "Your ARCNODE deployment package is ready.\n\n"
-                f"Portal: {portal_url}\n"
+                f"Portal: {portal_url}\n\n"
+                "Before launching the CFN stack, you'll need to sign up at "
+                "Tiger Cloud and Neo4j Aura and collect six API tokens. The "
+                "portal page lists exactly what to grab and where to find it.\n"
             ),
         )
 

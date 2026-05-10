@@ -10,13 +10,32 @@ from typing import Final
 from src.edp_client.edp_artifacts import ArtifactKind, ArtifactRef
 from src.orders.orders_record import OrderEmsDelivery
 
-# Three managed-service connection strings the operator must collect before
-# launching the CFN stack — links go to vendor docs (setup guides), not to
-# signup pages, so customers find their own onboarding path.
-PREREQ_DOCS: Final[tuple[tuple[str, str], ...]] = (
-    ("Neon connection string", "https://neon.tech/docs"),
-    ("Neo4j Aura connection string", "https://neo4j.com/docs/aura/"),
-    ("TimescaleDB connection string", "https://docs.timescale.com/"),
+# Six vendor API tokens the operator must collect before launching the CFN
+# stack. The CFN custom-resource Lambdas use these tokens to provision Tiger
+# Cloud + Neo4j Aura instances; Aurora is provisioned natively by CFN with
+# no operator action. Links go to vendor docs (setup guides), not to signup
+# pages, so customers find their own onboarding path.
+PREREQ_DOCS: Final[tuple[tuple[str, str, str], ...]] = (
+    (
+        "Tiger Cloud — Access Key + Secret Key",
+        "Tiger Console > Settings > API Keys > Create",
+        "https://docs.tigerdata.com/use-timescale/latest/security/client-credentials/",
+    ),
+    (
+        "Tiger Cloud — Project ID",
+        "Tiger Console > Projects (UUID shown next to project name)",
+        "https://docs.tigerdata.com/getting-started/latest/services/",
+    ),
+    (
+        "Neo4j Aura — OAuth Client ID + Secret",
+        "Aura Console > Account > API Keys > Create",
+        "https://neo4j.com/docs/aura/classic/platform/api/authentication/",
+    ),
+    (
+        "Neo4j Aura — Tenant ID",
+        "Aura Console > Account > Tenants",
+        "https://neo4j.com/docs/aura/platform/api/overview/",
+    ),
 )
 
 # Display labels for ArtifactKind. Order = display order in portal.
@@ -118,21 +137,27 @@ class PortalService:
 
     @staticmethod
     def _render_prereqs() -> str:
-        """Checklist of three connection strings the operator collects up front.
+        """Checklist of vendor API tokens the operator pastes into CFN at create-stack.
 
         Per PM contract: links go to vendor *docs* (setup guides), not signup
-        pages — operators find their own onboarding path.
+        pages — operators find their own onboarding path. Each row shows the
+        token name, where to find it in the vendor console, and a doc link.
         """
         items = "\n".join(
-            f"  <li>&#9744; {html.escape(name)} "
-            f'&nbsp;&nbsp;<a href="{html.escape(url, quote=True)}">[setup guide]</a></li>'
-            for name, url in PREREQ_DOCS
+            f"  <li>&#9744; <strong>{html.escape(name)}</strong><br>\n"
+            f"    <small>{html.escape(where)} "
+            f'&nbsp;<a href="{html.escape(url, quote=True)}">[setup guide]</a></small></li>'
+            for name, where, url in PREREQ_DOCS
         )
         return (
             "<h2>Prerequisites</h2>\n"
-            "<p>Before deploying this stack:</p>\n"
+            "<p>Before launching the CFN stack, sign up at Tiger Cloud and "
+            "Neo4j Aura, then collect the following tokens. You'll paste them "
+            "as CFN parameters at <code>aws cloudformation create-stack</code> "
+            "time. Aurora Postgres is provisioned automatically — no setup "
+            "needed for that one.</p>\n"
             f"<ul>\n{items}\n</ul>\n"
-            "<p>The stack will hard fail on deploy without these.</p>"
+            "<p>The stack will hard fail on deploy without all six values.</p>"
         )
 
     @staticmethod
