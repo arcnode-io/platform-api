@@ -1,177 +1,104 @@
-"""PortalService — renders the operator-facing index.html.
+"""PortalService — renders the per-customer delivery portal.
 
-Pure string builder; no I/O. Caller uploads the result to S3 and emails the URL.
+Jinja2-templated. Output is a static HTML string that the orchestrator
+uploads to S3 alongside the `manifest.json` artifact.
+
+Single template (`templates/portal.html`) with the SOVEREIGN dark theme
+inlined as `<style>`. SOLARPUNK light theme is a future commit.
+
+The DeploymentManifest is the entire input contract; everything operator-facing
+flows from its fields. See `src/manifest/manifest_record.py` for the shape.
 """
 
-import html
-from collections import defaultdict
+import json
+from pathlib import Path
 from typing import Final
 
-from src.edp_client.edp_artifacts import ArtifactKind, ArtifactRef
-from src.orders.orders_record import OrderEmsDelivery
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-# Six vendor API tokens the operator must collect before launching the CFN
-# stack. The CFN custom-resource Lambdas use these tokens to provision Tiger
-# Cloud + Neo4j Aura instances; Aurora is provisioned natively by CFN with
-# no operator action. Links go to vendor docs (setup guides), not to signup
-# pages, so customers find their own onboarding path.
-PREREQ_DOCS: Final[tuple[tuple[str, str, str], ...]] = (
-    (
-        "Tiger Cloud — Access Key + Secret Key",
-        "Tiger Console > Settings > API Keys > Create",
-        "https://docs.tigerdata.com/use-timescale/latest/security/client-credentials/",
-    ),
-    (
-        "Tiger Cloud — Project ID",
-        "Tiger Console > Projects (UUID shown next to project name)",
-        "https://docs.tigerdata.com/getting-started/latest/services/",
-    ),
-    (
-        "Neo4j Aura — OAuth Client ID + Secret",
-        "Aura Console > Account > API Keys > Create",
-        "https://neo4j.com/docs/aura/classic/platform/api/authentication/",
-    ),
-    (
-        "Neo4j Aura — Tenant ID",
-        "Aura Console > Account > Tenants",
-        "https://neo4j.com/docs/aura/platform/api/overview/",
-    ),
-)
+from src.manifest.artifact_metadata import SECTION_LABEL
+from src.manifest.manifest_record import DeploymentManifest, ManifestSection
 
-# Display labels for ArtifactKind. Order = display order in portal.
-KIND_LABELS: Final[tuple[tuple[ArtifactKind, str], ...]] = (
-    (ArtifactKind.BOM, "Bill of Materials"),
-    (ArtifactKind.COMPUTE_CONTAINER_3D, "Compute Container 3D"),
-    (ArtifactKind.GRID_CONTAINER_3D, "Grid Container 3D"),
-    (ArtifactKind.INTERFACE_PLATE, "Interface Plates"),
-    (ArtifactKind.SLD, "Single Line Diagram"),
-    (ArtifactKind.PID_COOLING, "P&ID — Cooling System"),
-    (ArtifactKind.COMMS_DIAGRAM, "Communication Network Diagram"),
-    (ArtifactKind.CABLE_HOSE_SCHEDULE, "Cable and Hose Schedule"),
-    (ArtifactKind.INSTALLATION_GRAPH, "Installation Graph"),
-    (ArtifactKind.DTM, "Device Topology Manifest"),
+TEMPLATE_DIR: Final[Path] = Path(__file__).parent / "templates"
+TEMPLATE_NAME: Final[str] = "portal.html"
+
+
+def _filesize(n: int) -> str:
+    """Format bytes as '38.4 MB' / '566 B' / '2.46 GB' (mockup-matching scale).
+
+    Decimal (1000) base — matches modern OS file managers (macOS Finder,
+    Windows Explorer post-Win11) and the mockup's hand-picked values. We
+    deliberately don't use binary (1024) prefixes; operator-facing copy
+    follows operator-facing conventions, not bit-twiddling tradition.
+    """
+    if n < 1000:
+        return f"{n} B"
+    units = ("KB", "MB", "GB", "TB")
+    val = float(n)
+    idx = -1
+    while val >= 1000 and idx < len(units) - 1:
+        val /= 1000
+        idx += 1
+    # 2 decimals at GB+ for design fidelity (mockup: "2.46 GB"); 1 below.
+    return f"{val:.2f} {units[idx]}" if idx >= 2 else f"{val:.1f} {units[idx]}"
+
+
+def _split_curl_url(url: str) -> tuple[str, str]:
+    """Split URL into (prefix-with-trailing-slash, filename) for chip-coloring."""
+    if "/" not in url:
+        return "", url
+    prefix, _, filename = url.rpartition("/")
+    return f"{prefix}/", filename
+
+
+_SECTION_NUMBERS: Final[dict[ManifestSection, str]] = {
+    ManifestSection.SYSTEM_IMAGES: "01",
+    ManifestSection.ENGINEERING_DRAWINGS: "02",
+    ManifestSection.MANIFESTS_AND_SCHEDULES: "03",
+}
+
+_SECTION_RENDER_ORDER: Final[tuple[ManifestSection, ...]] = (
+    ManifestSection.SYSTEM_IMAGES,
+    ManifestSection.ENGINEERING_DRAWINGS,
+    ManifestSection.MANIFESTS_AND_SCHEDULES,
 )
 
 
 class PortalService:
-    """Builds the HTML artifact index for one delivered order."""
+    """Renders the delivery portal HTML + matching manifest.json."""
 
-    def __init__(self, *, ems_hmi_apk_url: str) -> None:
-        self._apk_url = ems_hmi_apk_url
+    def __init__(self) -> None:
+        self._env = Environment(
+            loader=FileSystemLoader(TEMPLATE_DIR),
+            autoescape=select_autoescape(["html"]),
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        self._env.filters["filesize"] = _filesize
 
-    def render(
-        self,
-        *,
-        order_id: str,
-        artifacts: list[ArtifactRef],
-        delivery: OrderEmsDelivery,
-    ) -> str:
-        """Return the HTML body: artifacts + prereqs + download CTA + APK."""
-        artifact_html = self._render_artifacts(artifacts)
-        prereqs_html = self._render_prereqs()
-        launch_html = self._render_launch(delivery)
-        apk = html.escape(self._apk_url, quote=True)
-        return (
-            "<!doctype html>\n"
-            '<html lang="en">\n'
-            "<head>\n"
-            '<meta charset="utf-8">\n'
-            f"<title>ARCNODE deployment package — {html.escape(order_id)}</title>\n"
-            "</head>\n"
-            "<body>\n"
-            "<h1>ARCNODE deployment package</h1>\n"
-            f"<p>Order: <code>{html.escape(order_id)}</code></p>\n"
-            "<h2>EDP Artifacts</h2>\n"
-            f"{artifact_html}\n"
-            f"{prereqs_html}\n"
-            "<h2>EMS Deployment</h2>\n"
-            f"{launch_html}\n"
-            "<h2>EMS Mobile App (Android)</h2>\n"
-            f'<p><a href="{apk}">{apk}</a></p>\n'
-            "</body>\n"
-            "</html>\n"
+    def render(self, *, manifest: DeploymentManifest) -> str:
+        """Render the portal HTML page (uploaded to S3 as `index.html`)."""
+        section_specs = [
+            {
+                "key": s,
+                "num": _SECTION_NUMBERS[s],
+                "label": SECTION_LABEL[s],
+            }
+            for s in _SECTION_RENDER_ORDER
+        ]
+        curl_prefix, curl_filename = _split_curl_url(manifest.bundle_curl_url or "")
+        template = self._env.get_template(TEMPLATE_NAME)
+        return template.render(
+            manifest=manifest,
+            section_specs=section_specs,
+            curl_prefix=curl_prefix,
+            curl_filename=curl_filename,
         )
 
-    @staticmethod
-    def _render_artifacts(artifacts: list[ArtifactRef]) -> str:
-        """Group flat ArtifactRef list by kind, render in canonical order."""
-        by_kind: dict[ArtifactKind, list[ArtifactRef]] = defaultdict(list)
-        for a in artifacts:
-            by_kind[a.kind].append(a)
-        sections: list[str] = []
-        for kind, label in KIND_LABELS:
-            refs = by_kind.get(kind, [])
-            if not refs:
-                continue
-            sections.append(PortalService._render_kind_section(label, kind, refs))
-        return "\n".join(sections)
-
-    @staticmethod
-    def _render_kind_section(
-        label: str, kind: ArtifactKind, refs: list[ArtifactRef]
-    ) -> str:
-        """Render one kind block. Plates get sub-grouped by plate_id."""
-        if kind == ArtifactKind.INTERFACE_PLATE:
-            by_plate: dict[str, list[ArtifactRef]] = defaultdict(list)
-            for r in refs:
-                by_plate[r.plate_id or "(unknown)"].append(r)
-            plate_blocks = "\n".join(
-                f"  <li><strong>{html.escape(pid)}</strong><br>\n"
-                f"    {PortalService._render_format_links(plate_refs)}\n"
-                "  </li>"
-                for pid, plate_refs in by_plate.items()
-            )
-            return f"<h3>{html.escape(label)}</h3>\n<ul>\n{plate_blocks}\n</ul>"
-        return (
-            f"<h3>{html.escape(label)}</h3>\n"
-            f"<p>{PortalService._render_format_links(refs)}</p>"
-        )
-
-    @staticmethod
-    def _render_format_links(refs: list[ArtifactRef]) -> str:
-        """One `<a>` per format, joined with ` · `."""
-        return " · ".join(
-            f'<a href="{html.escape(r.url, quote=True)}">{html.escape(r.format)}</a>'
-            for r in refs
-        )
-
-    @staticmethod
-    def _render_prereqs() -> str:
-        """Checklist of vendor API tokens the operator pastes into CFN at create-stack.
-
-        Per PM contract: links go to vendor *docs* (setup guides), not signup
-        pages — operators find their own onboarding path. Each row shows the
-        token name, where to find it in the vendor console, and a doc link.
-        """
-        items = "\n".join(
-            f"  <li>&#9744; <strong>{html.escape(name)}</strong><br>\n"
-            f"    <small>{html.escape(where)} "
-            f'&nbsp;<a href="{html.escape(url, quote=True)}">[setup guide]</a></small></li>'
-            for name, where, url in PREREQ_DOCS
-        )
-        return (
-            "<h2>Prerequisites</h2>\n"
-            "<p>Before launching the CFN stack, sign up at Tiger Cloud and "
-            "Neo4j Aura, then collect the following tokens. You'll paste them "
-            "as CFN parameters at <code>aws cloudformation create-stack</code> "
-            "time. Aurora Postgres is provisioned automatically — no setup "
-            "needed for that one.</p>\n"
-            f"<ul>\n{items}\n</ul>\n"
-            "<p>The stack will hard fail on deploy without all six values.</p>"
-        )
-
-    @staticmethod
-    def _render_launch(delivery: OrderEmsDelivery) -> str:
-        """Download CTA for the per-order CFN yaml. ISO path: placeholder."""
-        path = html.escape(delivery.path.value)
-        mode = html.escape(delivery.ems_mode)
-        if not delivery.template_url:
-            return f"<p>Path: {path} — link not yet available.</p>"
-        download = html.escape(delivery.template_url, quote=True)
-        return (
-            f"<p>Path: {path}, mode: {mode}</p>\n"
-            f'<p><a href="{download}" download>Download CFN template '
-            "(ems-stack.yaml)</a> — run from any partition with "
-            "<code>aws cloudformation create-stack</code> or upload via "
-            "your AWS Console.</p>"
+    def render_manifest_json(self, *, manifest: DeploymentManifest) -> str:
+        """Serialize the manifest as the `manifest.json` artifact (pretty JSON)."""
+        return json.dumps(
+            manifest.model_dump(mode="json"),
+            indent=2,
+            ensure_ascii=False,
         )

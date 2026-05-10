@@ -18,6 +18,7 @@ from src.aws.aws_module import AwsModule
 from src.cfn.cfn_module import CfnModule
 from src.config import Config, load_config
 from src.edp_client.edp_client_module import EdpClientModule
+from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
 from src.orders.orders_module import OrdersModule
 from src.portal.portal_module import PortalModule
@@ -36,12 +37,15 @@ class AppModule:
             ses_sender_email=self.config.ses_sender_email,
         )
         self.cfn_module = CfnModule()
-        self.portal_module = PortalModule(ems_hmi_apk_url=self.config.ems_hmi_apk_url)
+        self.portal_module = PortalModule()
+        self.manifest_module = ManifestModule()
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,
             cfn=self.cfn_module,
             portal=self.portal_module,
+            manifest=self.manifest_module,
+            ems_hmi_apk_url=self.config.ems_hmi_apk_url,
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self._db_lifespan_enabled = False

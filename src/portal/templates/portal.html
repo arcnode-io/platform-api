@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en" data-theme="sovereign">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ manifest.site_display_name }} — ARCNODE Delivery Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    /* SOVEREIGN tokens — see ems-mockups/tokens.jsx §SOVEREIGN */
+    :root {
+      --bg:           #080808;
+      --surface:      #0e0e0e;
+      --panel:        #131313;
+      --border:       #1f1f1f;
+      --border-soft:  #2a2a2a;
+      --accent:       #4a7aaa;
+      --accent-dim:   #3a6090;
+      --accent-faint: #0a1520;
+      --text:         #d4d0c8;
+      --text-mid:     #8a8680;
+      --text-soft:    #6b6860;
+      --text-faint:   #3a3835;
+      --status-ok:    #4a7c5f;
+      --status-warn:  #f5a623;
+      --status-alarm: #e84040;
+      --color-bess:    #4a7c5f;
+      --color-thermal: #4a9a9a;
+      --color-pv:      #d4a849;
+
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+      --space-8: 48px;
+
+      --radius-1: 2px;
+      --radius-2: 4px;
+      --radius-3: 6px;
+      --radius-4: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "DM Mono", ui-monospace, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      letter-spacing: 0.01em;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      min-height: 100vh;
+    }
+
+    body {
+      /* hairline gradient + film-grain noise = quiet depth */
+      background-image:
+        radial-gradient(ellipse 90% 60% at 50% -20%, rgba(74, 122, 170, 0.05), transparent 70%),
+        url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/></svg>");
+      padding: var(--space-6);
+    }
+
+    .portal {
+      max-width: 1680px;
+      margin: 0 auto;
+      display: grid;
+      gap: var(--space-5);
+    }
+
+    /* ─── Header ─────────────────────────────────────────────── */
+    .header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--space-6);
+      align-items: start;
+      padding: var(--space-5) 0;
+    }
+
+    .brand {
+      display: flex;
+      gap: var(--space-3);
+      align-items: center;
+      padding-right: var(--space-5);
+      border-right: 1px solid var(--border);
+    }
+
+    .brand-mark {
+      width: 50px;
+      height: 50px;
+      color: var(--status-warn);
+      flex-shrink: 0;
+    }
+
+    .brand-text { display: flex; flex-direction: column; gap: 2px; }
+
+    .brand-name {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 22px;
+      letter-spacing: 0.10em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .brand-tagline {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      color: var(--text-soft);
+      text-transform: uppercase;
+    }
+
+    .identity {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding-top: 2px;
+    }
+
+    .identity-row {
+      display: flex;
+      gap: var(--space-4);
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+
+    .site-name {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 52px;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      line-height: 0.95;
+      font-weight: 400;
+    }
+
+    .bundle-id {
+      font-size: 13px;
+      letter-spacing: 0.10em;
+      color: var(--status-warn);
+      font-weight: 500;
+    }
+
+    .badge {
+      display: inline-flex;
+      gap: var(--space-1);
+      align-items: center;
+      padding: 4px 10px 4px 8px;
+      border-radius: var(--radius-2);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      font-weight: 500;
+    }
+
+    .badge-signed {
+      color: var(--status-ok);
+      border: 1px solid rgba(74, 124, 95, 0.4);
+      background: rgba(74, 124, 95, 0.08);
+    }
+
+    .shield-icon { width: 11px; height: 11px; }
+
+    .metadata {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-mid);
+      letter-spacing: 0.02em;
+      line-height: 1.6;
+    }
+
+    .metadata .sep { color: var(--text-faint); }
+
+    /* ─── Actions ────────────────────────────────────────────── */
+    .actions {
+      display: flex;
+      gap: var(--space-3);
+      align-items: stretch;
+      flex-shrink: 0;
+    }
+
+    .action {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 18px 22px;
+      border-radius: var(--radius-2);
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .action-secondary {
+      color: var(--text);
+      border: 1px solid var(--border-soft);
+      background: var(--panel);
+    }
+
+    .action-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action-primary {
+      background: var(--status-warn);
+      color: #1a0e02;
+      border: 1px solid var(--status-warn);
+      font-weight: 600;
+    }
+
+    .action-primary:hover {
+      background: #ffba35;
+      border-color: #ffba35;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(245, 166, 35, 0.18);
+    }
+
+    .action-disabled {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px dashed var(--border-soft);
+      font-style: italic;
+      cursor: not-allowed;
+    }
+
+    .action .arrow { font-size: 14px; line-height: 1; }
+    .action .dot { color: rgba(0,0,0,0.5); }
+
+    /* ─── Curl one-liner ─────────────────────────────────────── */
+    .curl {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-3);
+      padding: var(--space-5) var(--space-5);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--space-4);
+      position: relative;
+    }
+
+    .curl-prompt {
+      color: var(--text-mid);
+      font-size: 14px;
+      user-select: none;
+      font-weight: 500;
+    }
+
+    .curl-cmd {
+      color: var(--text);
+      font-size: 14px;
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .curl-cmd .filename { color: var(--status-warn); }
+
+    .curl-copy {
+      background: transparent;
+      border: 1px solid var(--border-soft);
+      color: var(--text-mid);
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-2);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      transition: all 160ms ease;
+      display: grid;
+      place-items: center;
+    }
+
+    .curl-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* ─── Columns ────────────────────────────────────────────── */
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr 1fr;
+      gap: var(--space-4);
+    }
+
+    .column {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-3);
+      padding: var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .column-header {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: baseline;
+      gap: var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .column-num {
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.1em;
+    }
+
+    .column-title {
+      font-family: "Bebas Neue", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      color: var(--text);
+      font-weight: 400;
+      text-transform: uppercase;
+    }
+
+    .column-count {
+      font-size: 10px;
+      color: var(--text-mid);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    /* ─── Artifact rows ──────────────────────────────────────── */
+    .artifact-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .artifact {
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--border);
+      opacity: 0;
+      animation: rise 600ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+      animation-delay: var(--stagger, 0s);
+    }
+
+    .artifact:last-child { border-bottom: none; padding-bottom: 0; }
+    .artifact:first-child { padding-top: 0; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .artifact-code {
+      font-size: 10px;
+      color: var(--text-faint);
+      letter-spacing: 0.08em;
+      padding-top: 3px;
+      font-weight: 500;
+    }
+
+    .artifact-name {
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    .artifact-subtitle {
+      color: var(--text-mid);
+      font-size: 12px;
+      margin-top: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .artifact-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+    }
+
+    /* ─── File chips (color-coded by family) ─────────────────── */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 7px 11px;
+      border: 1px solid var(--border-soft);
+      border-radius: var(--radius-2);
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-decoration: none;
+      color: var(--text-mid);
+      background: rgba(255, 255, 255, 0.01);
+      transition: all 140ms ease;
+      font-weight: 500;
+    }
+
+    .chip:hover {
+      background: rgba(255, 255, 255, 0.03);
+      transform: translateY(-1px);
+    }
+
+    .chip-arrow { font-size: 11px; opacity: 0.85; line-height: 1; }
+    .chip-size  { opacity: 0.7; font-weight: 400; }
+
+    /* System-image families: ISO + APK = green, AAB = neutral */
+    .chip-iso, .chip-apk {
+      color: var(--status-ok);
+      border-color: rgba(74, 124, 95, 0.35);
+      background: rgba(74, 124, 95, 0.04);
+    }
+    .chip-iso:hover, .chip-apk:hover {
+      border-color: var(--status-ok);
+      background: rgba(74, 124, 95, 0.10);
+    }
+
+    /* Engineering CAD = teal (DXF, STEP) */
+    .chip-dxf {
+      color: var(--color-thermal);
+      border-color: rgba(74, 154, 154, 0.35);
+      background: rgba(74, 154, 154, 0.04);
+    }
+    .chip-dxf:hover {
+      border-color: var(--color-thermal);
+      background: rgba(74, 154, 154, 0.10);
+    }
+
+    /* Manifest data = warn amber (JSON) */
+    .chip-json {
+      color: var(--status-warn);
+      border-color: rgba(245, 166, 35, 0.35);
+      background: rgba(245, 166, 35, 0.04);
+    }
+    .chip-json:hover {
+      border-color: var(--status-warn);
+      background: rgba(245, 166, 35, 0.10);
+    }
+
+    /* Everything else (PDF, STEP, XLSX, AAB, SIG, SHA256) stays neutral */
+
+    /* ─── Footer ─────────────────────────────────────────────── */
+    .footer {
+      margin-top: var(--space-4);
+      padding: var(--space-4) var(--space-5);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-3);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: 11px;
+      color: var(--text-soft);
+      letter-spacing: 0.02em;
+    }
+
+    .lock-icon { width: 12px; height: 12px; color: var(--status-ok); flex-shrink: 0; }
+
+    /* ─── Responsive ─────────────────────────────────────────── */
+    @media (max-width: 1180px) {
+      .columns { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 760px) {
+      body { padding: var(--space-4); }
+      .header { grid-template-columns: 1fr; }
+      .columns { grid-template-columns: 1fr; }
+      .actions { flex-wrap: wrap; }
+      .site-name { font-size: 30px; }
+    }
+
+    /* ─── Scrollbar ──────────────────────────────────────────── */
+    ::-webkit-scrollbar { height: 6px; width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+  </style>
+</head>
+<body>
+  <main class="portal">
+
+    {# ─── Header ───────────────────────────────────────── #}
+    <header class="header">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M292.669 0.913645C292.669 2.11181 313.839 41.2288 316.342 44.6537C317.604 46.381 322.665 55.5675 327.589 65.068C332.513 74.5685 348.874 104.742 363.948 132.123C379.022 159.501 392.958 184.941 394.919 188.655C396.879 192.367 399.308 196.112 400.315 196.976C401.324 197.84 403.013 201.464 404.066 205.03C405.859 211.09 408.207 211.509 439.98 211.442L473.976 211.371L468.161 200.248C464.961 194.13 459.12 183.471 455.18 176.562C451.24 169.652 445.608 158.699 442.666 152.221C439.722 145.744 436.29 140.444 435.037 140.444C433.785 140.444 432.76 139.147 432.76 137.562C432.76 135.978 426.949 124.318 419.849 111.652C412.748 98.9856 403.548 82.2631 399.405 74.49C395.263 66.7169 389.001 55.0571 385.491 48.5795C381.98 42.1019 376.4 31.766 373.09 25.6087C358.342 -1.82501 361.638 -0.0599619 325.374 0.0640943C307.386 0.125337 292.669 0.508499 292.669 0.913645ZM264.626 34.4465C256.908 48.6973 249.361 62.477 247.855 65.068C228.73 97.9759 216.097 127.982 216.097 127.982C216.097 127.982 210.968 132.584 211.107 132.61C209.39 138.974 214.791 137.303 246.347 137.303H283.295L293.641 155.362C299.33 165.294 306.622 178.367 309.845 184.413C313.067 190.459 318.528 200.396 321.981 206.497C327.926 217.001 327.999 218.08 323.379 226.911C320.695 232.038 315.409 242.401 311.631 249.937C307.853 257.475 303.525 265.248 302.014 267.211C292.069 280.131 287.376 293.73 290.707 299.972C296.722 311.241 316.231 345.982 319.063 350.462C321.075 353.648 324.717 349.157 333.073 333.188C339.284 321.321 346.613 308.077 349.36 303.759C352.106 299.44 358.39 288.134 363.322 278.633C368.255 269.133 377.178 252.643 383.151 241.986C396.548 218.089 396.545 217.536 382.914 193.218C376.811 182.329 369.77 169.561 367.266 164.845C361.907 154.747 349.124 131.462 319.389 77.6307C307.462 56.0386 294.243 31.6592 290.015 23.4542C280.197 4.40292 281.112 4.0072 264.626 34.4465ZM128.734 151.551C128.734 153.453 143.271 180.445 152.999 196.608L161.728 211.109L234.65 211.235C274.757 211.304 307.573 210.142 307.573 208.651C307.573 207.161 300.531 193.358 291.924 177.978L276.276 150.014L202.505 150.166C161.931 150.249 128.734 150.873 128.734 151.551ZM97.6846 189.62C88.4491 206.621 79.68 222.651 78.1972 225.242C74.4654 231.76 56.0719 265.317 48.9302 278.633C45.6873 284.679 33.3519 307.292 21.5173 328.884L0 368.142L9.46503 386.986C14.6707 397.35 22.0314 411.311 25.8228 418.008L32.717 430.188L37.1209 422.719C44.6709 409.916 72.1018 359.75 72.1018 358.745C72.1018 357.918 91.078 323.476 98.935 310.04C100.451 307.449 105.525 298.262 110.211 289.626C114.898 280.989 121.446 268.976 124.765 262.93C128.084 256.884 134.944 244.164 140.011 234.664L149.224 217.39L134.276 190.695C126.054 176.012 118.236 162.809 116.901 161.354C115.567 159.9 106.919 172.62 97.6846 189.62ZM155.281 233.899C152.669 238.638 140.932 260.182 129.202 281.774C117.47 303.366 106.521 323.152 104.871 325.743C103.221 328.334 100.96 332.574 99.8471 335.165C98.7338 337.756 92.7069 348.734 86.4536 359.56C80.1987 370.388 75.0824 379.805 75.0824 380.488C75.0824 381.173 68.4847 393.511 60.4221 407.908C52.358 422.304 46.3162 434.669 46.9943 435.384C48.5323 437.003 185.366 437.676 185.366 436.064C185.366 435.42 179.33 424.417 171.953 411.612C164.576 398.809 158.511 387.324 158.475 386.089C158.438 384.855 155.897 380.402 152.827 376.193C147.326 368.653 147.348 368.368 154.382 356.627C158.309 350.074 161.521 343.943 161.521 343.003C161.521 342.062 166.886 332.342 173.444 321.401C180.001 310.461 185.366 300.114 185.366 298.41C185.366 288.734 196.055 286.205 235.477 286.554C280.786 286.956 276.1 289.66 295.48 251.938C300.804 241.573 306.538 231.327 308.222 229.168C310.656 226.046 295.805 225.247 235.657 225.262L160.031 225.281L155.281 233.899ZM393.141 249.582C385.817 262.969 376.82 279.575 373.147 286.485C350.063 329.905 338.841 349.969 334.938 354.794C329.491 361.531 326.671 360.898 365.056 361.548C404.306 362.214 397.522 367.194 423.478 318.677C426.943 312.199 432.298 302.306 435.375 296.692C438.454 291.078 445.938 277.298 452.009 266.071C458.077 254.843 465.728 241.063 469.009 235.449L474.974 225.242H440.715H406.455L393.141 249.582ZM220.036 321.817C226.149 333.477 233.592 346.387 236.575 350.507C239.557 354.626 241.998 359.037 241.998 360.311C241.998 361.583 250.717 377.773 261.373 396.289C272.028 414.806 280.747 431.089 280.747 432.474C280.747 437.532 507.07 440.07 511.818 435.067C513.082 433.737 450.575 316.214 445.32 310.04C443.819 308.276 444.323 307.468 422.751 346.158L406.989 374.423L361.758 374.687L316.525 374.95L307.117 357.414C301.942 347.767 294.349 333.516 290.242 325.743C275.845 298.498 279.863 300.618 242.626 300.618H208.919L220.036 321.817ZM187.43 321.817C183.003 330.022 175.827 343.995 171.485 352.868L163.593 369L200.56 436.769C235.776 501.328 237.739 504.226 241.998 497.935C247.487 489.826 260.917 465.792 267.355 452.552C272.894 441.164 276.963 450.611 230.536 367.073C213.889 337.12 200.269 311.328 200.269 309.756C200.269 302.939 194.895 307.987 187.43 321.817ZM285.75 450.815C282.999 451.373 280.747 453.047 280.747 454.532C280.747 457.353 266.078 484.193 256.164 499.511C253.003 504.398 251.186 509.208 252.128 510.201C254.036 512.211 480.116 512.74 481.246 510.738C481.639 510.042 484.973 504.935 488.657 499.392C492.34 493.849 495.353 488.351 495.353 487.176C495.353 486.002 499.454 478.018 504.468 469.433C509.48 460.85 512.794 452.998 511.835 451.985C510.043 450.098 294.774 448.983 285.75 450.815Z"/>
+        </svg>
+        <div class="brand-text">
+          <div class="brand-name">ARCNODE</div>
+          <div class="brand-tagline">Delivery Portal</div>
+        </div>
+      </div>
+
+      <div class="identity">
+        <div class="identity-row">
+          <h1 class="site-name">{{ manifest.site_display_name | upper }}</h1>
+          <span class="bundle-id">{{ manifest.bundle_id }}</span>
+          {% if manifest.signed %}
+          <span class="badge badge-signed" title="Signed by ARCNODE — key fingerprint shown in metadata">
+            <svg class="shield-icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path d="M6 1L10 2.5V6C10 8.5 8 10.5 6 11C4 10.5 2 8.5 2 6V2.5L6 1Z"/>
+              <path d="M4.5 6L5.5 7L7.5 5"/>
+            </svg>
+            <span>SIGNED</span>
+          </span>
+          {% endif %}
+        </div>
+        <div class="metadata">
+          <span>Rev {{ manifest.revision }}</span>
+          {% if manifest.supersedes %}
+          <span class="sep">·</span>
+          <span>supersedes {{ manifest.supersedes }}</span>
+          {% endif %}
+          <span class="sep">·</span>
+          <span>Built {{ manifest.built_at.strftime('%-d %b %Y') }}</span>
+          <span class="sep">·</span>
+          <span>{{ manifest.built_at.strftime('%H:%M') }} UTC</span>
+          {% if manifest.key_id %}
+          <span class="sep">·</span>
+          <span>Key {{ manifest.key_id }}</span>
+          {% endif %}
+          <span class="sep">·</span>
+          <span>{{ manifest.artifact_count }} artifacts</span>
+          <span class="sep">·</span>
+          <span>{{ manifest.total_file_count }} files</span>
+          <span class="sep">·</span>
+          <span>{{ manifest.total_size_bytes | filesize }}</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a href="manifest.json" class="action action-secondary">MANIFEST.JSON</a>
+        {% if manifest.bundle_url %}
+        <a href="{{ manifest.bundle_url }}" class="action action-primary" download>
+          <span class="arrow">↓</span>
+          <span>DOWNLOAD BUNDLE</span>
+          <span class="dot">·</span>
+          <span>{{ manifest.total_size_bytes | filesize }}</span>
+        </a>
+        {% else %}
+        <span class="action action-disabled" title="Bundle assembly is a future phase; download artifacts individually below for now">
+          BUNDLE PENDING
+        </span>
+        {% endif %}
+      </div>
+    </header>
+
+    {# ─── Curl one-liner ───────────────────────────────── #}
+    {% if manifest.bundle_curl_url %}
+    <div class="curl">
+      <span class="curl-prompt">$</span>
+      <code class="curl-cmd">curl -LO {{ curl_prefix }}<span class="filename">{{ curl_filename }}</span></code>
+      <button class="curl-copy"
+              onclick="navigator.clipboard.writeText('curl -LO {{ manifest.bundle_curl_url }}')"
+              title="Copy command">⎘</button>
+    </div>
+    {% endif %}
+
+    {# ─── Three columns ────────────────────────────────── #}
+    <section class="columns">
+      {% for spec in section_specs %}
+      {% set artifacts = manifest.sections[spec.key] %}
+      {% if artifacts %}
+      <article class="column">
+        <header class="column-header">
+          <span class="column-num">§ {{ spec.num }}</span>
+          <h2 class="column-title">{{ spec.label }}</h2>
+          <span class="column-count">{{ artifacts | length }} {{ 'item' if artifacts | length == 1 else 'items' }}</span>
+        </header>
+
+        <ul class="artifact-list">
+          {% for artifact in artifacts %}
+          <li class="artifact" style="--stagger: {{ '%.2f' | format(loop.index0 * 0.04) }}s">
+            <div class="artifact-code">{{ artifact.code }}</div>
+            <div class="artifact-body">
+              <div class="artifact-name">{{ artifact.name }}</div>
+              <div class="artifact-subtitle">{{ artifact.subtitle }}</div>
+              <div class="artifact-files">
+                {% for file in artifact.files %}
+                <a href="{{ file.url }}" class="chip chip-{{ file.format | lower }}" download>
+                  <span class="chip-arrow">↓</span>
+                  <span class="chip-format">{{ file.format }}</span>
+                  <span class="chip-size">{{ file.size_bytes | filesize }}</span>
+                </a>
+                {% endfor %}
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </article>
+      {% endif %}
+      {% endfor %}
+    </section>
+
+    {# ─── Footer ───────────────────────────────────────── #}
+    <footer class="footer">
+      <svg class="lock-icon" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+        <rect x="2.5" y="5.5" width="7" height="5" rx="0.5"/>
+        <path d="M4 5.5V3.5C4 2.4 4.9 1.5 6 1.5C7.1 1.5 8 2.4 8 3.5V5.5"/>
+      </svg>
+      <span>Pre-signed URLs · expire 7 days from issue</span>
+    </footer>
+
+  </main>
+</body>
+</html>

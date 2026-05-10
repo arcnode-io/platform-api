@@ -20,6 +20,9 @@ from src.edp_client.edp_artifacts import (
     JobResult,
 )
 from src.edp_client.edp_client_service import EdpClientService
+from src.manifest.artifact_metadata import MOCK_SYSTEM_IMAGE_TEMPLATES
+from src.manifest.manifest_record import ManifestArtifact, ManifestFile
+from src.manifest.manifest_service import ManifestService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
 from src.orders.orders_record import (
@@ -51,12 +54,16 @@ class OrchestratorService:
         ses: SesService,
         cfn: CfnService,
         portal: PortalService,
+        manifest: ManifestService,
+        ems_hmi_apk_url: str,
     ) -> None:
         self._edp = edp_client
         self._s3 = s3
         self._ses = ses
         self._cfn = cfn
         self._portal = portal
+        self._manifest = manifest
+        self._ems_hmi_apk_url = ems_hmi_apk_url
 
     # Public — business intent
 
@@ -80,11 +87,13 @@ class OrchestratorService:
         edp = await self._edp.submit_and_wait(payload, deployment_id=order.id)
         archived = await self._archive(str(order.id), edp)
         delivery = await self._build_delivery(str(order.id), payload, archived)
-        portal_url = await self._publish_portal(str(order.id), archived, delivery)
+        portal_url = await self._publish_portal(
+            str(order.id), payload, archived, delivery
+        )
         await self._notify(payload.contact_email, portal_url)
         return _PipelineResult(
             edp=edp,
-            archived=archived,
+            archived=[ref for ref, _ in archived],
             delivery=delivery,
             deployment_uuid=str(order.id),
         )
@@ -94,25 +103,34 @@ class OrchestratorService:
         await self._s3.ensure_bucket()
         await self._ses.verify_sender()
 
-    async def _archive(self, order_id: str, edp: JobResult) -> list[ArtifactRef]:
-        """Re-archive every edp-api artifact into platform-api S3."""
+    async def _archive(
+        self, order_id: str, edp: JobResult
+    ) -> list[tuple[ArtifactRef, int]]:
+        """Re-archive every edp-api artifact into platform-api S3.
+
+        Returns (ref, size_bytes) so the manifest builder can render file-size
+        chips without a follow-up HEAD round-trip.
+        """
         return [await self._archive_ref(order_id, a) for a in edp.edp_artifact_urls]
 
-    async def _archive_ref(self, order_id: str, ref: ArtifactRef) -> ArtifactRef:
-        """Stream one artifact's bytes into platform-api S3, return a new ref."""
+    async def _archive_ref(
+        self, order_id: str, ref: ArtifactRef
+    ) -> tuple[ArtifactRef, int]:
+        """Stream one artifact's bytes into platform-api S3, return (ref, size)."""
         source = self._to_absolute_url(ref.url)
         filename = source.rsplit("/", 1)[-1]
         key = f"orders/{order_id}/{filename}"
-        new_url = await self._s3.archive_from_url(source, key=key)
-        return ArtifactRef(
+        new_url, size = await self._s3.archive_from_url(source, key=key)
+        new_ref = ArtifactRef(
             kind=ref.kind, format=ref.format, url=new_url, plate_id=ref.plate_id
         )
+        return new_ref, size
 
     async def _build_delivery(
         self,
         order_id: str,
         payload: ConfiguratorPayload,
-        archived: list[ArtifactRef],
+        archived: list[tuple[ArtifactRef, int]],
     ) -> OrderEmsDelivery:
         """Render + upload per-order CFN template; expose its S3 URL.
 
@@ -140,14 +158,73 @@ class OrchestratorService:
     async def _publish_portal(
         self,
         order_id: str,
-        archived: list[ArtifactRef],
+        payload: ConfiguratorPayload,
+        archived: list[tuple[ArtifactRef, int]],
         delivery: OrderEmsDelivery,
     ) -> str:
-        """Render index.html and upload to S3; return its public URL."""
-        body = self._portal.render(
-            order_id=order_id, artifacts=archived, delivery=delivery
+        """Build manifest, render portal HTML + manifest.json, upload both.
+
+        Returns the portal index.html public URL (which is what the email
+        body links to).
+        """
+        system_artifacts = await self._build_system_artifacts(delivery)
+        manifest = self._manifest.build(
+            site_display_name=payload.deployment_site_name,
+            archived=archived,
+            system_artifacts=system_artifacts,
         )
-        return await self._s3.upload_html(f"orders/{order_id}/index.html", body)
+        html = self._portal.render(manifest=manifest)
+        manifest_json = self._portal.render_manifest_json(manifest=manifest)
+        await self._s3.upload_json(f"orders/{order_id}/manifest.json", manifest_json)
+        return await self._s3.upload_html(f"orders/{order_id}/index.html", html)
+
+    async def _build_system_artifacts(
+        self, delivery: OrderEmsDelivery
+    ) -> list[ManifestArtifact]:
+        """Compose the System Images section: APK from cfg.yml + per-order CFN yaml.
+
+        Future: ISO from the air-gapped build pipeline lands here too as A1.
+        """
+        artifacts: list[ManifestArtifact] = []
+
+        apk_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["ems_field_client"]
+        apk_size = await self._s3.head_size(self._ems_hmi_apk_url)
+        artifacts.append(
+            ManifestArtifact(
+                code="",
+                name=apk_meta.name,
+                subtitle=apk_meta.subtitle,
+                files=[
+                    ManifestFile(
+                        format="APK",
+                        size_bytes=apk_size,
+                        url=self._ems_hmi_apk_url,
+                    )
+                ],
+            )
+        )
+
+        # Cloud paths get the per-order CFN yaml as a System Images artifact.
+        # ISO path: no CFN; A2 stays absent until the ISO build pipeline lands.
+        if delivery.template_url:
+            cfn_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["aws_deployment"]
+            cfn_size = await self._s3.head_size(delivery.template_url)
+            artifacts.append(
+                ManifestArtifact(
+                    code="",
+                    name=cfn_meta.name,
+                    subtitle=cfn_meta.subtitle,
+                    files=[
+                        ManifestFile(
+                            format="YAML",
+                            size_bytes=cfn_size,
+                            url=delivery.template_url,
+                        )
+                    ],
+                )
+            )
+
+        return artifacts
 
     async def _notify(self, to: str, portal_url: str) -> None:
         """Email the operator the portal link + a brief prereq pointer.
@@ -207,9 +284,9 @@ class OrchestratorService:
         return f"{self._edp._base_url.rstrip('/')}{url}"
 
     @staticmethod
-    def _find_dtm_url(archived: list[ArtifactRef]) -> str:
+    def _find_dtm_url(archived: list[tuple[ArtifactRef, int]]) -> str:
         """Locate the DTM's archived URL — required for the CFN launch link."""
-        for a in archived:
-            if a.kind == ArtifactKind.DTM:
-                return a.url
+        for ref, _ in archived:
+            if ref.kind == ArtifactKind.DTM:
+                return ref.url
         raise ValueError("DTM url missing in archived artifacts")

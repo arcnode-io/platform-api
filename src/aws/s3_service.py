@@ -40,8 +40,13 @@ class S3Service:
 
     async def archive_from_url(
         self, source_url: str, key: str, content_type: str = "application/json"
-    ) -> str:
-        """Fetch `source_url` over HTTP, upload to S3 under `key`, return the S3 URL."""
+    ) -> tuple[str, int]:
+        """Fetch source_url, upload under `key`, return (S3 URL, size in bytes).
+
+        Size is captured for free at archive time (we already have the bytes
+        in memory). Portal/manifest renderers consume it for chip labels like
+        'JSON 612 KB'.
+        """
         async with httpx.AsyncClient(timeout=10.0) as http:
             resp = await http.get(source_url)
             resp.raise_for_status()
@@ -52,12 +57,27 @@ class S3Service:
                 Bucket=self._bucket, Key=key, Body=body, ContentType=content_type
             )
         url = self._public_url(key)
-        logging.info("archived %d bytes %s → %s", len(body), source_url, url)
-        return url
+        size = len(body)
+        logging.info("archived %d bytes %s → %s", size, source_url, url)
+        return url, size
+
+    async def head_size(self, url: str) -> int:
+        """HEAD request → Content-Length. For URLs not archived through us
+        (e.g., the EMS HMI APK in cfg.yml hosted on arcnode-public S3).
+        """
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http:
+            resp = await http.head(url)
+            resp.raise_for_status()
+            cl = resp.headers.get("content-length")
+            return int(cl) if cl is not None else 0
 
     async def upload_html(self, key: str, body: str) -> str:
         """Upload an HTML body under `key`, return the S3 URL."""
         return await self._upload_text(key, body, "text/html; charset=utf-8")
+
+    async def upload_json(self, key: str, body: str) -> str:
+        """Upload a JSON body under `key`, return the S3 URL."""
+        return await self._upload_text(key, body, "application/json")
 
     async def upload_yaml(self, key: str, body: str) -> str:
         """Upload a YAML body under `key`, return the S3 URL."""
