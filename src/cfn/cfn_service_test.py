@@ -118,6 +118,39 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
 
 
+def test_instance_role_can_read_persistence_secrets() -> None:
+    """EC2 instance role grants secretsmanager:GetSecretValue on ems/* prefix."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "secretsmanager:GetSecretValue" in rendered
+    assert "secret:ems/" in rendered  # the secret-name prefix appears in the policy
+
+
+def test_userdata_fetches_four_persistence_secrets() -> None:
+    """UserData calls aws secretsmanager get-secret-value for each persistence slot."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    for slot in ("aurora-document", "aurora-vector", "tiger", "neo4j-aura"):
+        assert slot in rendered, f"UserData missing fetch for {slot} secret"
+    assert "aws secretsmanager get-secret-value" in rendered
+
+
+def test_userdata_writes_secrets_to_opt_arcnode_url_files() -> None:
+    """Secrets land at /opt/arcnode/<name>.url for docker-compose env_file."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "/opt/arcnode/aurora-document.url" in rendered
+    assert "/opt/arcnode/aurora-vector.url" in rendered
+    assert "/opt/arcnode/tiger.url" in rendered
+    assert "/opt/arcnode/neo4j-aura.url" in rendered
+
+
 def test_render_template_includes_aurora_cluster() -> None:
     """Persistence sub-module's Aurora resources are merged into the template."""
     # Arrange + Act

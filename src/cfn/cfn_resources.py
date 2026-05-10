@@ -131,7 +131,7 @@ def network_resources() -> dict[str, object]:
 
 
 def iam_resources(*, short: str) -> dict[str, object]:
-    """Instance role with S3 GetObject on platform-api's bucket (DTM fetch)."""
+    """Instance role with S3 GetObject (DTM fetch) + SecretsManager read for persistence."""
     return {
         "EmsInstanceRole": {
             "Type": "AWS::IAM::Role",
@@ -159,7 +159,22 @@ def iam_resources(*, short: str) -> dict[str, object]:
                                 }
                             ],
                         },
-                    }
+                    },
+                    {
+                        "PolicyName": f"arcnode-{short}-secrets-read",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "secretsmanager:GetSecretValue",
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ems/*"
+                                    },
+                                }
+                            ],
+                        },
+                    },
                 ],
             },
         },
@@ -170,14 +185,29 @@ def iam_resources(*, short: str) -> dict[str, object]:
     }
 
 
-def build_userdata(*, deployment_uuid: str, dtm_url: str, ems_mode: str) -> str:
-    """Pre-launch placeholder UserData — drops marker files in /opt/arcnode/.
+PERSISTENCE_SECRET_SLOTS: Final[tuple[str, ...]] = (
+    "aurora-document",
+    "aurora-vector",
+    "tiger",
+    "neo4j-aura",
+)
 
-    Real docker-compose UserData lands once `registry.gitlab.com/arcnode-io/ems-*`
-    images are published. Until then this writes deployment metadata + the three
-    connection-string params (via Fn::Sub) to disk so an operator can SSH/SSM in
-    and confirm UserData ran end-to-end and CFN substitution wired through.
+
+def build_userdata(*, deployment_uuid: str, dtm_url: str, ems_mode: str) -> str:
+    """UserData: write deployment env, fetch persistence secrets, fetch DTM.
+
+    Each persistence secret was created at stack-create time by the
+    Aurora-bootstrap / Tiger-provisioner / Aura-provisioner Lambdas. The
+    EC2 instance fetches them via the AWS CLI (preinstalled on AL2023)
+    using the instance profile's secrets-read policy granted in
+    iam_resources(). Secrets are written to /opt/arcnode/<name>.url so
+    docker-compose can source them via env_file: directives.
     """
+    fetch_lines = "\n".join(
+        f'aws secretsmanager get-secret-value --secret-id "ems/{deployment_uuid}/persistence/{slot}" '
+        f"--query SecretString --output text > /opt/arcnode/{slot}.url"
+        for slot in PERSISTENCE_SECRET_SLOTS
+    )
     return (
         "#!/bin/bash\n"
         "set -euo pipefail\n"
@@ -187,8 +217,8 @@ def build_userdata(*, deployment_uuid: str, dtm_url: str, ems_mode: str) -> str:
         f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
-        "# Persistence connection strings will be fetched from Secrets Manager\n"
-        "# at boot once the persistence sub-module CFN custom resources land.\n"
+        "# Fetch persistence connection strings from Secrets Manager.\n"
+        f"{fetch_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json || "
         "echo 'DTM fetch failed; populate /opt/arcnode/dtm.json manually'\n"
