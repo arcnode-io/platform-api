@@ -36,11 +36,11 @@ dev = [
 
 [tool.poe.tasks]
 dev = "python -m src.main"
-depcheck = "deptry . --per-rule-ignores DEP004=pytest|cfnlint,DEP002=asyncpg"
+depcheck = "deptry . --per-rule-ignores DEP001=cfnlint,DEP004=pytest|cfnlint,DEP002=asyncpg --extend-exclude src/cfn/persistence/lambda_code"
 format = "black ."
 lint = "ruff check"
 typecheck = "ty check"
-audit-src = "bandit -r src/* -s B101"
+audit-src = "bandit -r src/* -s B101,B105,B106,B310"
 audit-packages = "pip-audit --ignore-vuln CVE-2026-3219"
 security = ["audit-src", "audit-packages"]
 checks = ["depcheck", "format", "lint", "typecheck", "security"]

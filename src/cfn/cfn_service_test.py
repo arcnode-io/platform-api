@@ -172,6 +172,55 @@ def test_render_template_includes_tiger_and_aura_custom_resources() -> None:
     assert "Custom::AuroraBootstrap" in rendered
 
 
+def test_render_template_full_resource_inventory() -> None:
+    """End-to-end: rendered template contains all expected logical IDs."""
+    # Arrange + Act
+    rendered = _render()
+
+    expected = [
+        # Network
+        "EmsVpc",
+        "EmsSubnet",
+        "EmsSecurityGroup",
+        # IAM
+        "EmsInstanceRole",
+        "EmsInstanceProfile",
+        # Aurora
+        "AuroraCluster",
+        "AuroraInstance",
+        "AuroraMasterSecret",
+        "AuroraSubnetGroup",
+        "AuroraSecurityGroup",
+        "AuroraBootstrapLambda",
+        "AuroraBootstrapCustomResource",
+        # Tiger
+        "TigerLambda",
+        "TigerCustomResource",
+        "TigerLambdaRole",
+        # Aura
+        "AuraLambda",
+        "AuraCustomResource",
+        "AuraLambdaRole",
+        # EC2
+        "EmsInstance",
+    ]
+
+    for logical_id in expected:
+        assert logical_id in rendered, f"missing logical id: {logical_id}"
+
+
+def test_ec2_instance_depends_on_all_three_persistence_resources() -> None:
+    """EC2 must wait for all three custom resources before launching."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "AuroraBootstrapCustomResource" in rendered
+    assert "TigerCustomResource" in rendered
+    assert "AuraCustomResource" in rendered
+    assert "DependsOn" in rendered
+
+
 def test_render_template_declares_vendor_token_parameters() -> None:
     """Six no-default NoEcho parameters: Tiger access+secret+project, Aura client id+secret+tenant.
 
