@@ -8,7 +8,7 @@ relay it to the configurator. Fields stay in lock-step with edp-api's
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class EnergySource(StrEnum):
@@ -62,10 +62,13 @@ class ClimateZone(StrEnum):
 
 
 class DeploymentContext(StrEnum):
-    """Customer segment. Drives EDP content (compliance), not delivery routing."""
+    """Customer segment. Drives EDP content (compliance), not delivery routing.
+
+    Mirrors edp-api/src/shared/enums.py:DeploymentContext exactly. Three values
+    only — there is no `research` segment downstream.
+    """
 
     COMMERCIAL = "commercial"
-    RESEARCH = "research"
     SOVEREIGN_GOVERNMENT = "sovereign_government"
     DEFENSE_FORWARD = "defense_forward"
 
@@ -83,7 +86,7 @@ class ConfiguratorPayload(BaseModel):
 
     operator_org: str
     deployment_site_name: str
-    contact_email: str
+    contact_email: EmailStr
     energy_source: EnergySource
     source_capacity_mw: float = Field(gt=0)
     primary_workload: PrimaryWorkload

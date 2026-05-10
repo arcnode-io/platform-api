@@ -69,7 +69,6 @@ def test_configurator_js_payload_covers_every_select_enum_value() -> None:
         "climate_zone": {"subarctic", "temperate", "arid_hot", "tropical"},
         "deployment_context": {
             "commercial",
-            "research",
             "sovereign_government",
             "defense_forward",
         },
