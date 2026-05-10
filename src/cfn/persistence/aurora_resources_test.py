@@ -66,3 +66,46 @@ def test_returns_subnet_group_and_security_group() -> None:
     assert "AuroraSecurityGroup" in resources
     assert resources["AuroraSubnetGroup"]["Type"] == "AWS::RDS::DBSubnetGroup"
     assert resources["AuroraSecurityGroup"]["Type"] == "AWS::EC2::SecurityGroup"
+
+
+def test_returns_bootstrap_lambda_and_custom_resource() -> None:
+    """Bootstrap Lambda + IAM role + custom resource trigger."""
+    # Arrange + Act
+    resources = aurora_cluster_resources()
+
+    # Assert
+    assert "AuroraBootstrapLambdaRole" in resources
+    assert "AuroraBootstrapLambda" in resources
+    assert "AuroraBootstrapCustomResource" in resources
+
+    lambda_res = resources["AuroraBootstrapLambda"]
+    assert lambda_res["Type"] == "AWS::Lambda::Function"
+    assert lambda_res["Properties"]["Runtime"] == "python3.13"
+    assert lambda_res["Properties"]["Handler"] == "index.handler"
+    # The Lambda runs inside the VPC because it speaks Postgres to private RDS
+    assert "VpcConfig" in lambda_res["Properties"]
+
+
+def test_bootstrap_custom_resource_passes_required_properties() -> None:
+    """ClusterEndpoint, MasterSecretArn, DeploymentUuid flow into the Lambda."""
+    # Arrange + Act
+    cr = aurora_cluster_resources()["AuroraBootstrapCustomResource"]
+
+    # Assert
+    assert cr["Type"] == "Custom::AuroraBootstrap"
+    props = cr["Properties"]
+    assert "ClusterEndpoint" in props
+    assert "MasterSecretArn" in props
+    assert "DeploymentUuid" in props
+
+
+def test_bootstrap_lambda_embeds_source_via_zipfile() -> None:
+    """Lambda code is the bootstrap source file content as ZipFile."""
+    # Arrange + Act
+    lambda_res = aurora_cluster_resources()["AuroraBootstrapLambda"]
+
+    # Assert
+    code = lambda_res["Properties"]["Code"]
+    assert "ZipFile" in code
+    # Source file content includes the SQL — confirms _load_lambda_source ran
+    assert "CREATE DATABASE ems_document" in code["ZipFile"]
