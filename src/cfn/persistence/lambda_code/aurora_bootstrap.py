@@ -48,30 +48,40 @@ def _create(event: dict) -> dict:
     doc_pw = secrets.token_urlsafe(32)
     vec_pw = secrets.token_urlsafe(32)
 
-    with psycopg2.connect(
+    # psycopg2's `with connect(...) as conn` begins a transaction on entry;
+    # CREATE DATABASE / CREATE USER must run outside any transaction. Manage
+    # the connection manually so autocommit takes effect before the first
+    # statement.
+    admin_conn = psycopg2.connect(
         host=cluster_endpoint,
         user=master["username"],
         password=master["password"],
         dbname="postgres",
-    ) as conn:
-        conn.autocommit = True
-        with conn.cursor() as cur:
+    )
+    admin_conn.autocommit = True
+    try:
+        with admin_conn.cursor() as cur:
             cur.execute("CREATE DATABASE ems_document")
             cur.execute("CREATE DATABASE ems_vector")
             cur.execute(f"CREATE USER ems_doc_app WITH PASSWORD '{doc_pw}'")
             cur.execute(f"CREATE USER ems_vec_app WITH PASSWORD '{vec_pw}'")
             cur.execute("GRANT ALL PRIVILEGES ON DATABASE ems_document TO ems_doc_app")
             cur.execute("GRANT ALL PRIVILEGES ON DATABASE ems_vector TO ems_vec_app")
+    finally:
+        admin_conn.close()
 
-    with psycopg2.connect(
+    vector_conn = psycopg2.connect(
         host=cluster_endpoint,
         user=master["username"],
         password=master["password"],
         dbname="ems_vector",
-    ) as conn:
-        conn.autocommit = True
-        with conn.cursor() as cur:
+    )
+    vector_conn.autocommit = True
+    try:
+        with vector_conn.cursor() as cur:
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    finally:
+        vector_conn.close()
 
     doc_url = f"postgres://ems_doc_app:{doc_pw}@{cluster_endpoint}:5432/ems_document"
     vec_url = f"postgres://ems_vec_app:{vec_pw}@{cluster_endpoint}:5432/ems_vector"
