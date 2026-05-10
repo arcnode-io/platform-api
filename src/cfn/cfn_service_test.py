@@ -87,7 +87,11 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
 
 
 def test_render_template_userdata_drops_marker_files() -> None:
-    """Pre-launch UserData touches /opt/arcnode/ marker files (no docker yet)."""
+    """Pre-launch UserData touches /opt/arcnode/ marker files (no docker yet).
+
+    Persistence connection-string fetch lands in Task 14 (Secrets Manager
+    + AWS CLI). For now UserData only writes deployment env + DTM fetch.
+    """
     # Arrange + Act
     rendered = _render()
 
@@ -95,9 +99,6 @@ def test_render_template_userdata_drops_marker_files() -> None:
     assert "#!/bin/bash" in rendered
     assert "/opt/arcnode/deployment.env" in rendered
     assert "/opt/arcnode/userdata.done" in rendered
-    assert "/opt/arcnode/neon.url" in rendered
-    assert "/opt/arcnode/aura.url" in rendered
-    assert "/opt/arcnode/timeseries.url" in rendered
     assert DTM_URL in rendered  # curl line bakes the DTM URL in directly
     # No docker bits — those land when registry images are published
     assert "docker compose" not in rendered
@@ -116,44 +117,25 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
 
 
-def test_render_template_requires_three_persistence_connection_strings() -> None:
-    """Three required no-default CFN parameters, NoEcho true, MinLength 1.
+def test_render_template_declares_vendor_token_parameters() -> None:
+    """Six no-default NoEcho parameters: Tiger access+secret+project, Aura client id+secret+tenant.
 
-    PM contract: operator must paste Neon + Neo4j Aura + TimescaleDB connection
-    strings at create-stack time. CFN hard-fails if any is missing because none
-    have a Default.
+    Operators paste vendor API tokens (not raw conn strings); the
+    persistence sub-module's CFN custom-resource Lambdas use these
+    tokens to provision Tiger Cloud + Neo4j Aura instances at
+    stack-create time.
     """
     # Arrange + Act
     rendered = _render()
 
-    # Assert — each parameter named + sensitive-marked + non-empty constraint
-    assert "NeonConnectionString:" in rendered
-    assert "AuraConnectionString:" in rendered
-    assert "TimeseriesConnectionString:" in rendered
-    assert rendered.count("NoEcho: true") == 3
-    assert rendered.count("MinLength: 1") == 3
-    # No `Default:` lines anywhere = stack creation fails without all three
+    # Assert
+    assert "TigerCloudAccessKey:" in rendered
+    assert "TigerCloudSecretKey:" in rendered
+    assert "TigerCloudProjectId:" in rendered
+    assert "Neo4jAuraClientId:" in rendered
+    assert "Neo4jAuraClientSecret:" in rendered
+    assert "Neo4jAuraTenantId:" in rendered
+    assert rendered.count("NoEcho: true") == 6
+    assert rendered.count("MinLength: 1") == 6
+    # No Default: anywhere → CFN hard-fails if any token is missing
     assert "Default:" not in rendered
-
-
-def test_render_template_userdata_substitutes_connection_strings_via_sub() -> None:
-    """UserData uses Fn::Sub so the three params land as docker-compose env vars."""
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert — CFN does the substitution server-side
-    assert "Fn::Sub" in rendered
-    assert "${NeonConnectionString}" in rendered
-    assert "${AuraConnectionString}" in rendered
-    assert "${TimeseriesConnectionString}" in rendered
-
-
-def test_render_template_writes_each_connection_string_to_disk() -> None:
-    """Each of the 3 connection strings lands in its own marker file via Fn::Sub."""
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert — one redirect per connection string
-    assert '"${NeonConnectionString}" > /opt/arcnode/neon.url' in rendered
-    assert '"${AuraConnectionString}" > /opt/arcnode/aura.url' in rendered
-    assert '"${TimeseriesConnectionString}" > /opt/arcnode/timeseries.url' in rendered

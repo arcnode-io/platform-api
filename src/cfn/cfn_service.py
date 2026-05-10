@@ -22,7 +22,7 @@ from src.cfn.cfn_resources import (
     build_userdata,
     iam_resources,
     network_resources,
-    persistence_parameters,
+    vendor_token_parameters,
 )
 
 
@@ -42,7 +42,7 @@ class CfnService:
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": f"ARCNODE EMS deployment — {deployment_uuid}",
-            "Parameters": persistence_parameters(),
+            "Parameters": vendor_token_parameters(),
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short),
