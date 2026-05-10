@@ -1,18 +1,13 @@
 """CfnService — renders the per-order CloudFormation template.
 
 Each order gets its own `ems-stack.yaml` with deployment_uuid / dtm_url /
-ems_mode baked in. Three managed-service connection strings (Neon, Neo4j
-Aura, TimescaleDB) are required CFN parameters with no defaults — CFN
-refuses to deploy if any are missing. Operators sign up for those three
-services first (the portal page lists them as prereqs), then run
-`aws cloudformation create-stack` (or upload via Console) and paste in
-the connection strings.
-
-v0 stub-real: single EC2 + UserData runs docker-compose with the EMS core
-triplet (device-api + hmi + industrial-gateway) pulled from arcnode-io's
-GitLab Container Registry. Cross-account DTM fetch + multi-region AMI
-lookup are follow-ups; ISO path (self-hosts all three services at
-localhost) is out of v1 scope.
+ems_mode baked in. Six vendor API tokens (Tiger Cloud access+secret+project,
+Neo4j Aura client_id+secret+tenant) are required CFN parameters with no
+defaults — CFN refuses to deploy if any are missing. The persistence
+sub-module's inline-Lambda custom resources use those tokens to provision
+Tiger Cloud + Neo4j Aura instances at stack-create time, while Aurora
+serverless PG is provisioned natively (no external API call). All resulting
+connection strings flow into Secrets Manager and are fetched by EC2 UserData.
 """
 
 import yaml
@@ -24,10 +19,14 @@ from src.cfn.cfn_resources import (
     network_resources,
     vendor_token_parameters,
 )
+from src.cfn.persistence.persistence_service import PersistenceService
 
 
 class CfnService:
     """Per-order CloudFormation template renderer."""
+
+    def __init__(self, persistence: PersistenceService) -> None:
+        self._persistence = persistence
 
     def render_template(
         self, *, deployment_uuid: str, dtm_url: str, ems_mode: str
@@ -46,16 +45,22 @@ class CfnService:
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short),
+                **self._persistence.build_resources(),
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",
+                    # Wait for all three persistence custom resources before
+                    # launching — UserData fetches their secrets at boot.
+                    "DependsOn": [
+                        "AuroraBootstrapCustomResource",
+                        "TigerCustomResource",
+                        "AuraCustomResource",
+                    ],
                     "Properties": {
                         "InstanceType": "t3.medium",
                         "ImageId": AMI_SSM_PARAMETER,
                         "IamInstanceProfile": {"Ref": "EmsInstanceProfile"},
                         "SubnetId": {"Ref": "EmsSubnet"},
                         "SecurityGroupIds": [{"Ref": "EmsSecurityGroup"}],
-                        # Fn::Sub substitutes the three ConnectionString params
-                        # into the script before CFN base64-encodes it.
                         "UserData": {"Fn::Base64": {"Fn::Sub": userdata}},
                         "Tags": [
                             {"Key": "Name", "Value": f"arcnode-{short}"},

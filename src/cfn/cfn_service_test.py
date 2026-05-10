@@ -13,6 +13,7 @@ happens when the operator actually runs the stack — out of scope here.
 from cfnlint import api as cfnlint_api
 
 from src.cfn.cfn_service import CfnService
+from src.cfn.persistence.persistence_service import PersistenceService
 
 DEPLOYMENT_UUID: str = "abcd1234-5678-90ef-1234-567890abcdef"
 DTM_URL: str = "https://platform-api-artifacts.example/orders/o1/dtm.json"
@@ -20,7 +21,7 @@ EMS_MODE: str = "sim"
 
 
 def _render() -> str:
-    return CfnService().render_template(
+    return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID, dtm_url=DTM_URL, ems_mode=EMS_MODE
     )
 
@@ -115,6 +116,27 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     assert f"Value: {DTM_URL}" in rendered
     assert f"Value: {EMS_MODE}" in rendered
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
+
+
+def test_render_template_includes_aurora_cluster() -> None:
+    """Persistence sub-module's Aurora resources are merged into the template."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "AuroraCluster" in rendered
+    assert "AWS::RDS::DBCluster" in rendered
+
+
+def test_render_template_includes_tiger_and_aura_custom_resources() -> None:
+    """Persistence sub-module's vendor custom resources are merged."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "Custom::TigerCloudInstance" in rendered
+    assert "Custom::Neo4jAuraInstance" in rendered
+    assert "Custom::AuroraBootstrap" in rendered
 
 
 def test_render_template_declares_vendor_token_parameters() -> None:
