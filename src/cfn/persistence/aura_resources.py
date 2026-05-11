@@ -5,12 +5,16 @@ from typing import Final
 
 LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 
+DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
+
 
 def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def aura_provisioning_resources() -> dict[str, dict]:
+def aura_provisioning_resources(
+    lambda_runtime: str = DEFAULT_LAMBDA_RUNTIME,
+) -> dict[str, dict]:
     """CFN resources that provision a Neo4j Aura instance via REST API."""
     return {
         "AuraLambdaRole": {
@@ -53,7 +57,7 @@ def aura_provisioning_resources() -> dict[str, dict]:
         "AuraLambda": {
             "Type": "AWS::Lambda::Function",
             "Properties": {
-                "Runtime": "python3.13",
+                "Runtime": lambda_runtime,
                 "Handler": "index.handler",
                 "Role": {"Fn::GetAtt": ["AuraLambdaRole", "Arn"]},
                 "Timeout": 900,

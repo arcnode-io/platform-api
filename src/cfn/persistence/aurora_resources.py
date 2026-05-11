@@ -19,6 +19,7 @@ LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 PSYCOPG2_LAYER_ARN_TEMPLATE: Final[str] = (
     "arn:aws:lambda:${AWS::Region}:898466741470:layer:psycopg2-py313:1"
 )
+DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
 
 
 def _load_lambda_source(filename: str) -> str:
@@ -26,8 +27,16 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def aurora_cluster_resources() -> dict[str, dict]:
-    """CFN resources for a scale-to-0 Aurora serverless PG cluster."""
+def aurora_cluster_resources(
+    lambda_runtime: str = DEFAULT_LAMBDA_RUNTIME,
+    psycopg2_layer_arn_template: str | None = PSYCOPG2_LAYER_ARN_TEMPLATE,
+) -> dict[str, dict]:
+    """CFN resources for a scale-to-0 Aurora serverless PG cluster.
+
+    `psycopg2_layer_arn_template=None` omits the Layers field — the test
+    deploy uses this because LocalStack community can't fetch shared layers
+    from real AWS (Pro-only feature). Prod always sets the layer.
+    """
     return {
         "AuroraMasterSecret": {
             "Type": "AWS::SecretsManager::Secret",
@@ -134,7 +143,7 @@ def aurora_cluster_resources() -> dict[str, dict]:
         "AuroraBootstrapLambda": {
             "Type": "AWS::Lambda::Function",
             "Properties": {
-                "Runtime": "python3.13",
+                "Runtime": lambda_runtime,
                 "Handler": "index.handler",
                 "Role": {"Fn::GetAtt": ["AuroraBootstrapLambdaRole", "Arn"]},
                 "Timeout": 300,
@@ -143,7 +152,11 @@ def aurora_cluster_resources() -> dict[str, dict]:
                     "SubnetIds": [{"Ref": "EmsSubnet"}],
                     "SecurityGroupIds": [{"Ref": "EmsSecurityGroup"}],
                 },
-                "Layers": [{"Fn::Sub": PSYCOPG2_LAYER_ARN_TEMPLATE}],
+                **(
+                    {"Layers": [{"Fn::Sub": psycopg2_layer_arn_template}]}
+                    if psycopg2_layer_arn_template is not None
+                    else {}
+                ),
             },
         },
         "AuroraBootstrapCustomResource": {

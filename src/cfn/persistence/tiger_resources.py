@@ -5,12 +5,19 @@ from typing import Final
 
 LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 
+# Default targets prod AWS, which supports python3.13 since late 2024.
+# Tests against LocalStack pass `lambda_runtime="python3.12"` because
+# LocalStack's lambda image hasn't picked up 3.13 yet.
+DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
+
 
 def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-def tiger_provisioning_resources() -> dict[str, dict]:
+def tiger_provisioning_resources(
+    lambda_runtime: str = DEFAULT_LAMBDA_RUNTIME,
+) -> dict[str, dict]:
     """CFN resources that provision a Tiger Cloud service via REST API."""
     return {
         "TigerLambdaRole": {
@@ -53,7 +60,7 @@ def tiger_provisioning_resources() -> dict[str, dict]:
         "TigerLambda": {
             "Type": "AWS::Lambda::Function",
             "Properties": {
-                "Runtime": "python3.13",
+                "Runtime": lambda_runtime,
                 "Handler": "index.handler",
                 "Role": {"Fn::GetAtt": ["TigerLambdaRole", "Arn"]},
                 "Timeout": 900,

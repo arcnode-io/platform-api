@@ -98,6 +98,7 @@ def start_localstack(
     services: tuple[str, ...] = ("s3", "ses"),
     network: Network | None = None,
     network_alias: str | None = None,
+    enable_lambda: bool = False,
 ) -> Generator[Container]:
     """Start LocalStack with the given services. Yields the dynamic edge URL.
 
@@ -109,6 +110,11 @@ def start_localstack(
     inside the same Docker network (used by start_edp_api so edp-api's startup
     S3 fetch can resolve `http://<alias>:4566`).
 
+    `enable_lambda=True` mounts the host docker socket so LocalStack can
+    spawn lambda runtime containers (required for CFN templates that include
+    AWS::Lambda::Function or custom resources backed by Lambda). Off by default
+    because most tests don't need it and the mount adds blast radius.
+
     Pinned to `:3.7` — the last image tag where SES is freely available without a
     Pro license. `:latest` started gating SES behind LocalStack Pro mid-2024.
     """
@@ -117,6 +123,11 @@ def start_localstack(
         container.with_network(network)
     if network_alias is not None:
         container.with_network_aliases(network_alias)
+    if enable_lambda:
+        # LocalStack spawns lambda runtimes as sibling containers via the
+        # host docker daemon. Reason: docker-in-docker is slow and flaky;
+        # sibling-container is the LocalStack-recommended pattern.
+        container.with_volume_mapping("/var/run/docker.sock", "/var/run/docker.sock")
     with container as ls:
         url = ls.get_url()
         port = int(url.rsplit(":", 1)[-1])

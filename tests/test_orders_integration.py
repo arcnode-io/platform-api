@@ -212,3 +212,91 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             assert APK_URL in html
             assert bom_json.url in html
             assert template_url in html
+
+
+# All 7 deployment-profile combinations the resolver supports today.
+# (deployment_context, bess_coupling, aws_partition, expected_delivery_path)
+PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
+    ("commercial", "none", "standard", "cfn_standard"),
+    ("commercial", "ac_coupled", "standard", "cfn_standard"),
+    ("commercial", "dc_external_pcs", "standard", "cfn_standard"),
+    ("commercial", "dc_integrated_pcs", "standard", "cfn_standard"),
+    ("sovereign_government", "none", "govcloud", "cfn_govcloud"),
+    ("sovereign_government", "ac_coupled", "govcloud", "cfn_govcloud"),
+    ("sovereign_government", "dc_external_pcs", "govcloud", "cfn_govcloud"),
+]
+
+
+def test_all_profile_combinations_reach_complete() -> None:
+    """Smoke-test every supported profile against one shared container stack.
+
+    One Network + Postgres + LocalStack + edp-api lifecycle, then submit one
+    order per profile combination. Each must reach status=complete with the
+    expected delivery path. Asserts the strict minimum so the sweep stays
+    fast — full per-profile asserts (portal HTML, email body, etc.) are
+    covered by the single-profile happy-path test above.
+    """
+    with (
+        Network() as net,
+        start_postgres(password=POSTGRES_PASSWORD) as pg,
+        start_localstack(network=net, network_alias="localstack") as ls,
+    ):
+        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        with (
+            start_edp_api(
+                network=net, s3_endpoint_url="http://localstack:4566"
+            ) as edp,
+            pytest.MonkeyPatch.context() as mp,
+        ):
+            mp.setenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD)
+            cfg = Config(
+                log_level=LogLevel.DEBUG,
+                port=8000,
+                host=IPv4Address("127.0.0.1"),
+                e2e=True,
+                reload=False,
+                postgres_host="localhost",
+                postgres_port=pg.port,
+                edp_api_url=edp.url,
+                s3_endpoint_url=ls.url,
+                s3_bucket=S3_BUCKET,
+                ses_endpoint_url=ls.url,
+                ses_sender_email=SENDER_EMAIL,
+                ems_hmi_apk_url=APK_URL,
+                cors_origins=["*"],
+            )
+            module = AppModule(config=cfg)
+            module.register_database()
+            app = module.create_app()
+
+            with TestClient(app) as client:
+                for ctx, coupling, partition, expected_path in PROFILE_SWEEP:
+                    payload = {
+                        **VALID_PAYLOAD,
+                        "deployment_context": ctx,
+                        "bess_coupling": coupling,
+                        "aws_partition": partition,
+                        # bess_coupling=none means no battery — capacity must be 0.
+                        # dc_integrated_pcs is the CATL-integrated PCS path,
+                        # excluded for sovereign+ at the validator.
+                        "bess_capacity_mwh": (
+                            0.0 if coupling == "none" else 10.0
+                        ),
+                        "deployment_site_name": f"site-{ctx}-{coupling}",
+                    }
+                    submit = client.post("/platform-api/orders", json=payload)
+                    assert submit.status_code == 202, (
+                        f"{ctx}/{coupling}/{partition}: {submit.text}"
+                    )
+                    order_id = submit.json()["order_id"]
+
+                    final = _poll_until_complete(client, order_id)
+                    label = f"{ctx}/{coupling}/{partition}"
+                    assert final.status.value == "complete", (
+                        f"{label}: {final.model_dump()}"
+                    )
+                    assert final.ems_delivery is not None, label
+                    assert final.ems_delivery.path.value == expected_path, label
+                    kinds = {a.kind for a in final.edp_artifacts}
+                    assert ArtifactKind.BOM in kinds, label
+                    assert ArtifactKind.DTM in kinds, label
