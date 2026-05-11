@@ -16,20 +16,30 @@ Walks the walking-skeleton path:
 
 import time
 from ipaddress import IPv4Address
+from pathlib import Path
 
 import boto3
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from testcontainers.core.network import Network
 
 from src.app_module import AppModule
 from src.config import Config, LogLevel
 from src.edp_client.edp_artifacts import ArtifactKind
 from src.orders.orders_record import GetOrderResponse
 from tests.fixtures.containers import (
+    seed_edp_manifest,
     start_edp_api,
     start_localstack,
     start_postgres,
+)
+
+# Path to the real manifest produced by edp-module-assemblies CI. Loaded
+# verbatim into LocalStack so edp-api's startup S3 fetch resolves to a
+# valid Manifest object.
+EDP_MANIFEST_PATH: Path = (
+    Path(__file__).resolve().parents[2] / "edp-module-assemblies" / "manifest.yaml"
 )
 
 POSTGRES_PASSWORD: str = "test"
@@ -40,7 +50,7 @@ SENDER_EMAIL: str = "noreply@arcnode.test"
 VALID_PAYLOAD: dict[str, object] = {
     "operator_org": "acme",
     "deployment_site_name": "alpha",
-    "contact_email": "ops@acme.test",
+    "contact_email": "ops@acme.io",
     "energy_source": "nuclear",
     "source_capacity_mw": 10.0,
     "primary_workload": "ai_training",
@@ -82,135 +92,147 @@ def _extract_portal_url(email_body: str) -> str:
 
 
 def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
-    """POST → poll → assert portal HTML lists artifacts + launch link + APK."""
+    """POST → poll → assert portal HTML lists artifacts + launch link + APK.
+
+    Network topology: LocalStack + edp-api share a Docker network so edp-api's
+    startup S3 fetch can resolve `http://localstack:4566`. The manifest is
+    seeded into LocalStack BEFORE edp-api starts (otherwise edp-api's eager
+    ManifestService.from_client raises at boot).
+    """
     with (
+        Network() as net,
         start_postgres(password=POSTGRES_PASSWORD) as pg,
-        start_localstack() as ls,
-        start_edp_api() as edp,
-        pytest.MonkeyPatch.context() as mp,
+        start_localstack(network=net, network_alias="localstack") as ls,
     ):
-        mp.setenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD)
-        cfg = Config(
-            log_level=LogLevel.DEBUG,
-            port=8000,
-            host=IPv4Address("127.0.0.1"),
-            e2e=True,
-            reload=False,
-            postgres_host="localhost",
-            postgres_port=pg.port,
-            edp_api_url=edp.url,
-            s3_endpoint_url=ls.url,
-            s3_bucket=S3_BUCKET,
-            ses_endpoint_url=ls.url,
-            ses_sender_email=SENDER_EMAIL,
-            ems_hmi_apk_url=APK_URL,
-            cors_origins=["*"],
-        )
-        module = AppModule(config=cfg)
-        module.register_database()
-        app = module.create_app()
+        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        with (
+            start_edp_api(
+                network=net, s3_endpoint_url="http://localstack:4566"
+            ) as edp,
+            pytest.MonkeyPatch.context() as mp,
+        ):
+            mp.setenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD)
+            cfg = Config(
+                log_level=LogLevel.DEBUG,
+                port=8000,
+                host=IPv4Address("127.0.0.1"),
+                e2e=True,
+                reload=False,
+                postgres_host="localhost",
+                postgres_port=pg.port,
+                edp_api_url=edp.url,
+                s3_endpoint_url=ls.url,
+                s3_bucket=S3_BUCKET,
+                ses_endpoint_url=ls.url,
+                ses_sender_email=SENDER_EMAIL,
+                ems_hmi_apk_url=APK_URL,
+                cors_origins=["*"],
+            )
+            module = AppModule(config=cfg)
+            module.register_database()
+            app = module.create_app()
 
-        with TestClient(app) as client:
-            # Act — submit order
-            submit = client.post("/platform-api/orders", json=VALID_PAYLOAD)
-            assert submit.status_code == 202, submit.text
-            order_id = submit.json()["order_id"]
+            with TestClient(app) as client:
+                # Act — submit order
+                submit = client.post("/platform-api/orders", json=VALID_PAYLOAD)
+                assert submit.status_code == 202, submit.text
+                order_id = submit.json()["order_id"]
 
-            # Act — poll until complete
-            final = _poll_until_complete(client, order_id)
+                # Act — poll until complete
+                final = _poll_until_complete(client, order_id)
 
-        # Assert — order completed with re-archived platform-api S3 URLs
-        assert final.status.value == "complete"
-        kinds = {a.kind for a in final.edp_artifacts}
-        assert ArtifactKind.BOM in kinds
-        assert ArtifactKind.DTM in kinds
-        bom_json = next(
-            a
-            for a in final.edp_artifacts
-            if a.kind == ArtifactKind.BOM and a.format == "json"
-        )
-        assert (
-            ls.url in bom_json.url
-        ), f"expected platform-api to re-archive into LocalStack S3; got {bom_json.url}"
+            # Assert — order completed with re-archived platform-api S3 URLs
+            assert final.status.value == "complete"
+            kinds = {a.kind for a in final.edp_artifacts}
+            assert ArtifactKind.BOM in kinds
+            assert ArtifactKind.DTM in kinds
+            bom_json = next(
+                a
+                for a in final.edp_artifacts
+                if a.kind == ArtifactKind.BOM and a.format == "json"
+            )
+            assert (
+                ls.url in bom_json.url
+            ), f"expected platform-api to re-archive into LocalStack S3; got {bom_json.url}"
 
-        # Assert — bytes actually landed in the bucket (artifacts + portal)
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=ls.url,
-            region_name="us-east-1",
-            aws_access_key_id="test",
-            aws_secret_access_key="test",
-        )
-        objs = s3.list_objects_v2(Bucket=S3_BUCKET)
-        keys = {o["Key"] for o in objs.get("Contents", [])}
-        assert any(k.endswith("bom.json") for k in keys), keys
-        assert any(k.endswith("dtm.json") for k in keys), keys
-        assert any(k.endswith("cable_hose_schedule.json") for k in keys), keys
-        assert f"orders/{order_id}/index.html" in keys, keys
-        assert f"orders/{order_id}/ems-stack.yaml" in keys, keys
+            # Assert — bytes actually landed in the bucket (artifacts + portal)
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=ls.url,
+                region_name="us-east-1",
+                aws_access_key_id="test",
+                aws_secret_access_key="test",
+            )
+            objs = s3.list_objects_v2(Bucket=S3_BUCKET)
+            keys = {o["Key"] for o in objs.get("Contents", [])}
+            assert any(k.endswith("bom.json") for k in keys), keys
+            assert any(k.endswith("dtm.json") for k in keys), keys
+            assert any(k.endswith("cable_hose_schedule.json") for k in keys), keys
+            assert f"orders/{order_id}/index.html" in keys, keys
+            assert f"orders/{order_id}/ems-stack.yaml" in keys, keys
 
-        # Assert — per-order CFN template was uploaded + exposed for download
-        assert final.ems_delivery is not None
-        template_url = final.ems_delivery.template_url
-        assert template_url is not None
-        assert template_url.endswith(f"orders/{order_id}/ems-stack.yaml")
-        assert final.ems_delivery.path.value == "cfn_standard"
+            # Assert — per-order CFN template was uploaded + exposed for download
+            assert final.ems_delivery is not None
+            template_url = final.ems_delivery.template_url
+            assert template_url is not None
+            assert template_url.endswith(f"orders/{order_id}/ems-stack.yaml")
+            assert final.ems_delivery.path.value == "cfn_standard"
 
-        # Assert — per-order yaml at that URL is real CFN (deeper structural
-        # checks live in src/cfn/cfn_service_test.py)
-        yaml_resp = httpx.get(f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml")
-        assert yaml_resp.status_code == 200, yaml_resp.text
-        yaml_body = yaml_resp.text
-        assert "AWSTemplateFormatVersion" in yaml_body
-        assert "AWS::EC2::Instance" in yaml_body
-        assert "dtm.json" in yaml_body, yaml_body
+            # Assert — per-order yaml at that URL is real CFN (deeper structural
+            # checks live in src/cfn/cfn_service_test.py)
+            yaml_resp = httpx.get(f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml")
+            assert yaml_resp.status_code == 200, yaml_resp.text
+            yaml_body = yaml_resp.text
+            assert "AWSTemplateFormatVersion" in yaml_body
+            assert "AWS::EC2::Instance" in yaml_body
+            assert "dtm.json" in yaml_body, yaml_body
 
-        # Assert — SES email captured + body points at the portal URL
-        sent = httpx.get(f"{ls.url}/_aws/ses").json()
-        delivery_emails = [
-            m
-            for m in sent.get("messages", [])
-            if VALID_PAYLOAD["contact_email"]
-            in m.get("Destination", {}).get("ToAddresses", [])
-        ]
-        assert (
-            len(delivery_emails) == 1
-        ), f"expected one delivery email; got {len(delivery_emails)}"
-        body = delivery_emails[0].get("Body", {}).get("text_part", "")
-        portal_url = _extract_portal_url(body)
-        assert portal_url.endswith(f"orders/{order_id}/index.html")
-        assert ls.url in portal_url
+            # Assert — SES email captured + body points at the portal URL
+            sent = httpx.get(f"{ls.url}/_aws/ses").json()
+            delivery_emails = [
+                m
+                for m in sent.get("messages", [])
+                if VALID_PAYLOAD["contact_email"]
+                in m.get("Destination", {}).get("ToAddresses", [])
+            ]
+            assert (
+                len(delivery_emails) == 1
+            ), f"expected one delivery email; got {len(delivery_emails)}"
+            body = delivery_emails[0].get("Body", {}).get("text_part", "")
+            portal_url = _extract_portal_url(body)
+            assert portal_url.endswith(f"orders/{order_id}/index.html")
+            assert ls.url in portal_url
 
-        # Assert — portal HTML lists artifacts + prereqs + download CTA + APK
-        html_resp = httpx.get(portal_url)
-        assert html_resp.status_code == 200, html_resp.text
-        html = html_resp.text
-        assert APK_URL in html
-        assert bom_json.url in html
-        assert "Download CFN template" in html
-        assert template_url in html
-        # Prereqs checklist names the vendor tokens the operator pastes into
-        # CFN at create-stack time (Tiger access+secret+project, Aura
-        # client_id+secret+tenant). Aurora is provisioned natively by CFN —
-        # no operator action needed for that one.
-        assert "Tiger Cloud" in html
-        assert "Neo4j Aura" in html
-        assert "Project ID" in html
-        assert "Tenant ID" in html
-        assert "Aurora Postgres is provisioned automatically" in html
-        # Vendor doc links (not signup pages) per PM contract
-        assert "tigerdata.com" in html
-        assert "neo4j.com/docs/aura" in html
-        # Neon is gone — replaced by Aurora native CFN provisioning
-        assert "neon.tech" not in html
-        assert "[setup guide]" in html
-        assert "&#9744;" in html  # □ checkbox char
-        # Per PM contract: prereqs must appear *before* the download link
-        prereqs_pos = html.find("Prerequisites")
-        download_pos = html.find("Download CFN template")
-        assert 0 <= prereqs_pos < download_pos, (prereqs_pos, download_pos)
+            # Assert — portal HTML lists artifacts + prereqs + download CTA + APK
+            html_resp = httpx.get(portal_url)
+            assert html_resp.status_code == 200, html_resp.text
+            html = html_resp.text
+            assert APK_URL in html
+            assert bom_json.url in html
+            assert "Download CFN template" in html
+            assert template_url in html
+            # Prereqs checklist names the vendor tokens the operator pastes into
+            # CFN at create-stack time (Tiger access+secret+project, Aura
+            # client_id+secret+tenant). Aurora is provisioned natively by CFN —
+            # no operator action needed for that one.
+            assert "Tiger Cloud" in html
+            assert "Neo4j Aura" in html
+            assert "Project ID" in html
+            assert "Tenant ID" in html
+            assert "Aurora Postgres is provisioned automatically" in html
+            # Vendor doc links (not signup pages) per PM contract
+            assert "tigerdata.com" in html
+            assert "neo4j.com/docs/aura" in html
+            # Neon is gone — replaced by Aurora native CFN provisioning
+            assert "neon.tech" not in html
+            assert "[setup guide]" in html
+            assert "&#9744;" in html  # □ checkbox char
+            # Per PM contract: prereqs must appear *before* the download link
+            prereqs_pos = html.find("Prerequisites")
+            download_pos = html.find("Download CFN template")
+            assert 0 <= prereqs_pos < download_pos, (prereqs_pos, download_pos)
 
-        # Email body mentions prereq-collection step before the portal link
-        assert "Tiger Cloud" in body
-        assert "Neo4j Aura" in body
-        assert "six API tokens" in body
+            # Email body mentions prereq-collection step before the portal link
+            assert "Tiger Cloud" in body
+            assert "Neo4j Aura" in body
+            assert "six API tokens" in body

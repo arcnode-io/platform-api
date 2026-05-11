@@ -12,12 +12,13 @@ flows from its fields. See `src/manifest/manifest_record.py` for the shape.
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Final, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.manifest.artifact_metadata import SECTION_LABEL
 from src.manifest.manifest_record import DeploymentManifest, ManifestSection
+from src.orders.orders_record import DeliveryPath, OrderEmsDelivery
 
 TEMPLATE_DIR: Final[Path] = Path(__file__).parent / "templates"
 TEMPLATE_NAME: Final[str] = "portal.html"
@@ -64,6 +65,68 @@ _SECTION_RENDER_ORDER: Final[tuple[ManifestSection, ...]] = (
 )
 
 
+# Vendor prereqs the operator must collect *before* `aws cloudformation
+# create-stack`. These six tokens land as Parameters in the per-order CFN
+# template; the in-template Lambdas use them to provision Tiger Cloud +
+# Neo4j Aura over their REST APIs at stack-create time. Aurora Postgres
+# is provisioned natively by CFN — no operator action needed.
+#
+# Per PM contract (2026-05-10): doc links point at vendor *documentation*
+# pages (where to find the token), not signup pages.
+CFN_PREREQS: Final[list[dict[str, str]]] = [
+    {
+        "vendor": "Tiger Cloud",
+        "token": "Access Key",
+        "where": "Console > Settings > API Keys",
+        "doc_url": "https://docs.tigerdata.com/use-timescale/latest/services/api-keys/",
+    },
+    {
+        "vendor": "Tiger Cloud",
+        "token": "Secret Key",
+        "where": "Shown once at access-key creation — copy immediately",
+        "doc_url": "https://docs.tigerdata.com/use-timescale/latest/services/api-keys/",
+    },
+    {
+        "vendor": "Tiger Cloud",
+        "token": "Project ID",
+        "where": "Projects page (UUID under each project name)",
+        "doc_url": "https://docs.tigerdata.com/use-timescale/latest/projects/",
+    },
+    {
+        "vendor": "Neo4j Aura",
+        "token": "Client ID",
+        "where": "Aura Console > API Keys > Create",
+        "doc_url": "https://neo4j.com/docs/aura/classic/platform/api/authentication/",
+    },
+    {
+        "vendor": "Neo4j Aura",
+        "token": "Client Secret",
+        "where": "Shown once at API-key creation — copy immediately",
+        "doc_url": "https://neo4j.com/docs/aura/classic/platform/api/authentication/",
+    },
+    {
+        "vendor": "Neo4j Aura",
+        "token": "Tenant ID",
+        "where": "Aura Console > Account > Tenant settings",
+        "doc_url": "https://neo4j.com/docs/aura/classic/platform/api/specification/",
+    },
+]
+
+# Aurora Postgres is provisioned natively by CFN — informational only,
+# rendered as a callout under the Prerequisites checklist.
+AURORA_NOTE: Final[str] = (
+    "Aurora Postgres is provisioned automatically by the CFN stack — "
+    "no operator tokens required."
+)
+
+
+def _is_cfn_path(delivery: Optional[OrderEmsDelivery]) -> bool:
+    """True when the delivery routes via CloudFormation (standard or GovCloud)."""
+    if delivery is None:
+        return False
+    return delivery.path in (DeliveryPath.CFN_STANDARD, DeliveryPath.CFN_GOVCLOUD)
+
+
 class PortalService:
     """Renders the delivery portal HTML + matching manifest.json."""
 
@@ -76,8 +139,17 @@ class PortalService:
         )
         self._env.filters["filesize"] = _filesize
 
-    def render(self, *, manifest: DeploymentManifest) -> str:
-        """Render the portal HTML page (uploaded to S3 as `index.html`)."""
+    def render(
+        self,
+        *,
+        manifest: DeploymentManifest,
+        delivery: Optional[OrderEmsDelivery] = None,
+    ) -> str:
+        """Render the portal HTML page (uploaded to S3 as `index.html`).
+
+        `delivery` drives the Prerequisites + Download CFN template section
+        (CFN paths only). ISO and missing-delivery cases skip those blocks.
+        """
         section_specs = [
             {
                 "key": s,
@@ -88,11 +160,18 @@ class PortalService:
         ]
         curl_prefix, curl_filename = _split_curl_url(manifest.bundle_curl_url or "")
         template = self._env.get_template(TEMPLATE_NAME)
+        show_cfn = _is_cfn_path(delivery) and bool(
+            delivery and delivery.template_url
+        )
         return template.render(
             manifest=manifest,
             section_specs=section_specs,
             curl_prefix=curl_prefix,
             curl_filename=curl_filename,
+            show_cfn_section=show_cfn,
+            cfn_template_url=delivery.template_url if delivery else None,
+            cfn_prereqs=CFN_PREREQS if show_cfn else [],
+            aurora_note=AURORA_NOTE,
         )
 
     def render_manifest_json(self, *, manifest: DeploymentManifest) -> str:

@@ -45,12 +45,16 @@ class S3Service:
 
         Size is captured for free at archive time (we already have the bytes
         in memory). Portal/manifest renderers consume it for chip labels like
-        'JSON 612 KB'.
+        'JSON 612 KB'. Supports both http(s):// (via httpx) and s3:// (via
+        boto3) source URLs — edp-api emits s3:// for generated artifacts.
         """
-        async with httpx.AsyncClient(timeout=10.0) as http:
-            resp = await http.get(source_url)
-            resp.raise_for_status()
-            body = resp.content
+        if source_url.startswith("s3://"):
+            body = await self._fetch_s3(source_url)
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as http:
+                resp = await http.get(source_url)
+                resp.raise_for_status()
+                body = resp.content
 
         async with self._client() as s3:
             await s3.put_object(
@@ -61,15 +65,31 @@ class S3Service:
         logging.info("archived %d bytes %s → %s", size, source_url, url)
         return url, size
 
+    async def _fetch_s3(self, s3_url: str) -> bytes:
+        """GetObject for an `s3://bucket/key` URL via the configured endpoint."""
+        without_scheme = s3_url.removeprefix("s3://")
+        bucket, _, key = without_scheme.partition("/")
+        async with self._client() as s3:
+            resp = await s3.get_object(Bucket=bucket, Key=key)
+            return await resp["Body"].read()
+
     async def head_size(self, url: str) -> int:
         """HEAD request → Content-Length. For URLs not archived through us
         (e.g., the EMS HMI APK in cfg.yml hosted on arcnode-public S3).
+
+        Returns 0 if the URL doesn't resolve or HEAD fails — size is purely
+        cosmetic (chip label like '612 KB') so unreachable URLs shouldn't
+        break the pipeline (e.g., bogus APK URL in integration tests).
         """
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http:
-            resp = await http.head(url)
-            resp.raise_for_status()
-            cl = resp.headers.get("content-length")
-            return int(cl) if cl is not None else 0
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as http:
+                resp = await http.head(url)
+                resp.raise_for_status()
+                cl = resp.headers.get("content-length")
+                return int(cl) if cl is not None else 0
+        except (httpx.HTTPError, httpx.InvalidURL) as e:
+            logging.warning("head_size failed for %s: %s — defaulting to 0", url, e)
+            return 0
 
     async def upload_html(self, key: str, body: str) -> str:
         """Upload an HTML body under `key`, return the S3 URL."""
