@@ -20,7 +20,9 @@ from src.edp_client.edp_artifacts import (
 from src.orders.configurator_payload import ConfiguratorPayload
 
 POLL_INTERVAL_SECONDS: Final[float] = 0.5
-POLL_TIMEOUT_SECONDS: Final[float] = 60.0
+# 5 min — covers CI's slower edp-api pipeline (LocalStack S3 fetches +
+# Bom/Dtm generation under load). Local dev typically finishes in <10s.
+POLL_TIMEOUT_SECONDS: Final[float] = 300.0
 
 
 class EdpJobFailedError(Exception):

@@ -64,7 +64,9 @@ VALID_PAYLOAD: dict[str, object] = {
     "aws_partition": "standard",
 }
 
-POLL_TIMEOUT_SECONDS: float = 60.0
+# 6 min — outer wrapper around EdpClientService's 5 min inner poll, with
+# headroom for CFN render + S3 archive + portal upload + SES send.
+POLL_TIMEOUT_SECONDS: float = 360.0
 POLL_INTERVAL_SECONDS: float = 0.5
 
 
