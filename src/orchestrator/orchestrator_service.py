@@ -69,27 +69,39 @@ class OrchestratorService:
 
     async def execute(self, order: Order) -> None:
         """Drive `order` from PENDING → COMPLETE (or FAILED on any exception)."""
+        logging.info("🚀 orchestrator start order=%s", order.id)
         await self._mark_running(order)
         try:
             result = await self._run_pipeline(order)
         except Exception:
-            logging.exception("orchestrator failed for order %s", order.id)
+            logging.exception("❌ orchestrator failed for order %s", order.id)
             await self._mark_failed(order)
             return
+        logging.info("✅ orchestrator complete order=%s", order.id)
         await self._mark_complete(order, result)
 
     # Pipeline
 
     async def _run_pipeline(self, order: Order) -> _PipelineResult:
         """Setup → submit → archive → publish portal → notify."""
+        logging.info("🔧 aws setup order=%s", order.id)
         await self._setup_aws()
         payload = ConfiguratorPayload.model_validate(order.payload)
+        logging.info("⏩ edp submit order=%s", order.id)
         edp = await self._edp.submit_and_wait(payload, deployment_id=order.id)
+        logging.info(
+            "📥 archive %d artifacts order=%s",
+            len(edp.edp_artifact_urls),
+            order.id,
+        )
         archived = await self._archive(str(order.id), edp)
+        logging.info("📦 build delivery order=%s", order.id)
         delivery = await self._build_delivery(str(order.id), payload, archived)
+        logging.info("🎨 publish portal order=%s", order.id)
         portal_url = await self._publish_portal(
             str(order.id), payload, archived, delivery
         )
+        logging.info("📧 notify %s order=%s", payload.contact_email, order.id)
         await self._notify(payload.contact_email, portal_url)
         return _PipelineResult(
             edp=edp,
