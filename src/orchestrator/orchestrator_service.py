@@ -173,7 +173,7 @@ class OrchestratorService:
             archived=archived,
             system_artifacts=system_artifacts,
         )
-        html = self._portal.render(manifest=manifest, delivery=delivery)
+        html = self._portal.render(manifest=manifest)
         manifest_json = self._portal.render_manifest_json(manifest=manifest)
         await self._s3.upload_json(f"orders/{order_id}/manifest.json", manifest_json)
         return await self._s3.upload_html(f"orders/{order_id}/index.html", html)

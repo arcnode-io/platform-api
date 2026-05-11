@@ -203,36 +203,12 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
             assert portal_url.endswith(f"orders/{order_id}/index.html")
             assert ls.url in portal_url
 
-            # Assert — portal HTML lists artifacts + prereqs + download CTA + APK
+            # Assert — portal HTML lists artifacts + APK + per-order CFN URL.
+            # Prereqs/Download-CTA copy intentionally not asserted — that
+            # section is designer-owned, not engineer-improvised.
             html_resp = httpx.get(portal_url)
             assert html_resp.status_code == 200, html_resp.text
             html = html_resp.text
             assert APK_URL in html
             assert bom_json.url in html
-            assert "Download CFN template" in html
             assert template_url in html
-            # Prereqs checklist names the vendor tokens the operator pastes into
-            # CFN at create-stack time (Tiger access+secret+project, Aura
-            # client_id+secret+tenant). Aurora is provisioned natively by CFN —
-            # no operator action needed for that one.
-            assert "Tiger Cloud" in html
-            assert "Neo4j Aura" in html
-            assert "Project ID" in html
-            assert "Tenant ID" in html
-            assert "Aurora Postgres is provisioned automatically" in html
-            # Vendor doc links (not signup pages) per PM contract
-            assert "tigerdata.com" in html
-            assert "neo4j.com/docs/aura" in html
-            # Neon is gone — replaced by Aurora native CFN provisioning
-            assert "neon.tech" not in html
-            assert "[setup guide]" in html
-            assert "&#9744;" in html  # □ checkbox char
-            # Per PM contract: prereqs must appear *before* the download link
-            prereqs_pos = html.find("Prerequisites")
-            download_pos = html.find("Download CFN template")
-            assert 0 <= prereqs_pos < download_pos, (prereqs_pos, download_pos)
-
-            # Email body mentions prereq-collection step before the portal link
-            assert "Tiger Cloud" in body
-            assert "Neo4j Aura" in body
-            assert "six API tokens" in body

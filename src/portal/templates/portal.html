@@ -559,42 +559,6 @@
     </div>
     {% endif %}
 
-    {# ─── CFN prereqs + download (CFN paths only) ─────── #}
-    {% if show_cfn_section %}
-    <section class="cfn-launch">
-      <header class="cfn-header">
-        <span class="column-num">§ 00</span>
-        <h2 class="column-title">Prerequisites</h2>
-        <span class="column-count">six API tokens</span>
-      </header>
-      <p class="cfn-intro">
-        Before launching the CFN stack, sign up at the two managed-database
-        vendors below and collect the API tokens listed. Paste them as
-        Parameters at <code>aws cloudformation create-stack</code> time —
-        the in-template Lambdas use them to provision your Tiger Cloud
-        service and Neo4j Aura instance over their REST APIs.
-      </p>
-      <ul class="cfn-prereqs">
-        {% for prereq in cfn_prereqs %}
-        <li class="cfn-prereq">
-          <span class="cfn-checkbox">&#9744;</span>
-          <span class="cfn-prereq-vendor">{{ prereq.vendor }}</span>
-          <span class="cfn-prereq-token">{{ prereq.token }}</span>
-          <span class="cfn-prereq-where">{{ prereq.where }}</span>
-          <a class="cfn-prereq-doc" href="{{ prereq.doc_url }}" target="_blank" rel="noopener">[setup guide]</a>
-        </li>
-        {% endfor %}
-      </ul>
-      <p class="cfn-aurora-note">{{ aurora_note }}</p>
-      <div class="cfn-cta">
-        <a href="{{ cfn_template_url }}" class="action action-primary" download>
-          <span class="arrow">↓</span>
-          Download CFN template
-        </a>
-      </div>
-    </section>
-    {% endif %}
-
     {# ─── Three columns ────────────────────────────────── #}
     <section class="columns">
       {% for spec in section_specs %}
