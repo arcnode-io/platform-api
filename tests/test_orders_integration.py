@@ -106,9 +106,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
         with (
-            start_edp_api(
-                network=net, s3_endpoint_url="http://localstack:4566"
-            ) as edp,
+            start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD)
@@ -180,7 +178,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
 
             # Assert — per-order yaml at that URL is real CFN (deeper structural
             # checks live in src/cfn/cfn_service_test.py)
-            yaml_resp = httpx.get(f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml")
+            yaml_resp = httpx.get(
+                f"{ls.url}/{S3_BUCKET}/orders/{order_id}/ems-stack.yaml"
+            )
             assert yaml_resp.status_code == 200, yaml_resp.text
             yaml_body = yaml_resp.text
             assert "AWSTemplateFormatVersion" in yaml_body
@@ -243,9 +243,7 @@ def test_all_profile_combinations_reach_complete() -> None:
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
         with (
-            start_edp_api(
-                network=net, s3_endpoint_url="http://localstack:4566"
-            ) as edp,
+            start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
         ):
             mp.setenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD)
@@ -279,22 +277,20 @@ def test_all_profile_combinations_reach_complete() -> None:
                         # bess_coupling=none means no battery — capacity must be 0.
                         # dc_integrated_pcs is the CATL-integrated PCS path,
                         # excluded for sovereign+ at the validator.
-                        "bess_capacity_mwh": (
-                            0.0 if coupling == "none" else 10.0
-                        ),
+                        "bess_capacity_mwh": (0.0 if coupling == "none" else 10.0),
                         "deployment_site_name": f"site-{ctx}-{coupling}",
                     }
                     submit = client.post("/platform-api/orders", json=payload)
-                    assert submit.status_code == 202, (
-                        f"{ctx}/{coupling}/{partition}: {submit.text}"
-                    )
+                    assert (
+                        submit.status_code == 202
+                    ), f"{ctx}/{coupling}/{partition}: {submit.text}"
                     order_id = submit.json()["order_id"]
 
                     final = _poll_until_complete(client, order_id)
                     label = f"{ctx}/{coupling}/{partition}"
-                    assert final.status.value == "complete", (
-                        f"{label}: {final.model_dump()}"
-                    )
+                    assert (
+                        final.status.value == "complete"
+                    ), f"{label}: {final.model_dump()}"
                     assert final.ems_delivery is not None, label
                     assert final.ems_delivery.path.value == expected_path, label
                     kinds = {a.kind for a in final.edp_artifacts}

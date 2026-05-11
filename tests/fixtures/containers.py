@@ -126,6 +126,7 @@ def start_localstack(
         tag where SES is freely available before Pro gating mid-2024.
     """
     import os
+
     pro_token = os.environ.get("LOCALSTACK_AUTH_TOKEN")
     if image is None:
         image = (
@@ -171,7 +172,7 @@ def seed_edp_manifest(localstack_url: str, manifest_path: Path) -> None:
         endpoint_url=localstack_url,
         region_name="us-east-1",
         aws_access_key_id="test",
-        aws_secret_access_key="test",  # noqa: S106 — LocalStack dummy
+        aws_secret_access_key="test",
     )
     s3.create_bucket(Bucket=EDP_MANIFEST_BUCKET)
 
@@ -246,11 +247,7 @@ def start_edp_api(
     real S3. Required: pair with `network=` + a LocalStack started on the
     same network with a known alias (e.g. 'localstack').
     """
-    container = (
-        DockerContainer(image)
-        .with_exposed_ports(port)
-        .with_env("ENV", "beta")
-    )
+    container = DockerContainer(image).with_exposed_ports(port).with_env("ENV", "beta")
     if network is not None:
         container.with_network(network)
     if s3_endpoint_url is not None:

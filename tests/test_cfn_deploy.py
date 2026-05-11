@@ -33,7 +33,10 @@ VENDOR_TOKEN_PARAMS: list[dict[str, str]] = [
     {"ParameterKey": "TigerCloudSecretKey", "ParameterValue": "tiger-secret-test"},
     {"ParameterKey": "TigerCloudProjectId", "ParameterValue": "tiger-project-test"},
     {"ParameterKey": "Neo4jAuraClientId", "ParameterValue": "aura-client-id-test"},
-    {"ParameterKey": "Neo4jAuraClientSecret", "ParameterValue": "aura-client-secret-test"},
+    {
+        "ParameterKey": "Neo4jAuraClientSecret",
+        "ParameterValue": "aura-client-secret-test",
+    },
     {"ParameterKey": "Neo4jAuraTenantId", "ParameterValue": "aura-tenant-test"},
 ]
 
@@ -68,7 +71,15 @@ def test_cfn_template_deploys_cleanly_against_localstack() -> None:
     by real-AWS smoke tests, not by this fixture.
     """
     with start_localstack(
-        services=("cloudformation", "ec2", "iam", "ssm", "lambda", "secretsmanager", "rds"),
+        services=(
+            "cloudformation",
+            "ec2",
+            "iam",
+            "ssm",
+            "lambda",
+            "secretsmanager",
+            "rds",
+        ),
         enable_lambda=True,
     ) as ls:
         cfn = boto3.client(
@@ -136,12 +147,12 @@ def test_cfn_template_deploys_cleanly_against_localstack() -> None:
         }
 
         # Assert — Aura branch reached its lambda invocation.
-        assert "AuraLambdaRole" in completed, (
-            f"AuraLambdaRole should have created cleanly; events: {events}"
-        )
-        assert "AuraLambda" in completed, (
-            f"AuraLambda should have created cleanly; events: {events}"
-        )
+        assert (
+            "AuraLambdaRole" in completed
+        ), f"AuraLambdaRole should have created cleanly; events: {events}"
+        assert (
+            "AuraLambda" in completed
+        ), f"AuraLambda should have created cleanly; events: {events}"
 
         # Assert — the vendor 401 surfaces with a useful reason. Proves
         # the lambda's error-callback path to CFN is wired correctly.
@@ -159,7 +170,15 @@ def test_cfn_template_deploys_cleanly_against_localstack() -> None:
 def test_cfn_create_fails_when_required_params_missing() -> None:
     """No defaults → CFN refuses to deploy if any of the 3 connection strings are absent."""
     with start_localstack(
-        services=("cloudformation", "ec2", "iam", "ssm", "lambda", "secretsmanager", "rds"),
+        services=(
+            "cloudformation",
+            "ec2",
+            "iam",
+            "ssm",
+            "lambda",
+            "secretsmanager",
+            "rds",
+        ),
         enable_lambda=True,
     ) as ls:
         cfn = boto3.client(
@@ -170,7 +189,9 @@ def test_cfn_create_fails_when_required_params_missing() -> None:
             aws_secret_access_key="test",
         )
         template_body = CfnService(
-            persistence=PersistenceService(lambda_runtime="python3.12", psycopg2_layer_arn_template=None),
+            persistence=PersistenceService(
+                lambda_runtime="python3.12", psycopg2_layer_arn_template=None
+            ),
         ).render_template(
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
