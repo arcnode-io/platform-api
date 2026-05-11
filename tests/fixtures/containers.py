@@ -94,7 +94,7 @@ def start_postgres(
 
 @contextmanager
 def start_localstack(
-    image: str = "localstack/localstack:3.7",
+    image: str | None = None,
     services: tuple[str, ...] = ("s3", "ses"),
     network: Network | None = None,
     network_alias: str | None = None,
@@ -115,10 +115,29 @@ def start_localstack(
     AWS::Lambda::Function or custom resources backed by Lambda). Off by default
     because most tests don't need it and the mount adds blast radius.
 
-    Pinned to `:3.7` — the last image tag where SES is freely available without a
-    Pro license. `:latest` started gating SES behind LocalStack Pro mid-2024.
+    Image selection:
+      - If `image` is None and `LOCALSTACK_AUTH_TOKEN` is set in env, defaults
+        to `localstack/localstack-pro:latest` and forwards the token. Pro is
+        required for: {{resolve:secretsmanager:...}} dynamic refs, public
+        Lambda layer fetching, reliable custom-resource Lambda callbacks.
+        Pro license server enforces a minimum version (2026.3.0+); pinning
+        to `:latest` keeps activation working.
+      - Otherwise defaults to community `localstack/localstack:3.7` — last
+        tag where SES is freely available before Pro gating mid-2024.
     """
+    import os
+    pro_token = os.environ.get("LOCALSTACK_AUTH_TOKEN")
+    if image is None:
+        image = (
+            "localstack/localstack-pro:latest"
+            if pro_token
+            else "localstack/localstack:3.7"
+        )
     container = LocalStackContainer(image=image).with_services(*services)
+    if pro_token:
+        # Reason: LocalStack Pro auth — forwarded as env so the token never
+        # touches source files or fixture defaults.
+        container.with_env("LOCALSTACK_AUTH_TOKEN", pro_token)
     if network is not None:
         container.with_network(network)
     if network_alias is not None:
