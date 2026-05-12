@@ -298,3 +298,21 @@ def test_all_profile_combinations_reach_complete() -> None:
                     kinds = {a.kind for a in final.edp_artifacts}
                     assert ArtifactKind.BOM in kinds, label
                     assert ArtifactKind.DTM in kinds, label
+
+                    # Variant-specific YAML content asserts.
+                    assert final.ems_delivery.template_url is not None, label
+                    yaml = httpx.get(final.ems_delivery.template_url).text
+                    if ctx == "commercial":
+                        # Commercial: 2 vendor-URL params + CFN-native secrets,
+                        # no Neptune / AOSS resources.
+                        assert "TimeseriesConnectionUrl:" in yaml, label
+                        assert "GraphConnectionUrl:" in yaml, label
+                        assert "AWS::Neptune::DBCluster" not in yaml, label
+                        assert "AWS::OpenSearchServerless" not in yaml, label
+                    else:
+                        # Defense / sovereign: Neptune + AOSS in resources, no
+                        # vendor params.
+                        assert "AWS::Neptune::DBCluster" in yaml, label
+                        assert "AWS::OpenSearchServerless::Collection" in yaml, label
+                        assert "TimeseriesConnectionUrl:" not in yaml, label
+                        assert "GraphConnectionUrl:" not in yaml, label
