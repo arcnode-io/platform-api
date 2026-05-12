@@ -89,6 +89,11 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
                 "ClusterEndpoint": pg.host,
                 "MasterSecretArn": master_arn,
                 "DeploymentUuid": DEPLOYMENT_UUID,
+                # Commercial-shape slice list — document + vector. Defense
+                # adds "timeseries" but that needs pg_partman which the bare
+                # postgres:15 image doesn't carry. Coverage for the timeseries
+                # branch lives in unit tests on the SQL strings.
+                "Slices": ["document", "vector"],
             },
         }
 
@@ -159,12 +164,13 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
                 rows = cur.fetchall()
             assert rows == [("vector",)]
 
-            # Assert: secrets landed in LocalStack
+            # Assert: per-slice secrets landed in LocalStack under the new
+            # `arcnode-ems-{STACK}/<slice>-url` naming convention (Q4 lock).
             doc_secret = sm_client.get_secret_value(
-                SecretId=f"ems/{DEPLOYMENT_UUID}/persistence/aurora-document"
+                SecretId=f"arcnode-ems-{DEPLOYMENT_UUID}/document-url"
             )["SecretString"]
             vec_secret = sm_client.get_secret_value(
-                SecretId=f"ems/{DEPLOYMENT_UUID}/persistence/aurora-vector"
+                SecretId=f"arcnode-ems-{DEPLOYMENT_UUID}/vector-url"
             )["SecretString"]
             assert "ems_doc_app" in doc_secret
             assert "ems_document" in doc_secret
