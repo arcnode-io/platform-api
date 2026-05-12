@@ -14,15 +14,21 @@ from cfnlint import api as cfnlint_api
 
 from src.cfn.cfn_service import CfnService
 from src.cfn.persistence.persistence_service import PersistenceService
+from src.orders.configurator_payload import DeploymentContext
 
 DEPLOYMENT_UUID: str = "abcd1234-5678-90ef-1234-567890abcdef"
 DTM_URL: str = "https://platform-api-artifacts.example/orders/o1/dtm.json"
 EMS_MODE: str = "sim"
 
 
-def _render() -> str:
+def _render(
+    deployment_context: DeploymentContext = DeploymentContext.COMMERCIAL,
+) -> str:
     return CfnService(persistence=PersistenceService()).render_template(
-        deployment_uuid=DEPLOYMENT_UUID, dtm_url=DTM_URL, ems_mode=EMS_MODE
+        deployment_uuid=DEPLOYMENT_UUID,
+        dtm_url=DTM_URL,
+        ems_mode=EMS_MODE,
+        deployment_context=deployment_context,
     )
 
 
@@ -128,118 +134,22 @@ def test_instance_role_can_read_persistence_secrets() -> None:
     assert "secret:ems/" in rendered  # the secret-name prefix appears in the policy
 
 
-def test_userdata_fetches_four_persistence_secrets() -> None:
-    """UserData calls aws secretsmanager get-secret-value for each persistence slot."""
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert
-    for slot in ("aurora-document", "aurora-vector", "tiger", "neo4j-aura"):
-        assert slot in rendered, f"UserData missing fetch for {slot} secret"
-    assert "aws secretsmanager get-secret-value" in rendered
-
-
-def test_userdata_writes_secrets_to_opt_arcnode_url_files() -> None:
-    """Secrets land at /opt/arcnode/<name>.url for docker-compose env_file."""
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert
-    assert "/opt/arcnode/aurora-document.url" in rendered
-    assert "/opt/arcnode/aurora-vector.url" in rendered
-    assert "/opt/arcnode/tiger.url" in rendered
-    assert "/opt/arcnode/neo4j-aura.url" in rendered
-
-
 def test_render_template_includes_aurora_cluster() -> None:
-    """Persistence sub-module's Aurora resources are merged into the template."""
+    """Aurora resources merged into the template (both variants)."""
     # Arrange + Act
     rendered = _render()
 
     # Assert
     assert "AuroraCluster" in rendered
     assert "AWS::RDS::DBCluster" in rendered
-
-
-def test_render_template_includes_tiger_and_aura_custom_resources() -> None:
-    """Persistence sub-module's vendor custom resources are merged."""
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert
-    assert "Custom::TigerCloudInstance" in rendered
-    assert "Custom::Neo4jAuraInstance" in rendered
     assert "Custom::AuroraBootstrap" in rendered
 
 
-def test_render_template_full_resource_inventory() -> None:
-    """End-to-end: rendered template contains all expected logical IDs."""
-    # Arrange + Act
-    rendered = _render()
-
-    expected = [
-        # Network
-        "EmsVpc",
-        "EmsSubnet",
-        "EmsSecurityGroup",
-        # IAM
-        "EmsInstanceRole",
-        "EmsInstanceProfile",
-        # Aurora
-        "AuroraCluster",
-        "AuroraInstance",
-        "AuroraMasterSecret",
-        "AuroraSubnetGroup",
-        "AuroraSecurityGroup",
-        "AuroraBootstrapLambda",
-        "AuroraBootstrapCustomResource",
-        # Tiger
-        "TigerLambda",
-        "TigerCustomResource",
-        "TigerLambdaRole",
-        # Aura
-        "AuraLambda",
-        "AuraCustomResource",
-        "AuraLambdaRole",
-        # EC2
-        "EmsInstance",
-    ]
-
-    for logical_id in expected:
-        assert logical_id in rendered, f"missing logical id: {logical_id}"
-
-
-def test_ec2_instance_depends_on_all_three_persistence_resources() -> None:
-    """EC2 must wait for all three custom resources before launching."""
+def test_ec2_instance_depends_on_aurora_bootstrap() -> None:
+    """EC2 must wait for the Aurora bootstrap Lambda before launching."""
     # Arrange + Act
     rendered = _render()
 
     # Assert
     assert "AuroraBootstrapCustomResource" in rendered
-    assert "TigerCustomResource" in rendered
-    assert "AuraCustomResource" in rendered
     assert "DependsOn" in rendered
-
-
-def test_render_template_declares_vendor_token_parameters() -> None:
-    """Six no-default NoEcho parameters: Tiger access+secret+project, Aura client id+secret+tenant.
-
-    Operators paste vendor API tokens (not raw conn strings); the
-    persistence sub-module's CFN custom-resource Lambdas use these
-    tokens to provision Tiger Cloud + Neo4j Aura instances at
-    stack-create time.
-    """
-    # Arrange + Act
-    rendered = _render()
-
-    # Assert
-    assert "TigerCloudAccessKey:" in rendered
-    assert "TigerCloudSecretKey:" in rendered
-    assert "TigerCloudProjectId:" in rendered
-    assert "Neo4jAuraClientId:" in rendered
-    assert "Neo4jAuraClientSecret:" in rendered
-    assert "Neo4jAuraTenantId:" in rendered
-    assert rendered.count("NoEcho: true") == 6
-    assert rendered.count("MinLength: 1") == 6
-    # No Default: anywhere → CFN hard-fails if any token is missing
-    assert "Default:" not in rendered

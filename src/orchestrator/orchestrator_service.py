@@ -161,6 +161,7 @@ class OrchestratorService:
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
             ems_mode="sim",  # edp-api always emits SIM; ems-device-api flips post-deploy
+            deployment_context=payload.deployment_context,
         )
         template_url = await self._s3.upload_yaml(
             f"orders/{order_id}/ems-stack.yaml", template
@@ -250,10 +251,7 @@ class OrchestratorService:
             subject="ARCNODE deployment package ready",
             body_text=(
                 "Your ARCNODE deployment package is ready.\n\n"
-                f"Portal: {portal_url}\n\n"
-                "Before launching the CFN stack, you'll need to sign up at "
-                "Tiger Cloud and Neo4j Aura and collect six API tokens. The "
-                "portal page lists exactly what to grab and where to find it.\n"
+                f"Portal: {portal_url}\n"
             ),
         )
 

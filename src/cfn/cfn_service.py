@@ -1,13 +1,17 @@
 """CfnService — renders the per-order CloudFormation template.
 
 Each order gets its own `ems-stack.yaml` with deployment_uuid / dtm_url /
-ems_mode baked in. Six vendor API tokens (Tiger Cloud access+secret+project,
-Neo4j Aura client_id+secret+tenant) are required CFN parameters with no
-defaults — CFN refuses to deploy if any are missing. The persistence
-sub-module's inline-Lambda custom resources use those tokens to provision
-Tiger Cloud + Neo4j Aura instances at stack-create time, while Aurora
-serverless PG is provisioned natively (no external API call). All resulting
-connection strings flow into Secrets Manager and are fetched by EC2 UserData.
+ems_mode baked in. Variant is derived from the order's DeploymentContext and
+threaded into PersistenceService:
+
+  - COMMERCIAL → Aurora (doc + vector) + customer-supplied Tiger + Aura URLs
+  - SOVEREIGN_GOVERNMENT or DEFENSE_FORWARD → Aurora (doc + vector +
+    timeseries via pg_partman) + Neptune Serverless + AOSS
+
+The Aurora bootstrap Lambda lands the per-slice connection strings in
+Secrets Manager; EC2 UserData fetches them at boot. Neptune + AOSS endpoint
+hostnames (defense only) land in SSM Parameter Store — they have no creds
+and authenticate via IAM.
 """
 
 import yaml
@@ -17,9 +21,9 @@ from src.cfn.cfn_resources import (
     build_userdata,
     iam_resources,
     network_resources,
-    vendor_token_parameters,
 )
 from src.cfn.persistence.persistence_service import PersistenceService
+from src.orders.configurator_payload import DeploymentContext
 
 
 class CfnService:
@@ -29,7 +33,12 @@ class CfnService:
         self._persistence = persistence
 
     def render_template(
-        self, *, deployment_uuid: str, dtm_url: str, ems_mode: str
+        self,
+        *,
+        deployment_uuid: str,
+        dtm_url: str,
+        ems_mode: str,
+        deployment_context: DeploymentContext,
     ) -> str:
         """Return the per-order CFN template (yaml) with all inputs baked in."""
         short = deployment_uuid.split("-", 1)[0]
@@ -41,20 +50,22 @@ class CfnService:
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": f"ARCNODE EMS deployment — {deployment_uuid}",
-            "Parameters": vendor_token_parameters(),
+            # Parameters block: commercial gets Timeseries + Graph connection
+            # URLs; defense has no required params. Both variants accept the
+            # optional cost-knob params (ACU min/max, retention, etc.) — those
+            # land alongside the persistence resource block in a follow-up.
+            "Parameters": {},
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short),
-                **self._persistence.build_resources(),
+                **self._persistence.build_resources(
+                    deployment_context=deployment_context,
+                ),
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",
-                    # Wait for all three persistence custom resources before
-                    # launching — UserData fetches their secrets at boot.
-                    "DependsOn": [
-                        "AuroraBootstrapCustomResource",
-                        "TigerCustomResource",
-                        "AuraCustomResource",
-                    ],
+                    # Wait for Aurora bootstrap before launching — UserData
+                    # fetches per-slice connection strings at boot.
+                    "DependsOn": ["AuroraBootstrapCustomResource"],
                     "Properties": {
                         "InstanceType": "t3.medium",
                         "ImageId": AMI_SSM_PARAMETER,
