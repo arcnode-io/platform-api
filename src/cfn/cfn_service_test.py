@@ -124,14 +124,16 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
 
 
-def test_instance_role_can_read_persistence_secrets() -> None:
-    """EC2 instance role grants secretsmanager:GetSecretValue on ems/* prefix."""
+def test_instance_role_can_read_persistence_secrets_and_ssm() -> None:
+    """EC2 instance role grants secrets + SSM read on the arcnode-ems-* prefix."""
     # Arrange + Act
     rendered = _render()
 
     # Assert
     assert "secretsmanager:GetSecretValue" in rendered
-    assert "secret:ems/" in rendered  # the secret-name prefix appears in the policy
+    assert "secret:arcnode-ems-" in rendered
+    assert "ssm:GetParameter" in rendered
+    assert "parameter/arcnode-ems/" in rendered
 
 
 def test_render_template_includes_aurora_cluster() -> None:
@@ -153,3 +155,65 @@ def test_ec2_instance_depends_on_aurora_bootstrap() -> None:
     # Assert
     assert "AuroraBootstrapCustomResource" in rendered
     assert "DependsOn" in rendered
+
+
+def test_commercial_template_declares_two_vendor_url_parameters() -> None:
+    """Commercial variant: 2 NoEcho String params + 2 CFN-native vendor secrets."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "TimeseriesConnectionUrl:" in rendered
+    assert "GraphConnectionUrl:" in rendered
+    assert "TimeseriesUrlSecret:" in rendered
+    assert "GraphUrlSecret:" in rendered
+    # Commercial omits Neptune + AOSS
+    assert "AWS::Neptune::DBCluster" not in rendered
+    assert "AWS::OpenSearchServerless::Collection" not in rendered
+
+
+def test_defense_template_includes_neptune_and_aoss_resources() -> None:
+    """Defense variant: Neptune cluster + AOSS collection, no vendor params."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    # Assert
+    assert "AWS::Neptune::DBCluster" in rendered
+    assert "AWS::OpenSearchServerless::Collection" in rendered
+    # Defense has no vendor params
+    assert "TimeseriesConnectionUrl:" not in rendered
+    assert "GraphConnectionUrl:" not in rendered
+
+
+def test_sovereign_government_routes_to_defense_variant() -> None:
+    """SOVEREIGN_GOVERNMENT shares the defense template (Neptune + AOSS)."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.SOVEREIGN_GOVERNMENT)
+
+    # Assert
+    assert "AWS::Neptune::DBCluster" in rendered
+    assert "AWS::OpenSearchServerless::Collection" in rendered
+
+
+def test_commercial_userdata_fetches_graph_secret_from_secrets_manager() -> None:
+    """Commercial UserData fetches graph-url from Secrets Manager (Aura URL has creds)."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "arcnode-ems-${AWS::StackName}/graph-url" in rendered
+    # Commercial doesn't need neptune-host or aoss-host
+    assert "neptune-host" not in rendered
+    assert "aoss-host" not in rendered
+
+
+def test_defense_userdata_fetches_neptune_and_aoss_from_ssm() -> None:
+    """Defense UserData reads neptune-host + aoss-host from SSM Parameter Store."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    # Assert
+    assert "/arcnode-ems/${AWS::StackName}/neptune-host" in rendered
+    assert "/arcnode-ems/${AWS::StackName}/aoss-host" in rendered
+    # Defense doesn't fetch a graph-url secret (Neptune is IAM-auth)
+    assert "/graph-url" not in rendered

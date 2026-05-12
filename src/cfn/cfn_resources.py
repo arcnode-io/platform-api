@@ -6,6 +6,23 @@ out keeps the service file thin and lets unit tests target each block.
 
 from typing import Final
 
+from src.orders.configurator_payload import DeploymentContext
+
+# Secret slots (in Secrets Manager) and SSM parameters EC2 UserData fetches
+# at boot. Slot naming follows the Q4 lock: `arcnode-ems-{STACK}/<slot>-url`
+# for credential-bearing connection strings (Secrets Manager), and
+# `/arcnode-ems/{STACK}/<param>-host` for IAM-auth endpoint hostnames (SSM).
+COMMON_SECRET_SLOTS: Final[tuple[str, ...]] = (
+    "document-url",
+    "vector-url",
+    "timeseries-url",
+)
+COMMERCIAL_ONLY_SECRET_SLOTS: Final[tuple[str, ...]] = ("graph-url",)
+DEFENSE_ONLY_SSM_PARAMS: Final[tuple[str, ...]] = (
+    "neptune-host",
+    "aoss-host",
+)
+
 # Latest Amazon Linux 2023 x86_64 AMI in any region. CFN resolves this SSM
 # parameter against `--region` at deploy time, so the template is region-portable
 # without a Mappings table that would go stale every AMI revision.
@@ -123,7 +140,35 @@ def iam_resources(*, short: str) -> dict[str, object]:
                                     "Effect": "Allow",
                                     "Action": "secretsmanager:GetSecretValue",
                                     "Resource": {
-                                        "Fn::Sub": "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ems/*"
+                                        "Fn::Sub": (
+                                            "arn:aws:secretsmanager:"
+                                            "${AWS::Region}:${AWS::AccountId}"
+                                            ":secret:arcnode-ems-"
+                                            "${AWS::StackName}/*"
+                                        ),
+                                    },
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "PolicyName": f"arcnode-{short}-ssm-read",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ssm:GetParameter",
+                                        "ssm:GetParameters",
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": (
+                                            "arn:aws:ssm:${AWS::Region}:"
+                                            "${AWS::AccountId}:parameter"
+                                            "/arcnode-ems/"
+                                            "${AWS::StackName}/*"
+                                        ),
                                     },
                                 }
                             ],
@@ -139,24 +184,50 @@ def iam_resources(*, short: str) -> dict[str, object]:
     }
 
 
-def build_userdata(*, deployment_uuid: str, dtm_url: str, ems_mode: str) -> str:
-    """UserData: write deployment env, fetch persistence secrets, fetch DTM.
+def build_userdata(
+    *,
+    deployment_uuid: str,
+    dtm_url: str,
+    ems_mode: str,
+    deployment_context: DeploymentContext,
+) -> str:
+    """UserData: write deployment env, fetch persistence secrets + SSM, fetch DTM.
 
     Per-slice connection strings sit in Secrets Manager under
-    ``arcnode-ems-{STACK}/{document,vector,timeseries,graph}-url``. Neptune
-    and AOSS endpoint hostnames (defense only) sit in SSM Parameter Store
-    under ``/arcnode-ems/{STACK}/{neptune,aoss}-host`` — they're plain config
+    ``arcnode-ems-{STACK}/<slot>-url``. Neptune and AOSS endpoint
+    hostnames (defense only) sit in SSM Parameter Store under
+    ``/arcnode-ems/{STACK}/<param>-host`` — they're plain config
     (no creds; auth is IAM/sigv4 via the EC2 instance profile).
 
-    This function is variant-agnostic — the per-slice secrets are populated
-    by the Aurora bootstrap Lambda (Aurora slices) or by CFN-native
-    `AWS::SecretsManager::Secret` resources (Tiger + Aura URLs on commercial).
-    The defense-only SSM parameters are populated by CFN as well.
+    The slot list branches on `deployment_context`:
+      - Commercial: document, vector, timeseries, graph (all in Secrets Manager)
+      - Defense: document, vector, timeseries (Secrets Manager) + neptune-host,
+        aoss-host (SSM)
 
-    NOTE: the actual secret-fetch + SSM-read commands land in a follow-up
-    commit alongside the variant-specific resource blocks. This stub keeps
-    UserData minimal (env + DTM fetch) so the template still renders.
+    Output files land at ``/opt/arcnode/<slot>`` so docker-compose can mount
+    or env_file them. ``${AWS::StackName}`` is left intact for CFN
+    ``Fn::Sub`` substitution at deploy time.
     """
+    secret_slots = list(COMMON_SECRET_SLOTS)
+    ssm_params: list[str] = []
+    if deployment_context == DeploymentContext.COMMERCIAL:
+        secret_slots.extend(COMMERCIAL_ONLY_SECRET_SLOTS)
+    else:
+        ssm_params.extend(DEFENSE_ONLY_SSM_PARAMS)
+
+    secret_lines = "\n".join(
+        f"aws secretsmanager get-secret-value "
+        f'--secret-id "arcnode-ems-${{AWS::StackName}}/{slot}" '
+        f"--query SecretString --output text > /opt/arcnode/{slot}"
+        for slot in secret_slots
+    )
+    ssm_lines = "\n".join(
+        f"aws ssm get-parameter "
+        f'--name "/arcnode-ems/${{AWS::StackName}}/{p}" '
+        f"--query Parameter.Value --output text > /opt/arcnode/{p}"
+        for p in ssm_params
+    )
+    fetch_block = secret_lines + ("\n" + ssm_lines if ssm_lines else "")
     return (
         "#!/bin/bash\n"
         "set -euo pipefail\n"
@@ -166,6 +237,8 @@ def build_userdata(*, deployment_uuid: str, dtm_url: str, ems_mode: str) -> str:
         f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
+        "# Fetch persistence connection strings + endpoint hostnames.\n"
+        f"{fetch_block}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json || "
         "echo 'DTM fetch failed; populate /opt/arcnode/dtm.json manually'\n"

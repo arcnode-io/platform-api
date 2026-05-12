@@ -2,16 +2,17 @@
 
 Each order gets its own `ems-stack.yaml` with deployment_uuid / dtm_url /
 ems_mode baked in. Variant is derived from the order's DeploymentContext and
-threaded into PersistenceService:
+threaded into PersistenceService, which publishes the variant's Resources +
+Parameters + EmsInstance DependsOn list.
 
-  - COMMERCIAL → Aurora (doc + vector) + customer-supplied Tiger + Aura URLs
+  - COMMERCIAL → Aurora (doc + vector) + 2 customer-supplied URL params
+    (Tiger + Aura) stored as CFN-native Secrets Manager secrets.
   - SOVEREIGN_GOVERNMENT or DEFENSE_FORWARD → Aurora (doc + vector +
-    timeseries via pg_partman) + Neptune Serverless + AOSS
+    timeseries via pg_partman) + Neptune Serverless + AOSS — all
+    CFN-provisioned, zero customer params.
 
-The Aurora bootstrap Lambda lands the per-slice connection strings in
-Secrets Manager; EC2 UserData fetches them at boot. Neptune + AOSS endpoint
-hostnames (defense only) land in SSM Parameter Store — they have no creds
-and authenticate via IAM.
+EC2 UserData branches on variant to fetch the right secret slots from
+Secrets Manager + SSM Parameter Store at boot.
 """
 
 import yaml
@@ -46,26 +47,22 @@ class CfnService:
             deployment_uuid=deployment_uuid,
             dtm_url=dtm_url,
             ems_mode=ems_mode,
+            deployment_context=deployment_context,
+        )
+        persistence = self._persistence.build(
+            deployment_context=deployment_context,
         )
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": f"ARCNODE EMS deployment — {deployment_uuid}",
-            # Parameters block: commercial gets Timeseries + Graph connection
-            # URLs; defense has no required params. Both variants accept the
-            # optional cost-knob params (ACU min/max, retention, etc.) — those
-            # land alongside the persistence resource block in a follow-up.
-            "Parameters": {},
+            "Parameters": persistence.parameters,
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short),
-                **self._persistence.build_resources(
-                    deployment_context=deployment_context,
-                ),
+                **persistence.resources,
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",
-                    # Wait for Aurora bootstrap before launching — UserData
-                    # fetches per-slice connection strings at boot.
-                    "DependsOn": ["AuroraBootstrapCustomResource"],
+                    "DependsOn": persistence.ems_instance_depends_on,
                     "Properties": {
                         "InstanceType": "t3.medium",
                         "ImageId": AMI_SSM_PARAMETER,
@@ -93,4 +90,8 @@ class CfnService:
                 "EmsMode": {"Value": ems_mode},
             },
         }
+        if not template["Parameters"]:
+            # CFN tolerates missing Parameters but a literal `{}` looks
+            # wrong in the rendered YAML; drop the key entirely for defense.
+            del template["Parameters"]
         return yaml.safe_dump(template, sort_keys=False)
