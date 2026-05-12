@@ -27,11 +27,23 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
+# Per-variant Aurora slice sets. Commercial keeps only document + vector
+# (Tiger Cloud owns the timeseries slice). Defense adds timeseries (Aurora
+# pg_partman absorbs telemetry).
+COMMERCIAL_SLICES: Final[tuple[str, ...]] = ("document", "vector")
+DEFENSE_SLICES: Final[tuple[str, ...]] = ("document", "vector", "timeseries")
+
+
 def aurora_cluster_resources(
     lambda_runtime: str = DEFAULT_LAMBDA_RUNTIME,
     psycopg2_layer_arn_template: str | None = PSYCOPG2_LAYER_ARN_TEMPLATE,
+    slices: tuple[str, ...] = COMMERCIAL_SLICES,
 ) -> dict[str, dict]:
     """CFN resources for a scale-to-0 Aurora serverless PG cluster.
+
+    `slices` lists the per-variant database names the bootstrap Lambda must
+    create. The custom resource receives the list as a CFN property; the
+    Lambda branches on it. Defaults to commercial (`document + vector`).
 
     `psycopg2_layer_arn_template=None` omits the Layers field — the test
     deploy uses this because LocalStack community can't fetch shared layers
@@ -169,6 +181,9 @@ def aurora_cluster_resources(
                 },
                 "MasterSecretArn": {"Ref": "AuroraMasterSecret"},
                 "DeploymentUuid": {"Ref": "AWS::StackName"},
+                # Per-variant slice list — Lambda creates one db per slice and
+                # writes its connection string to arcnode-ems-{STACK}/<slice>-url.
+                "Slices": list(slices),
             },
         },
     }

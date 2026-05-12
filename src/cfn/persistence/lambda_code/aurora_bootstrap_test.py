@@ -1,8 +1,8 @@
 """Smoke tests for the Aurora bootstrap Lambda source.
 
 The function runs in Lambda; we test what we can statically — that the
-module parses, that `handler` is callable, and that the SQL statements
-match the expected database + extension shape.
+module parses, that ``handler`` is callable, and that the slice → db
+mapping + extension wiring match the expected shape.
 """
 
 import importlib.util
@@ -21,7 +21,7 @@ def _load_module():
 
 
 def test_module_loads_and_exposes_handler() -> None:
-    """Lambda entry point must be `handler(event, context)`."""
+    """Lambda entry point must be ``handler(event, context)``."""
     # Arrange + Act
     mod = _load_module()
 
@@ -29,20 +29,36 @@ def test_module_loads_and_exposes_handler() -> None:
     assert callable(mod.handler)
 
 
-def test_creates_document_and_vector_databases() -> None:
-    """SQL must CREATE DATABASE for both ems_document and ems_vector."""
+def test_slice_specs_cover_three_variants() -> None:
+    """SLICE_SPECS maps each supported slice → (db_name, app_user, extension)."""
     # Arrange + Act
-    source = MODULE_PATH.read_text()
+    mod = _load_module()
 
     # Assert
-    assert "CREATE DATABASE ems_document" in source
-    assert "CREATE DATABASE ems_vector" in source
+    assert set(mod.SLICE_SPECS.keys()) == {"document", "vector", "timeseries"}
+    # document has no extension
+    assert mod.SLICE_SPECS["document"] == ("ems_document", "ems_doc_app", None)
+    # vector installs pgvector
+    assert mod.SLICE_SPECS["vector"] == ("ems_vector", "ems_vec_app", "vector")
+    # timeseries installs pg_partman
+    assert mod.SLICE_SPECS["timeseries"] == (
+        "ems_timeseries",
+        "ems_ts_app",
+        "pg_partman",
+    )
 
 
-def test_installs_vector_extension_on_vector_db() -> None:
-    """pgvector goes on ems_vector only, not ems_document."""
+def test_measurements_schema_creates_partitioned_table_and_partman_parent() -> None:
+    """Hardcoded SQL: CREATE TABLE PARTITION BY RANGE + partman.create_parent."""
     # Arrange + Act
-    source = MODULE_PATH.read_text()
+    mod = _load_module()
+    sql_block = "\n".join(mod.MEASUREMENTS_SCHEMA_SQL)
 
     # Assert
-    assert "CREATE EXTENSION IF NOT EXISTS vector" in source
+    assert "CREATE TABLE IF NOT EXISTS measurements" in sql_block
+    assert "PARTITION BY RANGE (ts)" in sql_block
+    assert "partman.create_parent" in sql_block
+    assert "p_interval     => '1 hour'" in sql_block
+    assert "retention = '7 days'" in sql_block
+    # Q3 lock: JSONB value column, not DOUBLE PRECISION
+    assert "value       JSONB" in sql_block

@@ -5,7 +5,33 @@ master secret, subnet group, security group) and the scale-to-0 +
 serverless-v2-config invariants.
 """
 
-from src.cfn.persistence.aurora_resources import aurora_cluster_resources
+from src.cfn.persistence.aurora_resources import (
+    COMMERCIAL_SLICES,
+    DEFENSE_SLICES,
+    aurora_cluster_resources,
+)
+
+
+def test_commercial_slices_omit_timeseries() -> None:
+    """Commercial gets document + vector only — Tiger Cloud owns timeseries."""
+    # Assert
+    assert COMMERCIAL_SLICES == ("document", "vector")
+
+
+def test_defense_slices_include_timeseries() -> None:
+    """Defense gets document + vector + timeseries (Aurora pg_partman)."""
+    # Assert
+    assert DEFENSE_SLICES == ("document", "vector", "timeseries")
+
+
+def test_bootstrap_custom_resource_passes_slices_property() -> None:
+    """The CFN custom resource gets the slice list as a Property — Lambda branches on it."""
+    # Arrange + Act
+    resources = aurora_cluster_resources(slices=DEFENSE_SLICES)
+
+    # Assert
+    cr = resources["AuroraBootstrapCustomResource"]
+    assert cr["Properties"]["Slices"] == list(DEFENSE_SLICES)
 
 
 def test_returns_cluster_instance_and_master_secret() -> None:
@@ -107,5 +133,8 @@ def test_bootstrap_lambda_embeds_source_via_zipfile() -> None:
     # Assert
     code = lambda_res["Properties"]["Code"]
     assert "ZipFile" in code
-    # Source file content includes the SQL — confirms _load_lambda_source ran
-    assert "CREATE DATABASE ems_document" in code["ZipFile"]
+    # Source file content includes the slice spec table — confirms
+    # _load_lambda_source ran and embedded the slice-aware bootstrap.
+    assert "SLICE_SPECS" in code["ZipFile"]
+    assert "ems_document" in code["ZipFile"]
+    assert "ems_vector" in code["ZipFile"]
