@@ -61,6 +61,11 @@ max-statements = 30
 # and psycopg2 is in a Layer. urllib calls hit AWS-signed CFN URLs (S310).
 # `context` arg required by Lambda signature even when unused (ARG001).
 "src/cfn/persistence/lambda_code/*.py" = ["S310", "ARG001", "TRY002", "TRY301", "BLE001", "D103", "ANN401"]
+# Init container scripts: ship to bare python:3.13-alpine images. urllib
+# calls hit our own arcnode-public S3 (S310). Untyped boto3/neo4j driver
+# objects + Any annotations at the AWS / DB driver boundary (ANN001,
+# ANN401) — same model as Lambda code.
+"src/compose/init-scripts/*.py" = ["S310", "ANN001", "ANN401"]
 # Test files: missing docstrings, unused lambda args (mock context managers),
 # hardcoded test passwords, urllib mocks all expected.
 "**/*_test.py" = ["D101", "D102", "D103", "ANN001", "ANN201", "ANN202", "ARG001", "ARG005", "S105", "S106", "S310", "SIM117"]

@@ -1,0 +1,134 @@
+# Defense / Sovereign variant — EMS stack on customer EC2.
+#
+# Persistence: Aurora (document + vector + timeseries via pg_partman) +
+# Neptune Serverless (graph) + AOSS (FTS). All AWS-native — zero vendor
+# tokens. Connection URLs and IAM-auth hostnames sourced from
+# /opt/arcnode/persistence.env (written by EC2 UserData from CFN-managed
+# Secrets Manager + SSM Parameter Store entries).
+#
+# Diff from commercial:
+#   - seed-graph init uses Neptune Bulk Loader (boto3 + StartLoaderJob)
+#     instead of Aura's Bolt protocol
+#   - analyst-agent reads NEPTUNE_HOST + AOSS_HOST + AWS instance role
+#     for IAM-auth instead of GRAPH_URL with embedded creds
+#   - All other services identical
+
+x-env-files: &env-files
+  env_file:
+    - /opt/arcnode/deployment.env
+    - /opt/arcnode/persistence.env
+
+services:
+  # ─── init containers ─────────────────────────────────────
+  emqx-rule-render:
+    image: python:3.13-alpine
+    restart: "no"
+    <<: *env-files
+    environment:
+      TEMPLATE_PATH: /opt/arcnode/emqx/rule.hocon.tmpl
+      OUTPUT_PATH: /opt/arcnode/emqx/rule.hocon
+    volumes:
+      - /opt/arcnode/emqx:/opt/arcnode/emqx
+      - /opt/arcnode/init-scripts:/scripts:ro
+    command: ["python", "/scripts/render_emqx_rule.py"]
+
+  seed-vector:
+    image: alpine:3.20
+    restart: "no"
+    <<: *env-files
+    volumes:
+      - /opt/arcnode/init-scripts:/scripts:ro
+    command: ["sh", "/scripts/seed-vector.sh"]
+
+  seed-timeseries:
+    image: alpine:3.20
+    restart: "no"
+    <<: *env-files
+    volumes:
+      - /opt/arcnode/init-scripts:/scripts:ro
+    command: ["sh", "/scripts/seed-timeseries.sh"]
+
+  seed-graph:
+    image: python:3.13-alpine
+    restart: "no"
+    <<: *env-files
+    volumes:
+      - /opt/arcnode/init-scripts:/scripts:ro
+    command:
+      - sh
+      - -c
+      - "pip install --quiet boto3 && python /scripts/seed-graph-neptune.py"
+
+  # ─── long-running services ───────────────────────────────
+  emqx:
+    image: emqx/emqx:5.8
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      emqx-rule-render:
+        condition: service_completed_successfully
+    volumes:
+      - /opt/arcnode/emqx/rule.hocon:/etc/emqx/etc/rule.conf:ro
+    # 1883 MQTT — internal-only, no host port mapping (no auth per design)
+
+  device-api:
+    image: public.ecr.aws/arcnode/ems-device-api:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      seed-vector:
+        condition: service_completed_successfully
+      seed-graph:
+        condition: service_completed_successfully
+
+  industrial-gateway:
+    image: public.ecr.aws/arcnode/ems-industrial-gateway:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      emqx:
+        condition: service_started
+
+  hmi:
+    image: public.ecr.aws/arcnode/ems-hmi:latest
+    restart: unless-stopped
+    <<: *env-files
+    ports:
+      - "80:8080"
+    depends_on:
+      device-api:
+        condition: service_started
+
+  analyst-api:
+    image: public.ecr.aws/arcnode/ems-analyst-api:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      seed-timeseries:
+        condition: service_completed_successfully
+
+  analyst-server:
+    image: public.ecr.aws/arcnode/ems-analyst-server:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      analyst-api:
+        condition: service_started
+
+  analyst-agent:
+    image: public.ecr.aws/arcnode/ems-analyst-agent:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      seed-vector:
+        condition: service_completed_successfully
+      seed-graph:
+        condition: service_completed_successfully
+
+  analyst-model:
+    image: public.ecr.aws/arcnode/ems-analyst-model:latest
+    restart: unless-stopped
+    <<: *env-files
+    depends_on:
+      seed-timeseries:
+        condition: service_completed_successfully
