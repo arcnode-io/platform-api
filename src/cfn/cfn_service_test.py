@@ -247,12 +247,17 @@ def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
     assert "/init-scripts/render_emqx_rule.py" in defense
 
 
-def test_userdata_writes_arcnode_variant_to_deployment_env() -> None:
-    """deployment.env carries ARCNODE_VARIANT so compose can branch on it."""
+def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
+    """No ARCNODE_VARIANT env — containers branch on env-var presence instead.
+
+    The compose file already encodes the variant (commercial sets GRAPH_URL,
+    defense sets NEPTUNE_HOST + AOSS_HOST). A separate flag would be a
+    redundant + mismatch-prone signal.
+    """
     # Arrange + Act
     commercial = _render(DeploymentContext.COMMERCIAL)
     defense = _render(DeploymentContext.DEFENSE_FORWARD)
 
-    # Assert
-    assert "ARCNODE_VARIANT=commercial" in commercial
-    assert "ARCNODE_VARIANT=defense" in defense
+    # Assert — no ARCNODE_VARIANT export in either variant's UserData
+    assert "ARCNODE_VARIANT" not in commercial
+    assert "ARCNODE_VARIANT" not in defense

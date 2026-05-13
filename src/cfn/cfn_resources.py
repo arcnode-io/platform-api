@@ -223,6 +223,10 @@ def build_userdata(
 
     ``${AWS::StackName}`` is left intact for CFN ``Fn::Sub`` substitution.
     """
+    # `variant` drives which compose / HOCON path we fetch from arcnode-public.
+    # Not propagated as an env var into containers — the per-variant compose
+    # file's env-var set is itself the signal (presence of GRAPH_URL vs
+    # NEPTUNE_HOST), so consumer code just branches on what's there.
     variant = (
         "commercial"
         if deployment_context == DeploymentContext.COMMERCIAL
@@ -266,7 +270,6 @@ def build_userdata(
         "mkdir -p /opt/arcnode/init-scripts /etc/arcnode/emqx\n"
         "cat > /opt/arcnode/deployment.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
-        f"ARCNODE_VARIANT={variant}\n"
         f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
