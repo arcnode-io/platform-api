@@ -93,22 +93,22 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
     assert "Mappings:" not in rendered
 
 
-def test_render_template_userdata_drops_marker_files() -> None:
-    """Pre-launch UserData touches /opt/arcnode/ marker files (no docker yet).
-
-    Persistence connection-string fetch lands in Task 14 (Secrets Manager
-    + AWS CLI). For now UserData only writes deployment env + DTM fetch.
-    """
+def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
+    """UserData bootstraps docker + compose, fetches artifacts, runs the stack."""
     # Arrange + Act
     rendered = _render()
 
-    # Assert — bash shell + dummy-file scaffolding
+    # Assert — bash shell + the expected file layout
     assert "#!/bin/bash" in rendered
     assert "/opt/arcnode/config.env" in rendered
+    assert "/opt/arcnode/secrets.env" in rendered
     assert "/opt/arcnode/userdata.done" in rendered
-    assert DTM_URL in rendered  # curl line bakes the DTM URL in directly
-    # No docker bits — those land when registry images are published
-    assert "docker compose" not in rendered
+    assert DTM_URL in rendered
+    # Assert — docker install + compose up wire the EMS stack onto the EC2
+    assert "dnf install -y docker" in rendered
+    assert "systemctl enable --now docker" in rendered
+    assert "docker compose up -d" in rendered
+    # No reference to the old private registry — images come from ECR Public
     assert "registry.gitlab.com" not in rendered
 
 
