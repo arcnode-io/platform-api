@@ -10,7 +10,7 @@
 #      depends_on.<init>.condition: service_completed_successfully)
 #   3. EMQX rule writes telemetry MQTT → Tiger Cloud
 #
-# All images: public.ecr.aws/arcnode/<service>:latest (anonymous pull from
+# All images: public.ecr.aws/y1d2j6a8/<service>:latest (anonymous pull from
 # customer's EC2; arcnode publishes to ECR Public on release).
 
 x-env-files: &env-files
@@ -74,7 +74,7 @@ services:
     # 1883 MQTT — internal-only, no host port mapping (no auth per design)
 
   device-api:
-    image: public.ecr.aws/arcnode/ems-device-api:latest
+    image: public.ecr.aws/y1d2j6a8/ems-device-api:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
@@ -84,7 +84,7 @@ services:
         condition: service_completed_successfully
 
   industrial-gateway:
-    image: public.ecr.aws/arcnode/ems-industrial-gateway:latest
+    image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
@@ -92,7 +92,7 @@ services:
         condition: service_started
 
   hmi:
-    image: public.ecr.aws/arcnode/ems-hmi:latest
+    image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
     restart: unless-stopped
     <<: *env-files
     ports:
@@ -102,7 +102,7 @@ services:
         condition: service_started
 
   analyst-api:
-    image: public.ecr.aws/arcnode/ems-analyst-api:latest
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-api:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
@@ -110,7 +110,7 @@ services:
         condition: service_completed_successfully
 
   analyst-server:
-    image: public.ecr.aws/arcnode/ems-analyst-server:latest
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-server:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
@@ -118,7 +118,7 @@ services:
         condition: service_started
 
   analyst-agent:
-    image: public.ecr.aws/arcnode/ems-analyst-agent:latest
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-agent:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
@@ -128,7 +128,7 @@ services:
         condition: service_completed_successfully
 
   analyst-model:
-    image: public.ecr.aws/arcnode/ems-analyst-model:latest
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:

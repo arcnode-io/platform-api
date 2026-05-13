@@ -23,9 +23,9 @@ checks:
 build:
   stage: publish
   script:
-    - docker login -u admin -p $HARBOR_PASSWORD 173.211.12.43:8083
-    - docker build -t 173.211.12.43:8083/library/platform-api .
-    - docker push 173.211.12.43:8083/library/platform-api
+    - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
+    - docker build -t public.ecr.aws/y1d2j6a8/platform-api .
+    - docker push public.ecr.aws/y1d2j6a8/platform-api
 
 publish_compose:
   stage: publish
