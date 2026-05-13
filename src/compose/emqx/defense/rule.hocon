@@ -1,0 +1,44 @@
+# EMQX rule + Postgres connector for telemetry write — defense.
+#
+# Backend = Aurora pg_partman (CFN-provisioned, not Tiger Cloud).
+# Rendered at boot by the `emqx-rule-render` init container, which
+# substitutes {host}, {port}, {user}, {password}, {db} from the parsed
+# TIMESERIES_URL env var.
+#
+# SAME schema as commercial-and-iso — the `measurements` parent table is
+# created by the Aurora bootstrap Lambda with pg_partman attached. INSERTs
+# to the parent route to hourly partitions transparently. Identical INSERT
+# SQL keeps the rule template variant-independent except for the
+# connector's connection details.
+
+connectors.postgresql.timeseries {{
+  server   = "{host}:{port}"
+  database = "{db}"
+  username = "{user}"
+  password = "{password}"
+  pool_size = 8
+}}
+
+actions.postgresql.timeseries_writer {{
+  connector = timeseries
+  parameters {{
+    sql = """
+      INSERT INTO measurements (ts, site_id, device_id, measurement, unit, value)
+      VALUES (${{ts}}::timestamptz, ${{site_id}}, ${{device_id}}, ${{measurement}}, ${{unit}}, ${{value}}::jsonb)
+    """
+  }}
+}}
+
+rule_engine.rules.telemetry_write {{
+  sql = """
+    SELECT
+      payload.ts                       as ts,
+      nth(2, tokens(topic, '/'))       as site_id,
+      nth(4, tokens(topic, '/'))       as device_id,
+      nth(6, tokens(topic, '/'))       as measurement,
+      nth(7, tokens(topic, '/'))       as unit,
+      payload.value                    as value
+    FROM "sites/+/devices/+/measurements/+/+"
+  """
+  actions = ["postgresql:timeseries_writer"]
+}}
