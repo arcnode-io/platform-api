@@ -195,25 +195,64 @@ def test_sovereign_government_routes_to_defense_variant() -> None:
     assert "AWS::OpenSearchServerless::Collection" in rendered
 
 
-def test_commercial_userdata_fetches_graph_secret_from_secrets_manager() -> None:
-    """Commercial UserData fetches graph-url from Secrets Manager (Aura URL has creds)."""
+def test_commercial_userdata_writes_graph_url_into_persistence_env() -> None:
+    """Commercial UserData reads graph-url Secret + writes GRAPH_URL into persistence.env."""
     # Arrange + Act
     rendered = _render(DeploymentContext.COMMERCIAL)
 
-    # Assert
+    # Assert — fetches the Aura connection URL by Secrets Manager slot name
     assert "arcnode-ems-${AWS::StackName}/graph-url" in rendered
-    # Commercial doesn't need neptune-host or aoss-host
+    # Assert — surfaces it in persistence.env under the GRAPH_URL env var
+    assert "GRAPH_URL=" in rendered
+    assert "/opt/arcnode/persistence.env" in rendered
+    # Commercial doesn't fetch defense-only SSM params
     assert "neptune-host" not in rendered
     assert "aoss-host" not in rendered
 
 
-def test_defense_userdata_fetches_neptune_and_aoss_from_ssm() -> None:
-    """Defense UserData reads neptune-host + aoss-host from SSM Parameter Store."""
+def test_defense_userdata_writes_neptune_aoss_loader_role_into_persistence_env() -> (
+    None
+):
+    """Defense UserData reads 3 SSM params + writes NEPTUNE_HOST, AOSS_HOST, NEPTUNE_LOADER_ROLE_ARN."""
     # Arrange + Act
     rendered = _render(DeploymentContext.DEFENSE_FORWARD)
 
-    # Assert
+    # Assert — SSM lookups
     assert "/arcnode-ems/${AWS::StackName}/neptune-host" in rendered
     assert "/arcnode-ems/${AWS::StackName}/aoss-host" in rendered
+    assert "/arcnode-ems/${AWS::StackName}/neptune-loader-role-arn" in rendered
+    # Assert — env vars surface in persistence.env
+    assert "NEPTUNE_HOST=" in rendered
+    assert "AOSS_HOST=" in rendered
+    assert "NEPTUNE_LOADER_ROLE_ARN=" in rendered
     # Defense doesn't fetch a graph-url secret (Neptune is IAM-auth)
     assert "/graph-url" not in rendered
+
+
+def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
+    """UserData curls compose + HOCON template + init scripts from arcnode-public."""
+    # Arrange + Act
+    commercial = _render(DeploymentContext.COMMERCIAL)
+    defense = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    # Assert — variant-specific compose URL
+    assert "arcnode-public.s3" in commercial
+    assert "/compose/commercial/docker-compose.yaml" in commercial
+    assert "/compose/defense/docker-compose.yaml" in defense
+    # Assert — variant-specific HOCON template URL
+    assert "/emqx/commercial-and-iso/rule.hocon" in commercial
+    assert "/emqx/defense/rule.hocon" in defense
+    # Assert — init script(s) common to both
+    assert "/init-scripts/render_emqx_rule.py" in commercial
+    assert "/init-scripts/render_emqx_rule.py" in defense
+
+
+def test_userdata_writes_arcnode_variant_to_deployment_env() -> None:
+    """deployment.env carries ARCNODE_VARIANT so compose can branch on it."""
+    # Arrange + Act
+    commercial = _render(DeploymentContext.COMMERCIAL)
+    defense = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    # Assert
+    assert "ARCNODE_VARIANT=commercial" in commercial
+    assert "ARCNODE_VARIANT=defense" in defense

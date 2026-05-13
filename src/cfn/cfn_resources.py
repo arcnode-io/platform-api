@@ -12,15 +12,29 @@ from src.orders.configurator_payload import DeploymentContext
 # at boot. Slot naming follows the Q4 lock: `arcnode-ems-{STACK}/<slot>-url`
 # for credential-bearing connection strings (Secrets Manager), and
 # `/arcnode-ems/{STACK}/<param>-host` for IAM-auth endpoint hostnames (SSM).
-COMMON_SECRET_SLOTS: Final[tuple[str, ...]] = (
-    "document-url",
-    "vector-url",
-    "timeseries-url",
+# Secrets Manager slot → persistence.env env-var name. Each slot is a
+# Postgres / Neo4j connection URL (with embedded credentials); env_file
+# consumers parse with their lib's URL constructor.
+COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
+    ("document-url", "DOCUMENT_URL"),
+    ("vector-url", "VECTOR_URL"),
+    ("timeseries-url", "TIMESERIES_URL"),
 )
-COMMERCIAL_ONLY_SECRET_SLOTS: Final[tuple[str, ...]] = ("graph-url",)
-DEFENSE_ONLY_SSM_PARAMS: Final[tuple[str, ...]] = (
-    "neptune-host",
-    "aoss-host",
+COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
+    ("graph-url", "GRAPH_URL"),
+)
+# SSM Parameter Store entries → env-var name. No creds — IAM/sigv4 auth
+# via the EC2 instance profile.
+DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
+    ("neptune-host", "NEPTUNE_HOST"),
+    ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
+    ("aoss-host", "AOSS_HOST"),
+)
+
+# Static artifacts the EMS team publishes per release to arcnode-public.
+# UserData fetches them at boot — never per-order, never carry creds.
+ARCNODE_PUBLIC_BASE_URL: Final[str] = (
+    "https://arcnode-public.s3.us-east-1.amazonaws.com"
 )
 
 # Latest Amazon Linux 2023 x86_64 AMI in any region. CFN resolves this SSM
@@ -191,54 +205,80 @@ def build_userdata(
     ems_mode: str,
     deployment_context: DeploymentContext,
 ) -> str:
-    """UserData: write deployment env, fetch persistence secrets + SSM, fetch DTM.
+    """UserData: fetch arcnode-public artifacts, write env files, fetch DTM, run compose.
 
-    Per-slice connection strings sit in Secrets Manager under
-    ``arcnode-ems-{STACK}/<slot>-url``. Neptune and AOSS endpoint
-    hostnames (defense only) sit in SSM Parameter Store under
-    ``/arcnode-ems/{STACK}/<param>-host`` — they're plain config
-    (no creds; auth is IAM/sigv4 via the EC2 instance profile).
+    ``persistence.env`` exposes one env var per persistence slice — the
+    full connection URL for each Postgres/Neo4j slot, plus the bare
+    hostname for IAM-auth backends (Neptune, AOSS). Each ems-* container
+    consumes via ``env_file: /opt/arcnode/persistence.env``.
 
-    The slot list branches on `deployment_context`:
-      - Commercial: document, vector, timeseries, graph (all in Secrets Manager)
-      - Defense: document, vector, timeseries (Secrets Manager) + neptune-host,
-        aoss-host (SSM)
+    The slot list branches on ``deployment_context``:
+      - Commercial: 4 URL secrets (document, vector, timeseries, graph)
+      - Defense: 3 URL secrets + 3 SSM params (neptune-host, AOSS-host,
+        neptune-loader-role-arn)
 
-    Output files land at ``/opt/arcnode/<slot>`` so docker-compose can mount
-    or env_file them. ``${AWS::StackName}`` is left intact for CFN
-    ``Fn::Sub`` substitution at deploy time.
+    arcnode-public artifacts are static across orders — same compose +
+    HOCON + init scripts per arcnode release. UserData curls them once
+    at first boot.
+
+    ``${AWS::StackName}`` is left intact for CFN ``Fn::Sub`` substitution.
     """
-    secret_slots = list(COMMON_SECRET_SLOTS)
-    ssm_params: list[str] = []
+    variant = (
+        "commercial"
+        if deployment_context == DeploymentContext.COMMERCIAL
+        else "defense"
+    )
+    hocon_dir = (
+        "commercial-and-iso"
+        if deployment_context == DeploymentContext.COMMERCIAL
+        else "defense"
+    )
+    url_slots = list(COMMON_URL_SLOTS)
+    ssm_params: list[tuple[str, str]] = []
     if deployment_context == DeploymentContext.COMMERCIAL:
-        secret_slots.extend(COMMERCIAL_ONLY_SECRET_SLOTS)
+        url_slots.extend(COMMERCIAL_ONLY_URL_SLOTS)
     else:
         ssm_params.extend(DEFENSE_ONLY_SSM_PARAMS)
 
+    # Each line: ENV_VAR=$(aws secretsmanager get-secret-value ...) → persistence.env
     secret_lines = "\n".join(
-        f"aws secretsmanager get-secret-value "
-        f'--secret-id "arcnode-ems-${{AWS::StackName}}/{slot}" '
-        f"--query SecretString --output text > /opt/arcnode/{slot}"
-        for slot in secret_slots
+        f'echo "{env_name}=$(aws secretsmanager get-secret-value '
+        f"--secret-id arcnode-ems-${{AWS::StackName}}/{slot} "
+        f'--query SecretString --output text)" >> /opt/arcnode/persistence.env'
+        for slot, env_name in url_slots
     )
     ssm_lines = "\n".join(
-        f"aws ssm get-parameter "
-        f'--name "/arcnode-ems/${{AWS::StackName}}/{p}" '
-        f"--query Parameter.Value --output text > /opt/arcnode/{p}"
-        for p in ssm_params
+        f'echo "{env_name}=$(aws ssm get-parameter '
+        f"--name /arcnode-ems/${{AWS::StackName}}/{slot} "
+        f'--query Parameter.Value --output text)" >> /opt/arcnode/persistence.env'
+        for slot, env_name in ssm_params
     )
     fetch_block = secret_lines + ("\n" + ssm_lines if ssm_lines else "")
+    init_scripts = ["render_emqx_rule.py"]
+    init_script_lines = "\n".join(
+        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
+        f"-o /opt/arcnode/init-scripts/{s}"
+        for s in init_scripts
+    )
     return (
         "#!/bin/bash\n"
         "set -euo pipefail\n"
-        "mkdir -p /opt/arcnode\n"
+        "mkdir -p /opt/arcnode/init-scripts /etc/arcnode/emqx\n"
         "cat > /opt/arcnode/deployment.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
+        f"ARCNODE_VARIANT={variant}\n"
         f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
-        "# Fetch persistence connection strings + endpoint hostnames.\n"
+        "# Persistence env file populated below (one URL/host per line).\n"
+        ": > /opt/arcnode/persistence.env\n"
         f"{fetch_block}\n"
+        "# Fetch arcnode-public artifacts (compose, HOCON template, init scripts).\n"
+        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
+        "-o /opt/arcnode/docker-compose.yaml\n"
+        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/emqx/{hocon_dir}/rule.hocon "
+        "-o /opt/arcnode/emqx/rule.hocon.tmpl\n"
+        f"{init_script_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json || "
         "echo 'DTM fetch failed; populate /opt/arcnode/dtm.json manually'\n"

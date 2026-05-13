@@ -86,7 +86,7 @@ def test_defense_build_has_no_parameters() -> None:
 
 
 def test_defense_build_lists_ems_instance_dependencies() -> None:
-    """EmsInstance waits for Aurora bootstrap + Neptune + AOSS + 2 SSM params."""
+    """EmsInstance waits for Aurora bootstrap + Neptune + AOSS + 3 SSM params."""
     # Arrange
     service = PersistenceService()
 
@@ -99,6 +99,7 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
         "NeptuneInstance",
         "AossCollection",
         "NeptuneHostParam",
+        "NeptuneLoaderRoleArnParam",
         "AossHostParam",
     }
 

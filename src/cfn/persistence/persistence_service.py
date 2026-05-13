@@ -114,6 +114,7 @@ class PersistenceService:
                 "NeptuneInstance",
                 "AossCollection",
                 "NeptuneHostParam",
+                "NeptuneLoaderRoleArnParam",
                 "AossHostParam",
             ],
         )
