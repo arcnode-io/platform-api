@@ -111,8 +111,12 @@ def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-def test_all_services_consume_persistence_env(variant_path: Path) -> None:
-    """Every service's env_file points at deployment.env + persistence.env."""
+def test_all_services_consume_split_env_files(variant_path: Path) -> None:
+    """Every service env_file points at both config.env (non-secret) + secrets.env (URLs).
+
+    Split surfaces the secret/non-secret distinction at the file level so
+    operators can see which file holds what without running the container.
+    """
     # Arrange + Act
     spec = yaml.safe_load(variant_path.read_text())
 
@@ -120,8 +124,8 @@ def test_all_services_consume_persistence_env(variant_path: Path) -> None:
     for name, svc in spec["services"].items():
         env_files = svc.get("env_file", [])
         assert (
-            "/opt/arcnode/persistence.env" in env_files
-        ), f"{variant_path.name}: {name} missing persistence.env"
+            "/opt/arcnode/config.env" in env_files
+        ), f"{variant_path.name}: {name} missing config.env"
         assert (
-            "/opt/arcnode/deployment.env" in env_files
-        ), f"{variant_path.name}: {name} missing deployment.env"
+            "/opt/arcnode/secrets.env" in env_files
+        ), f"{variant_path.name}: {name} missing secrets.env"

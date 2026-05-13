@@ -244,20 +244,22 @@ def build_userdata(
     else:
         ssm_params.extend(DEFENSE_ONLY_SSM_PARAMS)
 
-    # Each line: ENV_VAR=$(aws secretsmanager get-secret-value ...) → persistence.env
+    # secrets.env — credential-bearing connection URLs from Secrets Manager.
+    # Each line writes one ENV_VAR=<URL>.
     secret_lines = "\n".join(
         f'echo "{env_name}=$(aws secretsmanager get-secret-value '
         f"--secret-id arcnode-ems-${{AWS::StackName}}/{slot} "
-        f'--query SecretString --output text)" >> /opt/arcnode/persistence.env'
+        f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
     )
+    # config.env — non-secret config from SSM Parameter Store + UserData
+    # literals (deployment uuid, dtm url, ems mode). No creds in this file.
     ssm_lines = "\n".join(
         f'echo "{env_name}=$(aws ssm get-parameter '
         f"--name /arcnode-ems/${{AWS::StackName}}/{slot} "
-        f'--query Parameter.Value --output text)" >> /opt/arcnode/persistence.env'
+        f'--query Parameter.Value --output text)" >> /opt/arcnode/config.env'
         for slot, env_name in ssm_params
     )
-    fetch_block = secret_lines + ("\n" + ssm_lines if ssm_lines else "")
     init_scripts = ["render_emqx_rule.py"]
     init_script_lines = "\n".join(
         f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
@@ -268,14 +270,16 @@ def build_userdata(
         "#!/bin/bash\n"
         "set -euo pipefail\n"
         "mkdir -p /opt/arcnode/init-scripts /etc/arcnode/emqx\n"
-        "cat > /opt/arcnode/deployment.env <<ENV\n"
+        "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
+        "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
         f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
-        "# Persistence env file populated below (one URL/host per line).\n"
-        ": > /opt/arcnode/persistence.env\n"
-        f"{fetch_block}\n"
+        f"{ssm_lines}\n"
+        "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
+        ": > /opt/arcnode/secrets.env\n"
+        f"{secret_lines}\n"
         "# Fetch arcnode-public artifacts (compose, HOCON template, init scripts).\n"
         f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"

@@ -104,7 +104,7 @@ def test_render_template_userdata_drops_marker_files() -> None:
 
     # Assert — bash shell + dummy-file scaffolding
     assert "#!/bin/bash" in rendered
-    assert "/opt/arcnode/deployment.env" in rendered
+    assert "/opt/arcnode/config.env" in rendered
     assert "/opt/arcnode/userdata.done" in rendered
     assert DTM_URL in rendered  # curl line bakes the DTM URL in directly
     # No docker bits — those land when registry images are published
@@ -195,25 +195,23 @@ def test_sovereign_government_routes_to_defense_variant() -> None:
     assert "AWS::OpenSearchServerless::Collection" in rendered
 
 
-def test_commercial_userdata_writes_graph_url_into_persistence_env() -> None:
-    """Commercial UserData reads graph-url Secret + writes GRAPH_URL into persistence.env."""
+def test_commercial_userdata_writes_graph_url_into_secrets_env() -> None:
+    """Commercial UserData reads graph-url Secret + writes GRAPH_URL into secrets.env."""
     # Arrange + Act
     rendered = _render(DeploymentContext.COMMERCIAL)
 
     # Assert — fetches the Aura connection URL by Secrets Manager slot name
     assert "arcnode-ems-${AWS::StackName}/graph-url" in rendered
-    # Assert — surfaces it in persistence.env under the GRAPH_URL env var
+    # Assert — surfaces it in secrets.env under the GRAPH_URL env var
     assert "GRAPH_URL=" in rendered
-    assert "/opt/arcnode/persistence.env" in rendered
+    assert "/opt/arcnode/secrets.env" in rendered
     # Commercial doesn't fetch defense-only SSM params
     assert "neptune-host" not in rendered
     assert "aoss-host" not in rendered
 
 
-def test_defense_userdata_writes_neptune_aoss_loader_role_into_persistence_env() -> (
-    None
-):
-    """Defense UserData reads 3 SSM params + writes NEPTUNE_HOST, AOSS_HOST, NEPTUNE_LOADER_ROLE_ARN."""
+def test_defense_userdata_writes_neptune_aoss_loader_role_into_config_env() -> None:
+    """Defense UserData reads 3 SSM params + writes NEPTUNE_HOST / AOSS_HOST / NEPTUNE_LOADER_ROLE_ARN into config.env."""
     # Arrange + Act
     rendered = _render(DeploymentContext.DEFENSE_FORWARD)
 
@@ -221,12 +219,36 @@ def test_defense_userdata_writes_neptune_aoss_loader_role_into_persistence_env()
     assert "/arcnode-ems/${AWS::StackName}/neptune-host" in rendered
     assert "/arcnode-ems/${AWS::StackName}/aoss-host" in rendered
     assert "/arcnode-ems/${AWS::StackName}/neptune-loader-role-arn" in rendered
-    # Assert — env vars surface in persistence.env
+    # Assert — env vars surface in config.env (no creds — IAM-auth hosts)
     assert "NEPTUNE_HOST=" in rendered
     assert "AOSS_HOST=" in rendered
     assert "NEPTUNE_LOADER_ROLE_ARN=" in rendered
+    assert "/opt/arcnode/config.env" in rendered
     # Defense doesn't fetch a graph-url secret (Neptune is IAM-auth)
     assert "/graph-url" not in rendered
+
+
+def test_userdata_keeps_secrets_and_config_in_separate_env_files() -> None:
+    """Credentials live in secrets.env; non-secret config lives in config.env.
+
+    Avoids the conflation bug class — operators can see at the file level
+    which values are sensitive without opening the values themselves.
+    """
+    # Arrange + Act
+    commercial = _render(DeploymentContext.COMMERCIAL)
+    defense = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    for rendered in (commercial, defense):
+        # Assert — URL-bearing slots route to secrets.env
+        assert "DOCUMENT_URL=" in rendered
+        assert "VECTOR_URL=" in rendered
+        assert "TIMESERIES_URL=" in rendered
+        # The aws secretsmanager get-secret-value lines all append to secrets.env
+        secret_section = rendered.split("/opt/arcnode/secrets.env")[1:]
+        secret_block = "\n".join(secret_section)
+        assert "secretsmanager get-secret-value" in secret_block
+        # And no SSM get-parameter writes leak into secrets.env
+        assert "ssm get-parameter" not in secret_block
 
 
 def test_userdata_fetches_arcnode_public_static_artifacts() -> None:

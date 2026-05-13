@@ -15,8 +15,8 @@
 
 x-env-files: &env-files
   env_file:
-    - /opt/arcnode/deployment.env
-    - /opt/arcnode/persistence.env
+    - /opt/arcnode/config.env
+    - /opt/arcnode/secrets.env
 
 services:
   # ─── init containers ─────────────────────────────────────
