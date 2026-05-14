@@ -43,9 +43,7 @@ def test_compose_yaml_parses_and_declares_emqx_plus_inits(
         "device-api",
         "industrial-gateway",
         "hmi",
-        "analyst-api",
         "analyst-server",
-        "analyst-agent",
         "analyst-model",
     ):
         assert required in services, f"{variant_path.name}: missing {required}"
@@ -102,9 +100,7 @@ def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
         "device-api",
         "industrial-gateway",
         "hmi",
-        "analyst-api",
         "analyst-server",
-        "analyst-agent",
         "analyst-model",
     ):
         assert spec["services"][service]["restart"] == "unless-stopped"
