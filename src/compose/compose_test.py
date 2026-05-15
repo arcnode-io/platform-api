@@ -26,7 +26,7 @@ BROKER_LEG = (
     "industrial-gateway",
     "hmi",
 )
-COMMERCIAL_INITS = ("seed-graph",)
+COMMERCIAL_INITS: tuple[str, ...] = ()
 COMMERCIAL_ANALYST = ("analyst-server", "analyst-model")
 
 
@@ -68,16 +68,6 @@ def test_commercial_has_broker_plus_analyst_stack() -> None:
         assert svc in services, f"commercial missing {svc}"
 
 
-def test_commercial_init_containers_have_restart_no() -> None:
-    """Init containers exit 0 once seeded; restart: no avoids re-seed on reboot."""
-    # Arrange + Act
-    services = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]
-
-    # Assert
-    for init in COMMERCIAL_INITS:
-        assert services[init]["restart"] == "no", f"{init} missing restart: no"
-
-
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
 def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
     """Long-running services restart on EC2 reboot via the docker daemon."""
@@ -89,9 +79,9 @@ def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
         if svc not in services:
             # mock-modbus-server is defense-only, not in commercial
             continue
-        assert services[svc]["restart"] == "unless-stopped", (
-            f"{variant_path.name}: {svc} should be unless-stopped"
-        )
+        assert (
+            services[svc]["restart"] == "unless-stopped"
+        ), f"{variant_path.name}: {svc} should be unless-stopped"
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
@@ -109,9 +99,9 @@ def test_all_services_consume_split_env_files(variant_path: Path) -> None:
         if name == "mock-modbus-server":
             continue  # no env consumption
         env_files = svc.get("env_file", [])
-        assert "/opt/arcnode/config.env" in env_files, (
-            f"{variant_path.name}: {name} missing config.env"
-        )
-        assert "/opt/arcnode/secrets.env" in env_files, (
-            f"{variant_path.name}: {name} missing secrets.env"
-        )
+        assert (
+            "/opt/arcnode/config.env" in env_files
+        ), f"{variant_path.name}: {name} missing config.env"
+        assert (
+            "/opt/arcnode/secrets.env" in env_files
+        ), f"{variant_path.name}: {name} missing secrets.env"

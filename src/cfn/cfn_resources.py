@@ -371,19 +371,12 @@ def build_userdata(
         f'--query Parameter.Value --output text)" >> /opt/arcnode/config.env'
         for slot, env_name in ssm_params
     )
-    # Init scripts compose mounts at /opt/arcnode/init-scripts/. Variant
-    # picks the matching graph seed script (Neo4j Aura vs Neptune loader).
-    # Vector + ercot moved to consumer-self-seed (analyst-server +
-    # analyst-model fetch their own dumps from public S3 at boot).
-    graph_seed_script = (
-        "seed-graph-neo4j.py"
-        if deployment_context == DeploymentContext.COMMERCIAL
-        else "seed-graph-neptune.py"
-    )
-    init_scripts = [
-        graph_seed_script,
-        "telemetry_writer.py",
-    ]
+    # Init scripts compose mounts at /opt/arcnode/init-scripts/. All
+    # data seeding (vector, graph, ercot) lives in consumer services —
+    # mcp-server pkg loaded by analyst-server seeds vector + graph;
+    # analyst-model seeds ercot. Only telemetry-writer (the MQTT →
+    # Postgres bridge) ships from platform-api.
+    init_scripts = ["telemetry_writer.py"]
     init_script_lines = "\n".join(
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
         f"-o /opt/arcnode/init-scripts/{s}"

@@ -4,19 +4,9 @@
 # (graph). Connection URLs sourced from /opt/arcnode/secrets.env (written
 # by EC2 UserData from CFN-managed Secrets Manager entries).
 #
-# Boot order:
-#   1. seed-graph init container runs (Neo4j Aura cypher restore)
-#   2. After it exits 0, long-running services start
-#   3. analyst-server self-seeds vector (Aurora) on first boot
-#   4. analyst-model self-seeds ercot (Tiger Cloud) on first boot
-#   5. telemetry-writer subscribes to MQTT and INSERTs into TIMESERIES_URL
-#      — HiveMQ CE has no built-in DB connector, we own the bridge.
-#
-# Self-seed pattern (vector + ercot): each consumer fetches its own dump
-# from public S3 at boot, idempotent via arcnode_seed_markers row. Graph
-# stays an init container for now — Neptune/Aura seed code is heavier
-# (Bulk Loader REST + cypher driver) and analyst-server doesn't yet
-# carry that boot logic. Migrate when consumer is ready.
+# Vector + graph + ercot seeding lives in the consumers (mcp-server pkg
+# loaded by analyst-server; analyst-model directly). Don't re-add init
+# containers here — see consumer seed.py.
 #
 # All images: public.ecr.aws/y1d2j6a8/<service>:latest (anonymous pull
 # from customer's EC2; arcnode publishes to ECR Public on release).
@@ -27,19 +17,6 @@ x-env-files: &env-files
     - /opt/arcnode/secrets.env
 
 services:
-  seed-graph:
-    image: python:3.13-alpine
-    restart: "no"
-    <<: *env-files
-    volumes:
-      - /opt/arcnode/init-scripts:/scripts:ro
-    # pip install before invoking — keeps the script free of subprocess
-    # bootstrap shenanigans + clean top-of-file imports.
-    command:
-      - sh
-      - -c
-      - "pip install --quiet neo4j && python /scripts/seed-graph-neo4j.py"
-
   hivemq:
     image: hivemq/hivemq-ce:latest
     restart: unless-stopped
@@ -47,7 +24,6 @@ services:
     # HiveMQ CE ships with the Allow All Extension out of the box, so
     # anonymous publish/subscribe just works. When real auth lands, drop
     # the Allow All extension and bring up an auth extension instead.
-    # 1883 MQTT — internal-only, no host port mapping (no auth per design)
 
   device-api:
     image: public.ecr.aws/y1d2j6a8/ems-device-api:latest
@@ -59,10 +35,6 @@ services:
       CUSTOMER_ENV: commercial
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
-    # device-api only consumes DOCUMENT_URL — vector/graph belong to the
-    # analyst stack, not here. Aurora itself is up by the time compose
-    # runs (CFN's ems_instance_depends_on gates the EC2 on the bootstrap
-    # custom resource), so no init-container gate needed.
 
   # MQTT → Tiger Cloud bridge. HiveMQ CE doesn't ship a Postgres connector
   # (Enterprise-only, sales-gated); we own the bridge as a tiny subscriber
@@ -93,28 +65,17 @@ services:
     image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
     restart: unless-stopped
     <<: *env-files
-    # Nginx listens on 80 (per Dockerfile EXPOSE 80 + default nginx.conf).
-    # EmsSecurityGroup opens 80 inbound from 0.0.0.0/0.
     ports:
       - "80:80"
     depends_on:
       device-api:
         condition: service_started
 
-  # analyst-server self-seeds vector slice from public S3 at boot:
-  #   https://arcnode-public.s3.us-east-1.amazonaws.com/seed/vector.sql.gz
-  # Idempotent via arcnode_seed_markers row, slice='vector'.
   analyst-server:
     image: public.ecr.aws/y1d2j6a8/ems-analyst-server:latest
     restart: unless-stopped
     <<: *env-files
-    depends_on:
-      seed-graph:
-        condition: service_completed_successfully
 
-  # analyst-model self-seeds ercot slice from public S3 at boot:
-  #   https://arcnode-public.s3.us-east-1.amazonaws.com/seed/ercot-solar-timeseries.sql.gz
-  # Idempotent via arcnode_seed_markers row, slice='ercot_solar_timeseries'.
   analyst-model:
     image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
     restart: unless-stopped
