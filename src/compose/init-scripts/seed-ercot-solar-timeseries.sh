@@ -23,8 +23,8 @@ apk add --no-cache postgresql-client curl >/dev/null
 psql "$TIMESERIES_URL" -c \
   "CREATE TABLE IF NOT EXISTS arcnode_seed_markers (slice TEXT PRIMARY KEY, seeded_at TIMESTAMPTZ DEFAULT now())"
 
-if psql "$TIMESERIES_URL" -tAc "SELECT 1 FROM arcnode_seed_markers WHERE slice = 'ercot_solar'" | grep -q 1; then
-  echo "ercot_solar already seeded; exiting"
+if psql "$TIMESERIES_URL" -tAc "SELECT 1 FROM arcnode_seed_markers WHERE slice = 'ercot_solar_timeseries'" | grep -q 1; then
+  echo "ercot_solar_timeseries already seeded; exiting"
   exit 0
 fi
 
@@ -32,7 +32,7 @@ fi
 # Directory format can't be streamed — extract to a tempdir then point
 # pg_restore at it.
 TMPDIR=$(mktemp -d)
-curl -fsSL https://arcnode-public.s3.us-east-1.amazonaws.com/seed/ercot-solar.tar.gz \
+curl -fsSL https://arcnode-public.s3.us-east-1.amazonaws.com/seed/ercot-solar-timeseries.tar.gz \
   | tar -xz -C "$TMPDIR"
 # pg_restore returns 1 when any error occurs even if it continued — on
 # Aurora the TimescaleDB-specific statements miss. `|| true` swallows
@@ -41,6 +41,6 @@ pg_restore --format=directory --dbname "$TIMESERIES_URL" --no-owner --no-privile
 rm -rf "$TMPDIR"
 
 psql "$TIMESERIES_URL" -c \
-  "INSERT INTO arcnode_seed_markers (slice) VALUES ('ercot_solar') ON CONFLICT DO NOTHING"
+  "INSERT INTO arcnode_seed_markers (slice) VALUES ('ercot_solar_timeseries') ON CONFLICT DO NOTHING"
 
-echo "ercot_solar seeded"
+echo "ercot_solar_timeseries seeded"
