@@ -1,14 +1,14 @@
-"""Subscribe to broker telemetry, INSERT into Aurora measurements.
+"""Subscribe to broker telemetry, INSERT into the timeseries DB.
 
-Bridges the EMQX-CE gap. EMQX Community doesn't ship a Postgres bridge
-(http + mqtt only); Enterprise tier has it as a first-class connector.
-For the smoke we run this minimal subscriber in-compose so the broker →
-measurements path is verifiable without an EE license. Same SQL the
-EMQX rule template uses; same topic shape.
+The MQTT → DB bridge for the EMS stack. We own this rather than relying
+on a broker plugin so the path works on any MQTT broker we deploy
+(HiveMQ CE in production today; Mosquitto / VerneMQ if we ever swap).
+Subscribes to ``sites/+/devices/+/measurements/+/+`` per the topic
+contract in system_adr §9 and writes one row per publish.
 
 Env contract (compose env_file: /opt/arcnode/secrets.env):
     TIMESERIES_URL  - postgres://user:pass@host:port/dbname
-    BROKER          - emqx hostname on the compose network (default: emqx)
+    BROKER          - broker hostname on the compose network (default: hivemq)
 """
 
 import json
@@ -18,7 +18,7 @@ import paho.mqtt.client as mqtt
 import psycopg2
 
 TIMESERIES_URL = os.environ["TIMESERIES_URL"]
-BROKER = os.environ.get("BROKER", "emqx")
+BROKER = os.environ.get("BROKER", "hivemq")
 TOPIC = "sites/+/devices/+/measurements/+/+"
 
 INSERT_SQL = (

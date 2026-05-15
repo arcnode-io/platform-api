@@ -7,8 +7,9 @@
 # persistence build. Restore both sides together.
 #
 # Persistence at the moment: Aurora only — document slice (device-api
-# DTM) + timeseries slice with pg_partman (EMQX-rule writes telemetry
-# into `measurements`).
+# DTM) + timeseries slice with pg_partman. telemetry-writer subscribes
+# to MQTT and INSERTs into the measurements table (HiveMQ CE has no
+# built-in DB connector; we own the bridge as a sidecar).
 #
 # Connection URLs sourced from /opt/arcnode/secrets.env (UserData writes
 # from CFN-managed Secrets Manager).
@@ -19,46 +20,17 @@ x-env-files: &env-files
     - /opt/arcnode/secrets.env
 
 services:
-  # ─── init containers ─────────────────────────────────────
-  emqx-rule-render:
-    image: python:3.13-alpine
-    restart: "no"
-    <<: *env-files
-    environment:
-      TEMPLATE_PATH: /opt/arcnode/emqx/rule.hocon.tmpl
-      OUTPUT_PATH: /opt/arcnode/emqx/rule.hocon
-    volumes:
-      - /opt/arcnode/emqx:/opt/arcnode/emqx
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["python", "/scripts/render_emqx_rule.py"]
-
-  # ─── long-running services ───────────────────────────────
-  emqx:
-    image: emqx/emqx:5.8
+  hivemq:
+    image: hivemq/hivemq-ce:latest
     restart: unless-stopped
     <<: *env-files
-    environment:
-      # SMOKE: anonymous + allow-all so mosquitto_sub from inside the
-      # EC2 (and the gateway publishing without creds) work without
-      # provisioning authn/acl rules. Production gates these at the
-      # broker — restore alongside the analyst stack.
-      EMQX_ALLOW_ANONYMOUS: "true"
-      EMQX_AUTHORIZATION__NO_MATCH: allow
-      # Default acl.conf source ships rules that deny anon on common topics.
-      # Empty sources list + no_match=allow → fully permissive for the smoke.
-      EMQX_AUTHORIZATION__SOURCES: "[]"
-    depends_on:
-      emqx-rule-render:
-        condition: service_completed_successfully
-    # SMOKE: rule.hocon mount intentionally dropped. EMQX 5 schema only
-    # accepts http/mqtt connectors in file-based config; postgres goes
-    # via the REST API. Rule registration moves to a post-boot init step.
+    # HiveMQ CE ships with the Allow All Extension out of the box, so
+    # anonymous publish/subscribe just works. When real auth lands, drop
+    # the Allow All extension and bring up an auth extension instead.
     ports:
       # SMOKE: 1883 exposed to the host so the operator can run
-      # `mosquitto_sub` against it from inside the EC2 to verify
-      # gateway publishes are flowing. Internal-only by design in
-      # production — drop the host port when restoring the analyst
-      # stack.
+      # `mosquitto_sub` against it from inside the EC2 to verify gateway
+      # publishes are flowing. Internal-only in production.
       - "1883:1883"
 
   device-api:
@@ -67,7 +39,7 @@ services:
     <<: *env-files
     environment:
       BOOT_DTM_PATH: /app/dtm.json
-      # ENV=beta picks up cfg.yml's beta block (mqttBrokerUrl: mqtt://emqx:1883
+      # ENV=beta picks up cfg.yml's beta block (mqttBrokerUrl: mqtt://hivemq:1883
       # + container-internal hostnames). Without it device-api defaults to
       # local cfg and tries to connect to 127.0.0.1:1883.
       ENV: beta
@@ -85,10 +57,10 @@ services:
     image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
     restart: unless-stopped
 
-  # SMOKE bridge between emqx + Aurora measurements. EMQX Community
-  # Edition doesn't ship the Postgres connector (only http/mqtt), so this
-  # tiny subscriber stands in. Replace with EMQX Enterprise's pgsql action
-  # when we upgrade the license.
+  # MQTT → Aurora bridge. HiveMQ CE doesn't ship a Postgres connector
+  # (that's an Enterprise-only feature behind a sales gate); we own the
+  # bridge here as a ~50-line subscriber instead. Same `INSERT INTO
+  # measurements ...` SQL.
   telemetry-writer:
     image: python:3.13-alpine
     restart: unless-stopped
@@ -100,7 +72,7 @@ services:
       - -c
       - "pip install --quiet paho-mqtt psycopg2-binary && python /scripts/telemetry_writer.py"
     depends_on:
-      emqx:
+      hivemq:
         condition: service_started
 
   industrial-gateway:
@@ -116,7 +88,7 @@ services:
     environment:
       ENV: beta
     depends_on:
-      emqx:
+      hivemq:
         condition: service_started
       device-api:
         condition: service_started

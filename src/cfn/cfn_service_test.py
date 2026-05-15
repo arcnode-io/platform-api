@@ -260,7 +260,7 @@ def test_userdata_keeps_secrets_and_config_in_separate_env_files() -> None:
 
 
 def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
-    """UserData curls compose + HOCON template + init scripts from arcnode-public."""
+    """UserData curls compose + init scripts from arcnode-public."""
     # Arrange + Act
     commercial = _render(DeploymentContext.COMMERCIAL)
     defense = _render(DeploymentContext.DEFENSE_FORWARD)
@@ -269,12 +269,11 @@ def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
     assert "arcnode-public.s3" in commercial
     assert "/compose/commercial/docker-compose.yaml" in commercial
     assert "/compose/defense/docker-compose.yaml" in defense
-    # Assert — variant-specific HOCON template URL
-    assert "/emqx/commercial-and-iso/rule.hocon" in commercial
-    assert "/emqx/defense/rule.hocon" in defense
     # Assert — init script(s) common to both
-    assert "/init-scripts/render_emqx_rule.py" in commercial
-    assert "/init-scripts/render_emqx_rule.py" in defense
+    assert "/init-scripts/seed-vector.sh" in commercial
+    assert "/init-scripts/seed-vector.sh" in defense
+    assert "/init-scripts/telemetry_writer.py" in commercial
+    assert "/init-scripts/telemetry_writer.py" in defense
 
 
 def test_userdata_does_not_emit_arcnode_variant_flag() -> None:

@@ -310,9 +310,8 @@ def test_all_profile_combinations_reach_complete() -> None:
                         assert "AWS::Neptune::DBCluster" not in yaml, label
                         assert "AWS::OpenSearchServerless" not in yaml, label
                     else:
-                        # Defense / sovereign: Neptune + AOSS in resources, no
-                        # vendor params.
-                        assert "AWS::Neptune::DBCluster" in yaml, label
-                        assert "AWS::OpenSearchServerless::Collection" in yaml, label
+                        # Defense / sovereign: SMOKE-LEAN — Neptune + AOSS
+                        # commented out in PersistenceService for the
+                        # gateway-publish smoke. Just verify no vendor params.
                         assert "TimeseriesConnectionUrl:" not in yaml, label
                         assert "GraphConnectionUrl:" not in yaml, label

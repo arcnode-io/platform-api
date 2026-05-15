@@ -37,7 +37,7 @@ SLICE_SPECS: dict[str, tuple[str, str, str | None]] = {
 }
 
 # measurements — the broker-ingest landing table. Every MQTT publish a
-# gateway sends gets written here by the EMQX rule. JSONB value column
+# gateway sends gets written here by the telemetry-writer sidecar. JSONB value column
 # matches the polymorphic MQTT payload (float | bool | enum). Hourly
 # partitions managed by pg_partman with 7-day retention (rolled-off
 # partitions dropped, not archived). Analyst-API consumers read from this

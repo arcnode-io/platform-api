@@ -5,7 +5,7 @@ do guarantee that:
   - both compose files parse as YAML cleanly
   - both declare the inits + long-runners we expect
   - long-runners gate behind the right inits via service_completed_successfully
-  - emqx port 1883 is NOT exposed to the host (no auth → no public reach)
+  - hivemq broker uses the HiveMQ CE image
 """
 
 from pathlib import Path
@@ -54,29 +54,14 @@ def test_compose_yaml_parses_and_declares_emqx_plus_inits(
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-def test_emqx_waits_for_rule_render_to_complete(variant_path: Path) -> None:
-    """emqx must DependsOn emqx-rule-render w/ service_completed_successfully."""
+def test_hivemq_broker_is_declared(variant_path: Path) -> None:
+    """Both variants declare a hivemq service running the HiveMQ CE image."""
     # Arrange + Act
     spec = yaml.safe_load(variant_path.read_text())
 
     # Assert
-    deps = spec["services"]["emqx"]["depends_on"]
-    assert deps["emqx-rule-render"]["condition"] == "service_completed_successfully"
-
-
-@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-@pytest.mark.skip(
-    reason="SMOKE-LEAN: defense compose exposes 1883 so operator can mosquitto_sub"
-)
-def test_emqx_does_not_publish_port_1883_to_host(variant_path: Path) -> None:
-    """No-auth + internal-only — port 1883 stays on the compose bridge network."""
-    # Arrange + Act
-    spec = yaml.safe_load(variant_path.read_text())
-
-    # Assert — emqx has no `ports:` block, OR no entry mapping 1883
-    ports = spec["services"]["emqx"].get("ports", [])
-    for p in ports:
-        assert "1883" not in str(p), f"emqx port 1883 is exposed to host: {p}"
+    assert "hivemq" in spec["services"]
+    assert spec["services"]["hivemq"]["image"].startswith("hivemq/hivemq-ce")
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])

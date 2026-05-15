@@ -339,17 +339,12 @@ def build_userdata(
 
     ``${AWS::StackName}`` is left intact for CFN ``Fn::Sub`` substitution.
     """
-    # `variant` drives which compose / HOCON path we fetch from arcnode-public.
+    # `variant` drives which compose path we fetch from arcnode-public.
     # Not propagated as an env var into containers — the per-variant compose
     # file's env-var set is itself the signal (presence of GRAPH_URL vs
     # NEPTUNE_HOST), so consumer code just branches on what's there.
     variant = (
         "commercial"
-        if deployment_context == DeploymentContext.COMMERCIAL
-        else "defense"
-    )
-    hocon_dir = (
-        "commercial-and-iso"
         if deployment_context == DeploymentContext.COMMERCIAL
         else "defense"
     )
@@ -384,10 +379,10 @@ def build_userdata(
         else "seed-graph-neptune.py"
     )
     init_scripts = [
-        "render_emqx_rule.py",
         "seed-vector.sh",
         "seed-timeseries.sh",
         graph_seed_script,
+        "telemetry_writer.py",
     ]
     init_script_lines = "\n".join(
         f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
@@ -397,7 +392,7 @@ def build_userdata(
     return (
         "#!/bin/bash\n"
         "set -euo pipefail\n"
-        "mkdir -p /opt/arcnode/init-scripts /opt/arcnode/emqx\n"
+        "mkdir -p /opt/arcnode/init-scripts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
@@ -409,11 +404,9 @@ def build_userdata(
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
-        "# Fetch arcnode-public artifacts (compose, HOCON template, init scripts).\n"
+        "# Fetch arcnode-public artifacts (compose + init scripts).\n"
         f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
-        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/emqx/{hocon_dir}/rule.hocon "
-        "-o /opt/arcnode/emqx/rule.hocon.tmpl\n"
         f"{init_script_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
@@ -429,8 +422,8 @@ def build_userdata(
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 "
         "-o $DOCKER_CLI_PLUGINS/docker-compose\n"
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"
-        "# Start the EMS stack — init containers seed DBs and render emqx\n"
-        "# rule, then long-runners (emqx, device-api, hmi, analyst-*) boot.\n"
+        "# Start the EMS stack — init containers seed DBs\n"
+        "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
         "cd /opt/arcnode && docker compose up -d\n"
         "touch /opt/arcnode/userdata.done\n"
     )

@@ -1,14 +1,16 @@
 # Commercial variant — EMS stack on customer EC2.
 #
 # Persistence: Aurora (document + vector) + Tiger Cloud (timeseries) +
-# Neo4j Aura (graph). Connection URLs sourced from /opt/arcnode/persistence.env
+# Neo4j Aura (graph). Connection URLs sourced from /opt/arcnode/secrets.env
 # (written by EC2 UserData from CFN-managed Secrets Manager entries).
 #
 # Boot order:
-#   1. seed-* + emqx-rule-render init containers run in parallel
+#   1. seed-* init containers run in parallel
 #   2. After all inits exit 0, long-running services start (gated by
 #      depends_on.<init>.condition: service_completed_successfully)
-#   3. EMQX rule writes telemetry MQTT → Tiger Cloud
+#   3. telemetry-writer subscribes to MQTT and INSERTs into TIMESERIES_URL
+#      (Tiger Cloud) — HiveMQ CE has no built-in DB connector; we own the
+#      bridge as a sidecar.
 #
 # All images: public.ecr.aws/y1d2j6a8/<service>:latest (anonymous pull from
 # customer's EC2; arcnode publishes to ECR Public on release).
@@ -20,18 +22,6 @@ x-env-files: &env-files
 
 services:
   # ─── init containers ─────────────────────────────────────
-  emqx-rule-render:
-    image: python:3.13-alpine
-    restart: "no"
-    <<: *env-files
-    environment:
-      TEMPLATE_PATH: /opt/arcnode/emqx/rule.hocon.tmpl
-      OUTPUT_PATH: /opt/arcnode/emqx/rule.hocon
-    volumes:
-      - /opt/arcnode/emqx:/opt/arcnode/emqx
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["python", "/scripts/render_emqx_rule.py"]
-
   seed-vector:
     image: alpine:3.20
     restart: "no"
@@ -62,15 +52,13 @@ services:
       - "pip install --quiet neo4j && python /scripts/seed-graph-neo4j.py"
 
   # ─── long-running services ───────────────────────────────
-  emqx:
-    image: emqx/emqx:5.8
+  hivemq:
+    image: hivemq/hivemq-ce:latest
     restart: unless-stopped
     <<: *env-files
-    depends_on:
-      emqx-rule-render:
-        condition: service_completed_successfully
-    volumes:
-      - /opt/arcnode/emqx/rule.hocon:/etc/emqx/etc/rule.conf:ro
+    # HiveMQ CE ships with the Allow All Extension out of the box, so
+    # anonymous publish/subscribe just works. When real auth lands, drop
+    # the Allow All extension and bring up an auth extension instead.
     # 1883 MQTT — internal-only, no host port mapping (no auth per design)
 
   device-api:
@@ -79,6 +67,10 @@ services:
     <<: *env-files
     environment:
       BOOT_DTM_PATH: /app/dtm.json
+      # ENV=beta picks up cfg.yml's beta block (mqttBrokerUrl: mqtt://hivemq:1883
+      # + container-internal hostnames). Without it device-api defaults to
+      # local cfg and tries to connect to 127.0.0.1:1883.
+      ENV: beta
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
     # device-api only consumes DOCUMENT_URL — vector/graph belong to the
@@ -86,12 +78,29 @@ services:
     # runs (CFN's ems_instance_depends_on gates the EC2 on the bootstrap
     # custom resource), so no init-container gate needed.
 
+  # MQTT → Tiger Cloud bridge. HiveMQ CE doesn't ship a Postgres connector
+  # (Enterprise-only, sales-gated); we own the bridge as a tiny subscriber
+  # instead. Same `INSERT INTO measurements ...` SQL as defense.
+  telemetry-writer:
+    image: python:3.13-alpine
+    restart: unless-stopped
+    <<: *env-files
+    volumes:
+      - /opt/arcnode/init-scripts:/scripts:ro
+    command:
+      - sh
+      - -c
+      - "pip install --quiet paho-mqtt psycopg2-binary && python /scripts/telemetry_writer.py"
+    depends_on:
+      hivemq:
+        condition: service_started
+
   industrial-gateway:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
     restart: unless-stopped
     <<: *env-files
     depends_on:
-      emqx:
+      hivemq:
         condition: service_started
 
   hmi:
