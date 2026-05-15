@@ -2,9 +2,11 @@
 #
 # Backend = TimescaleDB (Tiger Cloud in commercial, self-hosted in ISO).
 # Rendered at boot by the `emqx-rule-render` init container, which
-# substitutes {host}, {port}, {user}, {password}, {db} from the parsed
-# TIMESERIES_URL env var. EMQX reads the rendered file from
-# /etc/emqx/etc/rule.conf.
+# substitutes {{host}}, {{port}}, {{user}}, {{password}}, {{db}} from
+# the parsed TIMESERIES_URL env var. (Doubled braces escape Python's
+# str.format so the docstring doesn't accidentally render the password
+# into a comment.) EMQX reads the rendered file from
+# /opt/emqx/etc/base.hocon (mounted via compose).
 #
 # Topic shape: sites/{{site_id}}/devices/{{device_id}}/measurements/{{measurement}}/{{unit}}
 # Payload: {{"ts": "<ISO8601>", "value": <number|bool|string>}} per ADR §12.

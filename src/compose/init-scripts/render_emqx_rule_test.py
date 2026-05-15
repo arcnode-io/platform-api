@@ -148,6 +148,11 @@ def test_real_hocon_templates_render_cleanly(variant_dir: str) -> None:
     # Assert — EMQX rule-engine `${var}` references intact
     assert "${ts}::timestamptz" in rendered
     assert "${value}::jsonb" in rendered
-    # Assert — no stray format-string placeholders left (would be a bug)
-    assert "{host}" not in rendered
-    assert "{password}" not in rendered
+    # Assert — no stray format-string placeholders left in CODE lines
+    # (the template's docstring intentionally lists {host}, {password},
+    # etc. as literal text — doubled braces escape Python's str.format
+    # so they don't accidentally render into a comment).
+    body_lines = [ln for ln in rendered.splitlines() if not ln.lstrip().startswith("#")]
+    body = "\n".join(body_lines)
+    assert "{host}" not in body
+    assert "{password}" not in body

@@ -2,8 +2,10 @@
 #
 # Backend = Aurora pg_partman (CFN-provisioned, not Tiger Cloud).
 # Rendered at boot by the `emqx-rule-render` init container, which
-# substitutes {host}, {port}, {user}, {password}, {db} from the parsed
-# TIMESERIES_URL env var.
+# substitutes {{host}}, {{port}}, {{user}}, {{password}}, {{db}} from
+# the parsed TIMESERIES_URL env var. (Doubled braces escape Python's
+# str.format so the docstring doesn't accidentally render the password
+# into a comment.)
 #
 # SAME schema as commercial-and-iso — the `measurements` parent table is
 # created by the Aurora bootstrap Lambda with pg_partman attached. INSERTs

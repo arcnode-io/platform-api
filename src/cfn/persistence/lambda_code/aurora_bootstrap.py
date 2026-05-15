@@ -145,6 +145,16 @@ def _create(event: dict) -> dict:
                 # owner of public + grant on the bootstrap schema.
                 cur.execute(f"ALTER SCHEMA public OWNER TO {app_user}")
                 cur.execute(f"GRANT ALL ON SCHEMA public TO {app_user}")
+                # Default privileges so any future tables (partman child
+                # partitions, app migrations) auto-grant to the app user.
+                cur.execute(
+                    f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+                    f"GRANT ALL ON TABLES TO {app_user}"
+                )
+                cur.execute(
+                    f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+                    f"GRANT ALL ON SEQUENCES TO {app_user}"
+                )
                 if ext == "pg_partman":
                     # pg_partman publishes its functions in a dedicated
                     # schema; create it first so the extension lands there
@@ -158,6 +168,17 @@ def _create(event: dict) -> dict:
                 if slice_name == "timeseries":
                     for stmt in MEASUREMENTS_SCHEMA_SQL:
                         cur.execute(stmt)
+                # Grant on tables created above (measurements + partman
+                # child partitions, pgvector tables, etc.) — these were
+                # created as the master user, so app_user has no perms
+                # by default. Default-privileges only catches future
+                # tables, not this batch.
+                cur.execute(
+                    f"GRANT ALL ON ALL TABLES IN SCHEMA public TO {app_user}"
+                )
+                cur.execute(
+                    f"GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {app_user}"
+                )
         finally:
             slice_conn.close()
 
