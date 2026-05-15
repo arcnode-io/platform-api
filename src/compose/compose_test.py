@@ -53,9 +53,12 @@ def test_compose_yaml_parses_and_declares_emqx_plus_inits(
     assert services["seed-graph"]["image"] == expected_seed_graph_image
 
 
-@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE])
 def test_hivemq_broker_is_declared(variant_path: Path) -> None:
-    """Both variants declare a hivemq service running the HiveMQ CE image."""
+    """Commercial declares the hivemq service. Defense is currently
+    SMOKE-LEAN-SEED-only — broker leg commented out for the
+    seed-into-Aurora verification pass; restore alongside the broker
+    leg when re-enabled."""
     # Arrange + Act
     spec = yaml.safe_load(variant_path.read_text())
 

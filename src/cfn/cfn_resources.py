@@ -372,20 +372,27 @@ def build_userdata(
         for slot, env_name in ssm_params
     )
     # Init scripts compose mounts at /opt/arcnode/init-scripts/. Variant
-    # picks the matching graph seed script (Neo4j Aura vs Neptune loader).
+    # picks the matching graph seed script (Neo4j Aura vs Neptune loader)
+    # and the matching ercot-solar dump format (TS-native for Tiger Cloud
+    # commercial/ISO; plain pg_dump for Aurora pg_partman defense).
     graph_seed_script = (
         "seed-graph-neo4j.py"
         if deployment_context == DeploymentContext.COMMERCIAL
         else "seed-graph-neptune.py"
     )
+    ercot_seed_script = (
+        "seed-ercot-solar-timeseries-tigercloud.sh"
+        if deployment_context == DeploymentContext.COMMERCIAL
+        else "seed-ercot-solar-timeseries-plain.sh"
+    )
     init_scripts = [
         "seed-vector.sh",
-        "seed-ercot-solar-timeseries.sh",
+        ercot_seed_script,
         graph_seed_script,
         "telemetry_writer.py",
     ]
     init_script_lines = "\n".join(
-        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
         f"-o /opt/arcnode/init-scripts/{s}"
         for s in init_scripts
     )
@@ -405,20 +412,20 @@ def build_userdata(
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
         "# Fetch arcnode-public artifacts (compose + init scripts).\n"
-        f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
         f"{init_script_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
         "# it on boot per system_adr §22 - fatal here so compose never starts\n"
         "# with a missing/stale DTM.\n"
-        f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json\n"
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused'{dtm_url}' -o /opt/arcnode/dtm.json\n"
         "# Install docker + compose plugin (Amazon Linux 2023 ships neither).\n"
         "dnf install -y docker\n"
         "systemctl enable --now docker\n"
         "DOCKER_CLI_PLUGINS=/usr/libexec/docker/cli-plugins\n"
         "mkdir -p $DOCKER_CLI_PLUGINS\n"
-        "curl -fsSL "
+        "curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused"
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 "
         "-o $DOCKER_CLI_PLUGINS/docker-compose\n"
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"

@@ -36,7 +36,7 @@ services:
     <<: *env-files
     volumes:
       - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["sh", "/scripts/seed-ercot-solar-timeseries.sh"]
+    command: ["sh", "/scripts/seed-ercot-solar-timeseries-tigercloud.sh"]
 
   seed-graph:
     image: python:3.13-alpine
