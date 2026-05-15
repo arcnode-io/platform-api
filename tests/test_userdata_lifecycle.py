@@ -178,6 +178,22 @@ def test_userdata_lays_out_arcnode_dir_inside_amazonlinux(
     assert "dtm.json" in listing
     assert "userdata.done" in listing
 
+    # Assert — every init script compose mounts is present per variant
+    _, init_ls = amazon_linux_container.exec(["ls", "/opt/arcnode/init-scripts/"])
+    init_listing = (
+        init_ls.decode() if isinstance(init_ls, bytes) else init_ls
+    ).split()
+    expected_inits = {
+        "render_emqx_rule.py",
+        "seed-vector.sh",
+        "seed-timeseries.sh",
+        "seed-graph-neo4j.py"
+        if deployment_context == DeploymentContext.COMMERCIAL
+        else "seed-graph-neptune.py",
+    }
+    missing = expected_inits - set(init_listing)
+    assert not missing, f"missing init scripts: {missing}; got {init_listing}"
+
 
 def test_commercial_secrets_env_contains_graph_url(
     amazon_linux_container: DockerContainer,

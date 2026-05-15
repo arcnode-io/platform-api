@@ -247,7 +247,19 @@ def build_userdata(
         f'--query Parameter.Value --output text)" >> /opt/arcnode/config.env'
         for slot, env_name in ssm_params
     )
-    init_scripts = ["render_emqx_rule.py"]
+    # Init scripts compose mounts at /opt/arcnode/init-scripts/. Variant
+    # picks the matching graph seed script (Neo4j Aura vs Neptune loader).
+    graph_seed_script = (
+        "seed-graph-neo4j.py"
+        if deployment_context == DeploymentContext.COMMERCIAL
+        else "seed-graph-neptune.py"
+    )
+    init_scripts = [
+        "render_emqx_rule.py",
+        "seed-vector.sh",
+        "seed-timeseries.sh",
+        graph_seed_script,
+    ]
     init_script_lines = "\n".join(
         f"curl -fsSL {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
         f"-o /opt/arcnode/init-scripts/{s}"
