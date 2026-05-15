@@ -59,9 +59,7 @@ class CfnService:
             "Parameters": persistence.parameters,
             "Resources": {
                 **network_resources(),
-                **iam_resources(
-                    short=short, deployment_context=deployment_context
-                ),
+                **iam_resources(short=short, deployment_context=deployment_context),
                 **persistence.resources,
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",

@@ -28,7 +28,12 @@ INSERT_SQL = (
 )
 
 
-def on_message(_client: mqtt.Client, _userdata: object, msg: mqtt.MQTTMessage) -> None:
+def on_message(
+    _client: mqtt.Client,
+    _userdata: object,
+    msg: mqtt.MQTTMessage,
+    _properties: object = None,
+) -> None:
     """Parse a single MQTT publish and INSERT one row into measurements."""
     # Topic: sites/{site}/devices/{device}/measurements/{measurement}/{unit}
     parts = msg.topic.split("/")
@@ -56,7 +61,9 @@ def on_message(_client: mqtt.Client, _userdata: object, msg: mqtt.MQTTMessage) -
 
 conn = psycopg2.connect(TIMESERIES_URL)
 conn.autocommit = True
-client = mqtt.Client()
+# paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
+# supported callback shape for new code (extra `properties` arg, etc.).
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_message = on_message
 client.connect(BROKER, 1883, keepalive=60)
 client.subscribe(TOPIC)

@@ -15,7 +15,9 @@ def test_commercial_build_returns_aurora_plus_vendor_secrets() -> None:
     service = PersistenceService()
 
     # Act
-    build = service.build(deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234")
+    build = service.build(
+        deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234"
+    )
 
     # Assert
     assert isinstance(build, PersistenceBuild)
@@ -33,7 +35,9 @@ def test_commercial_build_declares_two_required_parameters() -> None:
     service = PersistenceService()
 
     # Act
-    build = service.build(deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234")
+    build = service.build(
+        deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234"
+    )
 
     # Assert
     assert set(build.parameters.keys()) == {
@@ -48,7 +52,9 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
     service = PersistenceService()
 
     # Act
-    build = service.build(deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234")
+    build = service.build(
+        deployment_context=DeploymentContext.COMMERCIAL, short="abcd1234"
+    )
 
     # Assert
     assert set(build.ems_instance_depends_on) == {

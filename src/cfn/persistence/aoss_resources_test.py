@@ -39,7 +39,9 @@ def test_aoss_collection_standby_disabled_by_default() -> None:
 def test_aoss_collection_standby_enabled_when_requested() -> None:
     """`standby_enabled=True` flips to ENABLED — 4 OCU floor, HA across AZs."""
     # Arrange + Act
-    collection = aoss_resources(short="abcd1234", standby_enabled=True)["AossCollection"]
+    collection = aoss_resources(short="abcd1234", standby_enabled=True)[
+        "AossCollection"
+    ]
 
     # Assert
     assert collection["Properties"]["StandbyReplicas"] == "ENABLED"

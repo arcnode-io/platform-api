@@ -65,7 +65,9 @@ def test_emqx_waits_for_rule_render_to_complete(variant_path: Path) -> None:
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-@pytest.mark.skip(reason="SMOKE-LEAN: defense compose exposes 1883 so operator can mosquitto_sub")
+@pytest.mark.skip(
+    reason="SMOKE-LEAN: defense compose exposes 1883 so operator can mosquitto_sub"
+)
 def test_emqx_does_not_publish_port_1883_to_host(variant_path: Path) -> None:
     """No-auth + internal-only — port 1883 stays on the compose bridge network."""
     # Arrange + Act
@@ -92,7 +94,9 @@ def test_init_containers_have_restart_no(variant_path: Path) -> None:
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-@pytest.mark.skip(reason="SMOKE-LEAN: defense compose drops analyst-server / analyst-model / hmi")
+@pytest.mark.skip(
+    reason="SMOKE-LEAN: defense compose drops analyst-server / analyst-model / hmi"
+)
 def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
     """Long-running services restart on EC2 reboot via docker daemon."""
     # Arrange + Act

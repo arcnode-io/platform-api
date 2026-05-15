@@ -174,7 +174,9 @@ def test_commercial_template_declares_two_vendor_url_parameters() -> None:
     assert "AWS::OpenSearchServerless::Collection" not in rendered
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: Neptune+AOSS commented out for gateway-publish smoke")
+@pytest.mark.skip(
+    reason="SMOKE-LEAN: Neptune+AOSS commented out for gateway-publish smoke"
+)
 def test_defense_template_includes_neptune_and_aoss_resources() -> None:
     """Defense variant: Neptune cluster + AOSS collection, no vendor params."""
     # Arrange + Act

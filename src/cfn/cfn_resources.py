@@ -189,6 +189,46 @@ def network_resources() -> dict[str, object]:
     }
 
 
+def _neptune_data_policy(*, short: str) -> dict[str, object]:
+    """neptune-db:* on the Neptune cluster ResourceId — defense-only.
+
+    The seed-graph init container uses boto3 sigv4-auth to stamp and read
+    the ArcnodeSeedMarker. Requires Read / Write / Delete on the cluster's
+    data plane plus the loader-job pair for the seed bulk-load.
+
+    Currently unused: defense's PersistenceService build comments out the
+    Neptune resources for the SMOKE-LEAN phase. When Neptune comes back,
+    re-enable this in `iam_resources` by appending its return value to
+    the policy list.
+    """
+    return {
+        "PolicyName": f"arcnode-{short}-neptune-data",
+        "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "neptune-db:ReadDataViaQuery",
+                        "neptune-db:WriteDataViaQuery",
+                        "neptune-db:DeleteDataViaQuery",
+                        "neptune-db:GetEngineStatus",
+                        "neptune-db:StartLoaderJob",
+                        "neptune-db:GetLoaderJobStatus",
+                    ],
+                    "Resource": {
+                        "Fn::Sub": (
+                            "arn:aws:neptune-db:${AWS::Region}:"
+                            "${AWS::AccountId}:"
+                            "${NeptuneCluster.ClusterResourceId}/*"
+                        ),
+                    },
+                }
+            ],
+        },
+    }
+
+
 def iam_resources(
     *, short: str, deployment_context: DeploymentContext  # noqa: ARG001
 ) -> dict[str, object]:
@@ -196,44 +236,12 @@ def iam_resources(
     plus AmazonSSMManagedInstanceCore so operators can `aws ssm start-session`
     into the EC2 for boot diagnostics without provisioning SSH keys.
 
-    Defense variant additionally needs neptune-db:* (Read/Write/Delete
-    DataViaQuery) on the Neptune cluster so the seed-graph init container
-    can stamp + read the ArcnodeSeedMarker via boto3 sigv4-auth.
+    SMOKE-LEAN: neptune-db:* policy intentionally not appended — defense's
+    PersistenceService build has no NeptuneCluster to ref. Restore by
+    appending `_neptune_data_policy(short=short)` to the policy list when
+    Neptune comes back.
     """
-    # SMOKE-LEAN: Neptune is commented out in defense's PersistenceService
-    # build, so the policy below has no NeptuneCluster to reference.
-    # Restore alongside the Neptune resources when bringing the analyst
-    # stack back online.
     neptune_data_policy: list[dict[str, object]] = []
-    # if deployment_context != DeploymentContext.COMMERCIAL:
-    #     neptune_data_policy = [
-    #         {
-    #             "PolicyName": f"arcnode-{short}-neptune-data",
-    #             "PolicyDocument": {
-    #                 "Version": "2012-10-17",
-    #                 "Statement": [
-    #                     {
-    #                         "Effect": "Allow",
-    #                         "Action": [
-    #                             "neptune-db:ReadDataViaQuery",
-    #                             "neptune-db:WriteDataViaQuery",
-    #                             "neptune-db:DeleteDataViaQuery",
-    #                             "neptune-db:GetEngineStatus",
-    #                             "neptune-db:StartLoaderJob",
-    #                             "neptune-db:GetLoaderJobStatus",
-    #                         ],
-    #                         "Resource": {
-    #                             "Fn::Sub": (
-    #                                 "arn:aws:neptune-db:${AWS::Region}:"
-    #                                 "${AWS::AccountId}:"
-    #                                 "${NeptuneCluster.ClusterResourceId}/*"
-    #                             ),
-    #                         },
-    #                     }
-    #                 ],
-    #             },
-    #         }
-    #     ]
     return {
         "EmsInstanceRole": {
             "Type": "AWS::IAM::Role",

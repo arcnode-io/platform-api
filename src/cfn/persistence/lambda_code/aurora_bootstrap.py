@@ -173,9 +173,7 @@ def _create(event: dict) -> dict:
                 # created as the master user, so app_user has no perms
                 # by default. Default-privileges only catches future
                 # tables, not this batch.
-                cur.execute(
-                    f"GRANT ALL ON ALL TABLES IN SCHEMA public TO {app_user}"
-                )
+                cur.execute(f"GRANT ALL ON ALL TABLES IN SCHEMA public TO {app_user}")
                 cur.execute(
                     f"GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {app_user}"
                 )
