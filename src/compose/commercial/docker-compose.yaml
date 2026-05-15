@@ -81,11 +81,10 @@ services:
       BOOT_DTM_PATH: /app/dtm.json
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
-    depends_on:
-      seed-vector:
-        condition: service_completed_successfully
-      seed-graph:
-        condition: service_completed_successfully
+    # device-api only consumes DOCUMENT_URL — vector/graph belong to the
+    # analyst stack, not here. Aurora itself is up by the time compose
+    # runs (CFN's ems_instance_depends_on gates the EC2 on the bootstrap
+    # custom resource), so no init-container gate needed.
 
   industrial-gateway:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest

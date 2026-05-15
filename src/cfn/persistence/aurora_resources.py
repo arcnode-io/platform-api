@@ -17,7 +17,7 @@ LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 # once a stable arcnode-hosted layer is available; arn shown is a known
 # community publisher — region must be substituted at template-render time.
 PSYCOPG2_LAYER_ARN_TEMPLATE: Final[str] = (
-    "arn:aws:lambda:${AWS::Region}:898466741470:layer:psycopg2-py313:1"
+    "arn:aws:lambda:${AWS::Region}:878287304298:layer:psycopg2-py313:1"
 )
 DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
 
@@ -66,10 +66,7 @@ def aurora_cluster_resources(
             "Type": "AWS::RDS::DBSubnetGroup",
             "Properties": {
                 "DBSubnetGroupDescription": "Aurora serverless subnet group",
-                # MVP: reuse the existing public subnet from network_resources().
-                # RDS requires >=2 subnets in different AZs for production clusters;
-                # follow-up adds EmsSubnetB in a second AZ to network_resources().
-                "SubnetIds": [{"Ref": "EmsSubnet"}, {"Ref": "EmsSubnet"}],
+                "SubnetIds": [{"Ref": "EmsSubnet"}, {"Ref": "EmsSubnetB"}],
             },
         },
         "AuroraSecurityGroup": {

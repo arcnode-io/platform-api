@@ -15,9 +15,13 @@ from src.orders.configurator_payload import DeploymentContext
 # Secrets Manager slot → persistence.env env-var name. Each slot is a
 # Postgres / Neo4j connection URL (with embedded credentials); env_file
 # consumers parse with their lib's URL constructor.
+#
+# SMOKE-LEAN: vector slot commented out — defense's PersistenceService
+# build skips the analyst-stack vector slice. Restore alongside the
+# analyst services + their seed init container.
 COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("document-url", "DOCUMENT_URL"),
-    ("vector-url", "VECTOR_URL"),
+    # ("vector-url", "VECTOR_URL"),
     ("timeseries-url", "TIMESERIES_URL"),
 )
 COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
@@ -25,10 +29,12 @@ COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
 )
 # SSM Parameter Store entries → env-var name. No creds — IAM/sigv4 auth
 # via the EC2 instance profile.
+#
+# SMOKE-LEAN: Neptune + AOSS commented out alongside their CFN resources.
 DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
-    ("neptune-host", "NEPTUNE_HOST"),
-    ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
-    ("aoss-host", "AOSS_HOST"),
+    # ("neptune-host", "NEPTUNE_HOST"),
+    # ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
+    # ("aoss-host", "AOSS_HOST"),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
@@ -75,6 +81,23 @@ def network_resources() -> dict[str, object]:
                 "VpcId": {"Ref": "EmsVpc"},
                 "CidrBlock": "10.0.0.0/24",
                 "MapPublicIpOnLaunch": True,
+                "AvailabilityZone": {
+                    "Fn::Select": [0, {"Fn::GetAZs": ""}],
+                },
+            },
+        },
+        # Second AZ subnet — Neptune + Aurora subnet groups require >=2 AZs.
+        # EC2 itself only lives in EmsSubnet; this subnet exists purely to
+        # satisfy the multi-AZ requirement for managed-DB subnet groups.
+        "EmsSubnetB": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {"Ref": "EmsVpc"},
+                "CidrBlock": "10.0.1.0/24",
+                "MapPublicIpOnLaunch": True,
+                "AvailabilityZone": {
+                    "Fn::Select": [1, {"Fn::GetAZs": ""}],
+                },
             },
         },
         "EmsRouteTable": {
@@ -97,6 +120,57 @@ def network_resources() -> dict[str, object]:
                 "RouteTableId": {"Ref": "EmsRouteTable"},
             },
         },
+        "EmsSubnetBRouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {"Ref": "EmsSubnetB"},
+                "RouteTableId": {"Ref": "EmsRouteTable"},
+            },
+        },
+        # VPC endpoints — keep AWS-API traffic on the AWS backbone so the
+        # Aurora bootstrap Lambda (which lives in this VPC) can reach
+        # Secrets Manager + S3 (CFN-response signaling) without a NAT
+        # gateway. Gateway endpoints (S3, DynamoDB) are free; interface
+        # endpoints bill ~$0.01/hr per AZ per endpoint.
+        "S3VpcEndpoint": {
+            "Type": "AWS::EC2::VPCEndpoint",
+            "Properties": {
+                "VpcId": {"Ref": "EmsVpc"},
+                "ServiceName": {
+                    "Fn::Sub": "com.amazonaws.${AWS::Region}.s3",
+                },
+                "VpcEndpointType": "Gateway",
+                "RouteTableIds": [{"Ref": "EmsRouteTable"}],
+            },
+        },
+        "SecretsManagerVpcEndpoint": {
+            "Type": "AWS::EC2::VPCEndpoint",
+            "Properties": {
+                "VpcId": {"Ref": "EmsVpc"},
+                "ServiceName": {
+                    "Fn::Sub": "com.amazonaws.${AWS::Region}.secretsmanager",
+                },
+                "VpcEndpointType": "Interface",
+                "SubnetIds": [{"Ref": "EmsSubnet"}, {"Ref": "EmsSubnetB"}],
+                "SecurityGroupIds": [{"Ref": "VpcEndpointSecurityGroup"}],
+                "PrivateDnsEnabled": True,
+            },
+        },
+        "VpcEndpointSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Allow HTTPS from VPC to interface endpoints",
+                "VpcId": {"Ref": "EmsVpc"},
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
+                        "CidrIp": "10.0.0.0/16",
+                    }
+                ],
+            },
+        },
         "EmsSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
@@ -115,8 +189,51 @@ def network_resources() -> dict[str, object]:
     }
 
 
-def iam_resources(*, short: str) -> dict[str, object]:
-    """Instance role with SecretsManager + SSM Parameter Store read for persistence."""
+def iam_resources(
+    *, short: str, deployment_context: DeploymentContext
+) -> dict[str, object]:
+    """Instance role with SecretsManager + SSM Parameter Store read for persistence
+    plus AmazonSSMManagedInstanceCore so operators can `aws ssm start-session`
+    into the EC2 for boot diagnostics without provisioning SSH keys.
+
+    Defense variant additionally needs neptune-db:* (Read/Write/Delete
+    DataViaQuery) on the Neptune cluster so the seed-graph init container
+    can stamp + read the ArcnodeSeedMarker via boto3 sigv4-auth.
+    """
+    # SMOKE-LEAN: Neptune is commented out in defense's PersistenceService
+    # build, so the policy below has no NeptuneCluster to reference.
+    # Restore alongside the Neptune resources when bringing the analyst
+    # stack back online.
+    neptune_data_policy: list[dict[str, object]] = []
+    # if deployment_context != DeploymentContext.COMMERCIAL:
+    #     neptune_data_policy = [
+    #         {
+    #             "PolicyName": f"arcnode-{short}-neptune-data",
+    #             "PolicyDocument": {
+    #                 "Version": "2012-10-17",
+    #                 "Statement": [
+    #                     {
+    #                         "Effect": "Allow",
+    #                         "Action": [
+    #                             "neptune-db:ReadDataViaQuery",
+    #                             "neptune-db:WriteDataViaQuery",
+    #                             "neptune-db:DeleteDataViaQuery",
+    #                             "neptune-db:GetEngineStatus",
+    #                             "neptune-db:StartLoaderJob",
+    #                             "neptune-db:GetLoaderJobStatus",
+    #                         ],
+    #                         "Resource": {
+    #                             "Fn::Sub": (
+    #                                 "arn:aws:neptune-db:${AWS::Region}:"
+    #                                 "${AWS::AccountId}:"
+    #                                 "${NeptuneCluster.ClusterResourceId}/*"
+    #                             ),
+    #                         },
+    #                     }
+    #                 ],
+    #             },
+    #         }
+    #     ]
     return {
         "EmsInstanceRole": {
             "Type": "AWS::IAM::Role",
@@ -131,6 +248,9 @@ def iam_resources(*, short: str) -> dict[str, object]:
                         }
                     ],
                 },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                ],
                 "Policies": [
                     {
                         "PolicyName": f"arcnode-{short}-secrets-read",
@@ -175,6 +295,7 @@ def iam_resources(*, short: str) -> dict[str, object]:
                             ],
                         },
                     },
+                    *neptune_data_policy,
                 ],
             },
         },
@@ -273,6 +394,8 @@ def build_userdata(
         "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
         f"EMS_MODE={ems_mode}\n"
+        "AWS_REGION=${AWS::Region}\n"
+        "AWS_DEFAULT_REGION=${AWS::Region}\n"
         "ENV\n"
         f"{ssm_lines}\n"
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"

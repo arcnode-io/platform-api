@@ -19,8 +19,14 @@ if psql "$VECTOR_URL" -tAc "SELECT 1 FROM arcnode_seed_markers WHERE slice = 've
   exit 0
 fi
 
+# Tarball is pg_dump --format=directory output (toc.dat + .dat files).
+# Directory format can't be streamed — extract to a tempdir then point
+# pg_restore at it.
+TMPDIR=$(mktemp -d)
 curl -fsSL https://arcnode-public.s3.us-east-1.amazonaws.com/seed/vector.tar.gz \
-  | tar -xzO | psql "$VECTOR_URL"
+  | tar -xz -C "$TMPDIR"
+pg_restore --format=directory --dbname "$VECTOR_URL" --no-owner --no-privileges "$TMPDIR"
+rm -rf "$TMPDIR"
 
 psql "$VECTOR_URL" -c \
   "INSERT INTO arcnode_seed_markers (slice) VALUES ('vector') ON CONFLICT DO NOTHING"

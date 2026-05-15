@@ -73,11 +73,18 @@ class PersistenceService:
         self._lambda_runtime = lambda_runtime
         self._psycopg2_layer_arn_template = psycopg2_layer_arn_template
 
-    def build(self, *, deployment_context: DeploymentContext) -> PersistenceBuild:
-        """Return the per-variant persistence build."""
+    def build(
+        self, *, deployment_context: DeploymentContext, short: str
+    ) -> PersistenceBuild:
+        """Return the per-variant persistence build.
+
+        ``short`` is the 8-char prefix of the deployment uuid used for
+        AWS-resource names that have tight length limits (e.g. AOSS
+        policies cap at 32 chars — full StackName blows the limit).
+        """
         if deployment_context == DeploymentContext.COMMERCIAL:
             return self._commercial_build()
-        return self._defense_build()
+        return self._defense_build(short=short)
 
     def _commercial_build(self) -> PersistenceBuild:
         return PersistenceBuild(
@@ -97,24 +104,30 @@ class PersistenceService:
             ],
         )
 
-    def _defense_build(self) -> PersistenceBuild:
+    def _defense_build(self, *, short: str) -> PersistenceBuild:
+        # SMOKE-LEAN: Neptune + AOSS commented out while we focus on the
+        # gateway-publish → broker → measurements-write → subscriber path.
+        # Aurora-only is enough: document slice for device-api's DTM,
+        # timeseries slice (pg_partman) for the EMQX-rule measurements
+        # writes. Restore the commented blocks before bringing the analyst
+        # stack back online.
         return PersistenceBuild(
             resources={
                 **aurora_cluster_resources(
                     lambda_runtime=self._lambda_runtime,
                     psycopg2_layer_arn_template=self._psycopg2_layer_arn_template,
-                    slices=DEFENSE_SLICES,
+                    slices=("document", "timeseries"),
                 ),
-                **neptune_resources(),
-                **aoss_resources(),
+                # **neptune_resources(),
+                # **aoss_resources(short=short),
             },
             parameters={},
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
-                "NeptuneInstance",
-                "AossCollection",
-                "NeptuneHostParam",
-                "NeptuneLoaderRoleArnParam",
-                "AossHostParam",
+                # "NeptuneInstance",
+                # "AossCollection",
+                # "NeptuneHostParam",
+                # "NeptuneLoaderRoleArnParam",
+                # "AossHostParam",
             ],
         )

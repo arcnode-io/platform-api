@@ -51,6 +51,7 @@ class CfnService:
         )
         persistence = self._persistence.build(
             deployment_context=deployment_context,
+            short=short,
         )
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
@@ -58,7 +59,9 @@ class CfnService:
             "Parameters": persistence.parameters,
             "Resources": {
                 **network_resources(),
-                **iam_resources(short=short),
+                **iam_resources(
+                    short=short, deployment_context=deployment_context
+                ),
                 **persistence.resources,
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",

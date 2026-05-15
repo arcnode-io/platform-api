@@ -10,75 +10,62 @@ HA upgrade isn't worth the doubling.
 Endpoint hostname is published to SSM Parameter Store under
 ``/arcnode-ems/{STACK}/aoss-host`` for the same reason as Neptune — no
 creds in the URL, sigv4 auth is signed by the EC2 instance role.
+
+Resource naming uses the 8-char ``short`` prefix of the deployment uuid
+(not StackName) because AOSS caps policy and collection names at 32
+characters; long stack names blow the limit.
 """
 
 from typing import Final
 
-COLLECTION_NAME_PREFIX: Final[str] = "arcnode-ems"
+NAME_PREFIX: Final[str] = "aoss"
 
 
-def aoss_resources(standby_enabled: bool = False) -> dict[str, dict]:
+def aoss_resources(*, short: str, standby_enabled: bool = False) -> dict[str, dict]:
     """CFN resources for an AOSS collection + 3 policies + SSM endpoint param.
 
     AWS requires three policies per collection (encryption, network,
-    data-access) before the collection itself can be created. The
-    collection name is keyed on `AWS::StackName` for per-stack uniqueness.
+    data-access) before the collection itself can be created. Names are
+    keyed on the deployment-uuid prefix to stay under the 32-char AWS cap.
     """
+    collection = f"{NAME_PREFIX}-{short}"
     return {
         "AossEncryptionPolicy": {
             "Type": "AWS::OpenSearchServerless::SecurityPolicy",
             "Properties": {
-                "Name": {
-                    "Fn::Sub": f"{COLLECTION_NAME_PREFIX}-${{AWS::StackName}}-enc",
-                },
+                "Name": f"{collection}-enc",
                 "Type": "encryption",
-                "Policy": {
-                    "Fn::Sub": (
-                        '{"Rules":[{"ResourceType":"collection",'
-                        '"Resource":["collection/'
-                        f"{COLLECTION_NAME_PREFIX}"
-                        '-${AWS::StackName}"]}],'
-                        '"AWSOwnedKey":true}'
-                    ),
-                },
+                "Policy": (
+                    '{"Rules":[{"ResourceType":"collection",'
+                    f'"Resource":["collection/{collection}"]}}],'
+                    '"AWSOwnedKey":true}'
+                ),
             },
         },
         "AossNetworkPolicy": {
             "Type": "AWS::OpenSearchServerless::SecurityPolicy",
             "Properties": {
-                "Name": {
-                    "Fn::Sub": f"{COLLECTION_NAME_PREFIX}-${{AWS::StackName}}-net",
-                },
+                "Name": f"{collection}-net",
                 "Type": "network",
-                "Policy": {
-                    "Fn::Sub": (
-                        '[{"Rules":[{"ResourceType":"collection",'
-                        '"Resource":["collection/'
-                        f"{COLLECTION_NAME_PREFIX}"
-                        '-${AWS::StackName}"]}],'
-                        '"AllowFromPublic":true}]'
-                    ),
-                },
+                "Policy": (
+                    '[{"Rules":[{"ResourceType":"collection",'
+                    f'"Resource":["collection/{collection}"]}}],'
+                    '"AllowFromPublic":true}]'
+                ),
             },
         },
         "AossDataAccessPolicy": {
             "Type": "AWS::OpenSearchServerless::AccessPolicy",
             "Properties": {
-                "Name": {
-                    "Fn::Sub": f"{COLLECTION_NAME_PREFIX}-${{AWS::StackName}}-data",
-                },
+                "Name": f"{collection}-data",
                 "Type": "data",
                 "Policy": {
                     "Fn::Sub": (
                         '[{"Rules":[{"ResourceType":"collection",'
-                        '"Resource":["collection/'
-                        f"{COLLECTION_NAME_PREFIX}"
-                        '-${AWS::StackName}"],'
+                        f'"Resource":["collection/{collection}"],'
                         '"Permission":["aoss:*"]},'
                         '{"ResourceType":"index",'
-                        '"Resource":["index/'
-                        f"{COLLECTION_NAME_PREFIX}"
-                        '-${AWS::StackName}/*"],'
+                        f'"Resource":["index/{collection}/*"],'
                         '"Permission":["aoss:*"]}],'
                         '"Principal":["${EmsInstanceRole.Arn}"]}]'
                     ),
@@ -93,9 +80,7 @@ def aoss_resources(standby_enabled: bool = False) -> dict[str, dict]:
                 "AossDataAccessPolicy",
             ],
             "Properties": {
-                "Name": {
-                    "Fn::Sub": f"{COLLECTION_NAME_PREFIX}-${{AWS::StackName}}",
-                },
+                "Name": collection,
                 "Type": "SEARCH",
                 "StandbyReplicas": "ENABLED" if standby_enabled else "DISABLED",
                 "Description": "Graphiti FTS index (defense variant)",

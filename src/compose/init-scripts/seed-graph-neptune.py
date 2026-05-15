@@ -35,11 +35,11 @@ def apply_seed(client) -> None:
     """Kick off the bulk load + poll until it lands."""
     load = client.start_loader_job(
         source=SEED_S3_PREFIX,
-        format="csv",
+        format="opencypher",
         iamRoleArn=os.environ["NEPTUNE_LOADER_ROLE_ARN"],
-        s3BucketRegion="us-east-1",
+        s3BucketRegion=os.environ["AWS_REGION"],
         mode="AUTO",
-        failOnError="TRUE",
+        failOnError=True,
     )
     load_id = load["payload"]["loadId"]
     print(f"started Neptune bulk load: {load_id}")

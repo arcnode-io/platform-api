@@ -1,15 +1,17 @@
 # Defense / Sovereign variant — EMS stack on customer EC2.
 #
-# Persistence: Aurora (document + vector + timeseries via pg_partman) +
-# Neptune Serverless (graph) + AOSS (FTS). All AWS-native — zero vendor
-# tokens. Connection URLs and IAM-auth hostnames sourced from
-# /opt/arcnode/persistence.env (written by EC2 UserData from CFN-managed
-# Secrets Manager + SSM Parameter Store entries).
+# SMOKE-LEAN: this slice of the stack is tuned to verify the
+# gateway-publish → broker → measurements-write → subscriber path. The
+# analyst stack (Neptune + AOSS + analyst-server / analyst-model + their
+# seed init containers) is commented out here AND in the matching CFN
+# persistence build. Restore both sides together.
 #
-# Diff from commercial:
-#   - seed-graph init uses Neptune Bulk Loader (boto3 + StartLoaderJob)
-#     instead of Aura's Bolt protocol
-#   - All other services identical
+# Persistence at the moment: Aurora only — document slice (device-api
+# DTM) + timeseries slice with pg_partman (EMQX-rule writes telemetry
+# into `measurements`).
+#
+# Connection URLs sourced from /opt/arcnode/secrets.env (UserData writes
+# from CFN-managed Secrets Manager).
 
 x-env-files: &env-files
   env_file:
@@ -30,33 +32,6 @@ services:
       - /opt/arcnode/init-scripts:/scripts:ro
     command: ["python", "/scripts/render_emqx_rule.py"]
 
-  seed-vector:
-    image: alpine:3.20
-    restart: "no"
-    <<: *env-files
-    volumes:
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["sh", "/scripts/seed-vector.sh"]
-
-  seed-timeseries:
-    image: alpine:3.20
-    restart: "no"
-    <<: *env-files
-    volumes:
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["sh", "/scripts/seed-timeseries.sh"]
-
-  seed-graph:
-    image: python:3.13-alpine
-    restart: "no"
-    <<: *env-files
-    volumes:
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command:
-      - sh
-      - -c
-      - "pip install --quiet boto3 && python /scripts/seed-graph-neptune.py"
-
   # ─── long-running services ───────────────────────────────
   emqx:
     image: emqx/emqx:5.8
@@ -67,7 +42,13 @@ services:
         condition: service_completed_successfully
     volumes:
       - /opt/arcnode/emqx/rule.hocon:/etc/emqx/etc/rule.conf:ro
-    # 1883 MQTT — internal-only, no host port mapping (no auth per design)
+    ports:
+      # SMOKE: 1883 exposed to the host so the operator can run
+      # `mosquitto_sub` against it from inside the EC2 to verify
+      # gateway publishes are flowing. Internal-only by design in
+      # production — drop the host port when restoring the analyst
+      # stack.
+      - "1883:1883"
 
   device-api:
     image: public.ecr.aws/y1d2j6a8/ems-device-api:latest
@@ -77,11 +58,17 @@ services:
       BOOT_DTM_PATH: /app/dtm.json
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
-    depends_on:
-      seed-vector:
-        condition: service_completed_successfully
-      seed-graph:
-        condition: service_completed_successfully
+    # device-api only consumes DOCUMENT_URL — vector/graph belong to the
+    # analyst stack, not here. Aurora itself is up by the time compose
+    # runs (CFN's ems_instance_depends_on gates the EC2 on the bootstrap
+    # custom resource), so no init-container gate needed.
+
+  # mock-modbus-server gives the gateway a fixture to poll. The DTM
+  # mounted at device-api references this container by hostname. Without
+  # a fixture the gateway has nothing to publish.
+  mock-modbus-server:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
 
   industrial-gateway:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
@@ -90,33 +77,7 @@ services:
     depends_on:
       emqx:
         condition: service_started
-
-  hmi:
-    image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
-    restart: unless-stopped
-    <<: *env-files
-    ports:
-      - "80:8080"
-    depends_on:
       device-api:
         condition: service_started
-
-  analyst-server:
-    image: public.ecr.aws/y1d2j6a8/ems-analyst-server:latest
-    restart: unless-stopped
-    <<: *env-files
-    depends_on:
-      seed-timeseries:
-        condition: service_completed_successfully
-      seed-vector:
-        condition: service_completed_successfully
-      seed-graph:
-        condition: service_completed_successfully
-
-  analyst-model:
-    image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
-    restart: unless-stopped
-    <<: *env-files
-    depends_on:
-      seed-timeseries:
-        condition: service_completed_successfully
+      mock-modbus-server:
+        condition: service_started

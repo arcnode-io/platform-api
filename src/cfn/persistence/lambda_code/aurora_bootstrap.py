@@ -36,9 +36,12 @@ SLICE_SPECS: dict[str, tuple[str, str, str | None]] = {
     "timeseries": ("ems_timeseries", "ems_ts_app", "pg_partman"),
 }
 
-# Hardcoded measurements schema (defense only). Hourly partitions, 7-day
-# retention, dropped (not archived) on roll-off. JSONB value per Q3 lock —
-# matches the polymorphic MQTT payload (float | bool | enum).
+# measurements — the broker-ingest landing table. Every MQTT publish a
+# gateway sends gets written here by the EMQX rule. JSONB value column
+# matches the polymorphic MQTT payload (float | bool | enum). Hourly
+# partitions managed by pg_partman with 7-day retention (rolled-off
+# partitions dropped, not archived). Analyst-API consumers read from this
+# same table.
 MEASUREMENTS_SCHEMA_SQL: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS measurements (
@@ -127,7 +130,7 @@ def _create(event: dict) -> dict:
     # bootstrap the timeseries schema. Each connection is independent;
     # autocommit so CREATE EXTENSION takes effect immediately.
     for slice_name in slices:
-        db_name, _app_user, ext = SLICE_SPECS[slice_name]
+        db_name, app_user, ext = SLICE_SPECS[slice_name]
         slice_conn = psycopg2.connect(
             host=cluster_endpoint,
             user=master["username"],
@@ -137,7 +140,20 @@ def _create(event: dict) -> dict:
         slice_conn.autocommit = True
         try:
             with slice_conn.cursor() as cur:
-                if ext:
+                # Postgres 15+ revokes CREATE on public schema from PUBLIC.
+                # The per-slice app user owns its slice's data, so make it
+                # owner of public + grant on the bootstrap schema.
+                cur.execute(f"ALTER SCHEMA public OWNER TO {app_user}")
+                cur.execute(f"GRANT ALL ON SCHEMA public TO {app_user}")
+                if ext == "pg_partman":
+                    # pg_partman publishes its functions in a dedicated
+                    # schema; create it first so the extension lands there
+                    # and `partman.create_parent(...)` resolves.
+                    cur.execute("CREATE SCHEMA IF NOT EXISTS partman")
+                    cur.execute(
+                        "CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman"
+                    )
+                elif ext:
                     cur.execute(f"CREATE EXTENSION IF NOT EXISTS {ext}")
                 if slice_name == "timeseries":
                     for stmt in MEASUREMENTS_SCHEMA_SQL:

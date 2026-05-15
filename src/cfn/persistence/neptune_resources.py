@@ -10,7 +10,7 @@ seed-graph-neptune init container can pass it to ``StartLoaderJob``.
 
 Demo defaults target the cheapest possible footprint:
   - 1 NCU floor (Serverless minimum; can't go lower)
-  - Single AZ — Aurora-style subnet group "two entries same subnet" trick
+  - Two AZs (EmsSubnet + EmsSubnetB) — Neptune enforces multi-AZ subnet group
 """
 
 from typing import Final
@@ -41,10 +41,7 @@ def neptune_resources(
             "Type": "AWS::Neptune::DBSubnetGroup",
             "Properties": {
                 "DBSubnetGroupDescription": "Neptune serverless subnet group",
-                # Same single-AZ trick as Aurora's subnet group — Neptune
-                # also requires 2 entries; we duplicate the public subnet
-                # until network_resources() adds a second AZ.
-                "SubnetIds": [{"Ref": "EmsSubnet"}, {"Ref": "EmsSubnet"}],
+                "SubnetIds": [{"Ref": "EmsSubnet"}, {"Ref": "EmsSubnetB"}],
             },
         },
         "NeptuneSecurityGroup": {

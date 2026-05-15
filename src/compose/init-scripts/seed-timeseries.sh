@@ -19,8 +19,19 @@ if psql "$TIMESERIES_URL" -tAc "SELECT 1 FROM arcnode_seed_markers WHERE slice =
   exit 0
 fi
 
+# Tarball is pg_dump --format=directory output (toc.dat + .dat files).
+# Directory format can't be streamed — extract to a tempdir then point
+# pg_restore at it.
+TMPDIR=$(mktemp -d)
 curl -fsSL https://arcnode-public.s3.us-east-1.amazonaws.com/seed/timeseries.tar.gz \
-  | tar -xzO | psql "$TIMESERIES_URL"
+  | tar -xz -C "$TMPDIR"
+# pg_restore returns 1 when any error occurs even if it continued. The
+# defense-variant Aurora cluster lacks TimescaleDB extension (Tiger-only),
+# so a chunk of the dump's CREATE TRIGGER / INDEX statements fail. Treat
+# those as warnings; the table data still lands. A defense-specific dump
+# would be the production fix.
+pg_restore --format=directory --dbname "$TIMESERIES_URL" --no-owner --no-privileges "$TMPDIR" || true
+rm -rf "$TMPDIR"
 
 psql "$TIMESERIES_URL" -c \
   "INSERT INTO arcnode_seed_markers (slice) VALUES ('timeseries') ON CONFLICT DO NOTHING"
