@@ -26,7 +26,7 @@ BROKER_LEG = (
     "industrial-gateway",
     "hmi",
 )
-COMMERCIAL_INITS = ("seed-vector", "seed-ercot-solar-timeseries", "seed-graph")
+COMMERCIAL_INITS = ("seed-graph",)
 COMMERCIAL_ANALYST = ("analyst-server", "analyst-model")
 
 

@@ -269,11 +269,13 @@ def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
     assert "arcnode-public.s3" in commercial
     assert "/compose/commercial/docker-compose.yaml" in commercial
     assert "/compose/defense/docker-compose.yaml" in defense
-    # Assert — init script(s) common to both
-    assert "/init-scripts/seed-vector.sh" in commercial
-    assert "/init-scripts/seed-vector.sh" in defense
+    # Assert — telemetry-writer init script common to both (vector/ercot
+    # moved to consumer-self-seed; graph remains an init container per
+    # variant — neo4j for commercial, neptune for defense)
     assert "/init-scripts/telemetry_writer.py" in commercial
     assert "/init-scripts/telemetry_writer.py" in defense
+    assert "/init-scripts/seed-graph-neo4j.py" in commercial
+    assert "/init-scripts/seed-graph-neptune.py" in defense
 
 
 def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
