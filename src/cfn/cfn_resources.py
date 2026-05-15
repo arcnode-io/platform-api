@@ -116,7 +116,7 @@ def network_resources() -> dict[str, object]:
 
 
 def iam_resources(*, short: str) -> dict[str, object]:
-    """Instance role with S3 GetObject (DTM fetch) + SecretsManager read for persistence."""
+    """Instance role with SecretsManager + SSM Parameter Store read for persistence."""
     return {
         "EmsInstanceRole": {
             "Type": "AWS::IAM::Role",
@@ -132,19 +132,6 @@ def iam_resources(*, short: str) -> dict[str, object]:
                     ],
                 },
                 "Policies": [
-                    {
-                        "PolicyName": f"arcnode-{short}-dtm-read",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Action": "s3:GetObject",
-                                    "Resource": "*",
-                                }
-                            ],
-                        },
-                    },
                     {
                         "PolicyName": f"arcnode-{short}-secrets-read",
                         "PolicyDocument": {
@@ -273,7 +260,6 @@ def build_userdata(
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
-        f"DTM_URL={dtm_url}\n"
         f"EMS_MODE={ems_mode}\n"
         "ENV\n"
         f"{ssm_lines}\n"
@@ -287,8 +273,10 @@ def build_userdata(
         "-o /opt/arcnode/emqx/rule.hocon.tmpl\n"
         f"{init_script_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
-        f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json || "
-        "echo 'DTM fetch failed; populate /opt/arcnode/dtm.json manually'\n"
+        "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
+        "# it on boot per system_adr §22 - fatal here so compose never starts\n"
+        "# with a missing/stale DTM.\n"
+        f"curl -fsSL '{dtm_url}' -o /opt/arcnode/dtm.json\n"
         "# Install docker + compose plugin (Amazon Linux 2023 ships neither).\n"
         "dnf install -y docker\n"
         "systemctl enable --now docker\n"

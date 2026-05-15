@@ -66,15 +66,16 @@ def test_render_template_provisions_vpc_and_subnet() -> None:
     assert "AWS::EC2::Route" in rendered
 
 
-def test_render_template_provisions_instance_role_for_dtm_fetch() -> None:
-    """An IAM role + InstanceProfile so the EC2 can s3:GetObject the DTM."""
+def test_render_template_provisions_instance_role_for_secret_and_ssm_reads() -> None:
+    """An IAM role + InstanceProfile so EC2 can read SecretsManager + SSM Parameter Store."""
     # Arrange + Act
     rendered = _render()
 
     # Assert
     assert "AWS::IAM::Role" in rendered
     assert "AWS::IAM::InstanceProfile" in rendered
-    assert "s3:GetObject" in rendered
+    assert "secretsmanager:GetSecretValue" in rendered
+    assert "ssm:GetParameter" in rendered
 
 
 def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:

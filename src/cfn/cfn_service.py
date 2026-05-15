@@ -94,4 +94,7 @@ class CfnService:
             # CFN tolerates missing Parameters but a literal `{}` looks
             # wrong in the rendered YAML; drop the key entirely for defense.
             del template["Parameters"]
-        return yaml.safe_dump(template, sort_keys=False)
+        # width=10000 disables YAML line-fold inside scalar strings, which
+        # would otherwise split UserData script lines mid-token and break
+        # substring search in tests + downstream CFN UserData consumption.
+        return yaml.safe_dump(template, sort_keys=False, width=10000)

@@ -73,6 +73,10 @@ services:
     image: public.ecr.aws/y1d2j6a8/ems-device-api:latest
     restart: unless-stopped
     <<: *env-files
+    environment:
+      BOOT_DTM_PATH: /app/dtm.json
+    volumes:
+      - /opt/arcnode/dtm.json:/app/dtm.json:ro
     depends_on:
       seed-vector:
         condition: service_completed_successfully
