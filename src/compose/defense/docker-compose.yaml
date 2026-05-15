@@ -75,6 +75,18 @@ services:
       hivemq:
         condition: service_started
 
+  hmi:
+    image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
+    restart: unless-stopped
+    <<: *env-files
+    # Nginx in the image listens on 80 (per Dockerfile EXPOSE 80 + default
+    # nginx.conf). The EmsSecurityGroup also opens 80 inbound from 0.0.0.0/0.
+    ports:
+      - "80:80"
+    depends_on:
+      device-api:
+        condition: service_started
+
   industrial-gateway:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
     restart: unless-stopped
