@@ -67,10 +67,10 @@ services:
     <<: *env-files
     environment:
       BOOT_DTM_PATH: /app/dtm.json
-      # ENV=beta picks up cfg.yml's beta block (mqttBrokerUrl: mqtt://hivemq:1883
-      # + container-internal hostnames). Without it device-api defaults to
-      # local cfg and tries to connect to 127.0.0.1:1883.
-      ENV: beta
+      # ENV=commercial picks up cfg.yml's commercial block (mqttBrokerUrl:
+      # mqtt://hivemq:1883 + container-internal hostnames). Without it
+      # device-api defaults to local cfg and tries to connect to 127.0.0.1:1883.
+      ENV: commercial
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
     # device-api only consumes DOCUMENT_URL — vector/graph belong to the

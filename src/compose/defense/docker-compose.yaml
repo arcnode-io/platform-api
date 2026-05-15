@@ -35,7 +35,7 @@ services:
     <<: *env-files
     environment:
       BOOT_DTM_PATH: /app/dtm.json
-      ENV: beta
+      ENV: defense
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
 
@@ -76,7 +76,7 @@ services:
     <<: *env-files
     command: ["/usr/local/cargo/bin/ems-industrial-gateway"]
     environment:
-      ENV: beta
+      ENV: defense
     depends_on:
       hivemq:
         condition: service_started
