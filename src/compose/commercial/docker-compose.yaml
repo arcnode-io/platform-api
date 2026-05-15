@@ -30,13 +30,13 @@ services:
       - /opt/arcnode/init-scripts:/scripts:ro
     command: ["sh", "/scripts/seed-vector.sh"]
 
-  seed-timeseries:
+  seed-ercot-solar:
     image: alpine:3.20
     restart: "no"
     <<: *env-files
     volumes:
       - /opt/arcnode/init-scripts:/scripts:ro
-    command: ["sh", "/scripts/seed-timeseries.sh"]
+    command: ["sh", "/scripts/seed-ercot-solar.sh"]
 
   seed-graph:
     image: python:3.13-alpine
@@ -120,7 +120,7 @@ services:
     restart: unless-stopped
     <<: *env-files
     depends_on:
-      seed-timeseries:
+      seed-ercot-solar:
         condition: service_completed_successfully
       seed-vector:
         condition: service_completed_successfully
@@ -132,5 +132,5 @@ services:
     restart: unless-stopped
     <<: *env-files
     depends_on:
-      seed-timeseries:
+      seed-ercot-solar:
         condition: service_completed_successfully

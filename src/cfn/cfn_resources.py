@@ -380,7 +380,7 @@ def build_userdata(
     )
     init_scripts = [
         "seed-vector.sh",
-        "seed-timeseries.sh",
+        "seed-ercot-solar.sh",
         graph_seed_script,
         "telemetry_writer.py",
     ]
