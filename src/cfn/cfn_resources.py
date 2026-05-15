@@ -372,25 +372,23 @@ def build_userdata(
         for slot, env_name in ssm_params
     )
     # Init scripts compose mounts at /opt/arcnode/init-scripts/. Variant
-    # picks the matching graph seed script (Neo4j Aura vs Neptune loader)
-    # and the matching ercot-solar dump format (TS-native for Tiger Cloud
-    # commercial/ISO; plain pg_dump for Aurora pg_partman defense).
+    # picks the matching graph seed script (Neo4j Aura vs Neptune loader).
+    # Commercial also delivers the TS-native ercot-solar dump for Tiger
+    # Cloud; defense's analyst stack (when integrated) self-seeds from
+    # public S3 at the consumer (ems-analyst-model), so platform-api
+    # doesn't ship an ercot init container in defense.
     graph_seed_script = (
         "seed-graph-neo4j.py"
         if deployment_context == DeploymentContext.COMMERCIAL
         else "seed-graph-neptune.py"
     )
-    ercot_seed_script = (
-        "seed-ercot-solar-timeseries-tigercloud.sh"
-        if deployment_context == DeploymentContext.COMMERCIAL
-        else "seed-ercot-solar-timeseries-plain.sh"
-    )
     init_scripts = [
         "seed-vector.sh",
-        ercot_seed_script,
         graph_seed_script,
         "telemetry_writer.py",
     ]
+    if deployment_context == DeploymentContext.COMMERCIAL:
+        init_scripts.append("seed-ercot-solar-timeseries-tigercloud.sh")
     init_script_lines = "\n".join(
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
         f"-o /opt/arcnode/init-scripts/{s}"
