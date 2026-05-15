@@ -21,14 +21,17 @@ CFN-provisioned, zero customer params.
 from dataclasses import dataclass, field
 from typing import Final
 
-from src.cfn.persistence.aoss_resources import aoss_resources
+# SMOKE-LEAN: aoss_resources, neptune_resources, DEFENSE_SLICES are unused
+# while the analyst stack is commented out in _defense_build. Imports kept
+# so restoring is a comment-uncomment, not a missing-symbol re-add.
+from src.cfn.persistence.aoss_resources import aoss_resources  # noqa: F401
 from src.cfn.persistence.aurora_resources import (
     COMMERCIAL_SLICES,
-    DEFENSE_SLICES,
+    DEFENSE_SLICES,  # noqa: F401
     PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
 )
-from src.cfn.persistence.neptune_resources import neptune_resources
+from src.cfn.persistence.neptune_resources import neptune_resources  # noqa: F401
 from src.cfn.persistence.vendor_secrets import (
     commercial_url_parameters,
     vendor_url_secrets,
@@ -104,7 +107,7 @@ class PersistenceService:
             ],
         )
 
-    def _defense_build(self, *, short: str) -> PersistenceBuild:
+    def _defense_build(self, *, short: str) -> PersistenceBuild:  # noqa: ARG002
         # SMOKE-LEAN: Neptune + AOSS commented out while we focus on the
         # gateway-publish → broker → measurements-write → subscriber path.
         # Aurora-only is enough: document slice for device-api's DTM,

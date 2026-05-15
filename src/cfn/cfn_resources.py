@@ -190,7 +190,7 @@ def network_resources() -> dict[str, object]:
 
 
 def iam_resources(
-    *, short: str, deployment_context: DeploymentContext
+    *, short: str, deployment_context: DeploymentContext  # noqa: ARG001
 ) -> dict[str, object]:
     """Instance role with SecretsManager + SSM Parameter Store read for persistence
     plus AmazonSSMManagedInstanceCore so operators can `aws ssm start-session`
