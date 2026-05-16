@@ -228,12 +228,18 @@ def _neptune_data_policy(*, short: str) -> dict[str, object]:
 
 
 def _aoss_data_policy(*, short: str) -> dict[str, object]:
-    """aoss:APIAccessAll on the SEARCH collection — defense-only.
+    """aoss:APIAccessAll on any collection in this account — defense-only.
 
     Graphiti's NeptuneDriver hits AOSS for keyword search on graph
     nodes. APIAccessAll is the data-plane action; the data-access
     policy on the collection (in aoss_resources) handles index-level
     grants.
+
+    Resource is scoped by account-arn pattern (not GetAtt on the
+    collection) because the AOSS data-access policy already references
+    EmsInstanceRole.Arn as a principal — a GetAtt back to the collection
+    here would create a circular dep (EmsInstanceRole → AossCollection
+    → AossDataAccessPolicy → EmsInstanceRole).
     """
     return {
         "PolicyName": f"arcnode-{short}-aoss-data",
@@ -244,7 +250,10 @@ def _aoss_data_policy(*, short: str) -> dict[str, object]:
                     "Effect": "Allow",
                     "Action": "aoss:APIAccessAll",
                     "Resource": {
-                        "Fn::GetAtt": ["AossCollection", "Arn"],
+                        "Fn::Sub": (
+                            "arn:aws:aoss:${AWS::Region}:"
+                            "${AWS::AccountId}:collection/*"
+                        ),
                     },
                 }
             ],
