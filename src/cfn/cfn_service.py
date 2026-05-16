@@ -17,6 +17,7 @@ Secrets Manager + SSM Parameter Store at boot.
 
 import yaml
 
+from src.cfn.bedrock_models import description_prereq_clause
 from src.cfn.cfn_resources import (
     AMI_SSM_PARAMETER,
     build_userdata,
@@ -58,17 +59,13 @@ class CfnService:
         )
         # CFN Description is the first thing operators see in the AWS console
         # before deploying — surface the Bedrock prereq here so they don't get
-        # a runtime AccessDeniedException after the stack is up. CFN truncates
-        # Description at 1024 chars; keep the prereq one-liner tight.
-        bedrock_prereq = (
-            " | Requires Bedrock model access (us-east-1) for: "
-            "amazon.titan-embed-text-v2:0, anthropic.claude-sonnet-4-6 (CRIS). "
-            "Grant via console > Bedrock > Model access BEFORE deploy."
-        )
+        # a runtime AccessDeniedException after the stack is up. Sourced from
+        # bedrock_models so a model deprecation bumps in one place.
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
             "Description": (
-                f"ARCNODE EMS deployment — {deployment_uuid}{bedrock_prereq}"
+                f"ARCNODE EMS deployment — {deployment_uuid}"
+                f"{description_prereq_clause()}"
             ),
             "Parameters": persistence.parameters,
             "Resources": {
@@ -85,6 +82,17 @@ class CfnService:
                         "BedrockPreflightCustomResource",
                         *persistence.ems_instance_depends_on,
                     ],
+                    # CFN waits for cfn-signal from UserData before marking
+                    # CREATE_COMPLETE. Without this, the stack reports green
+                    # the instant the EC2 boots — even if every curl in
+                    # UserData failed. 20-minute timeout covers docker
+                    # install + image pulls + initial compose-up.
+                    "CreationPolicy": {
+                        "ResourceSignal": {
+                            "Count": 1,
+                            "Timeout": "PT20M",
+                        },
+                    },
                     "Properties": {
                         "InstanceType": "t3.medium",
                         "ImageId": AMI_SSM_PARAMETER,

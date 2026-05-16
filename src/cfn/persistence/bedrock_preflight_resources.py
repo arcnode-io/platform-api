@@ -19,6 +19,12 @@ Bedrock so this resource set is omitted from their template.
 from pathlib import Path
 from typing import Final
 
+from src.cfn.bedrock_models import (
+    BEDROCK_CHAT_INFERENCE_PROFILE,
+    BEDROCK_EMBED_FOUNDATION_MODEL,
+    all_invoke_resources,
+)
+
 LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
 
@@ -61,23 +67,11 @@ def bedrock_preflight_resources(
                             "Statement": [
                                 {
                                     # Same resource list as the EC2 instance
-                                    # role's bedrock policy — keep them in sync.
+                                    # role's bedrock policy — both pulled
+                                    # from bedrock_models so they can't drift.
                                     "Effect": "Allow",
                                     "Action": "bedrock:InvokeModel",
-                                    "Resource": [
-                                        {
-                                            "Fn::Sub": (
-                                                "arn:aws:bedrock:us-east-1:"
-                                                "${AWS::AccountId}"
-                                                ":inference-profile/"
-                                                "us.anthropic.claude-sonnet-4-6"
-                                            ),
-                                        },
-                                        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
-                                    ],
+                                    "Resource": all_invoke_resources(),
                                 }
                             ],
                         },
@@ -101,6 +95,10 @@ def bedrock_preflight_resources(
                 "ServiceToken": {"Fn::GetAtt": ["BedrockPreflightLambda", "Arn"]},
                 # Bump this string to force re-probe on stack update.
                 "ProbeVersion": "v1",
+                # Lambda reads model IDs from event.ResourceProperties so
+                # the Lambda source stays generic; updates land here.
+                "ChatModelId": BEDROCK_CHAT_INFERENCE_PROFILE,
+                "EmbedModelId": BEDROCK_EMBED_FOUNDATION_MODEL,
             },
         },
     }

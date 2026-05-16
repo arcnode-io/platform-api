@@ -6,6 +6,7 @@ out keeps the service file thin and lets unit tests target each block.
 
 from typing import Final
 
+from src.cfn.bedrock_models import all_invoke_resources
 from src.orders.configurator_payload import DeploymentContext
 
 # Secret slots (in Secrets Manager) and SSM parameters EC2 UserData fetches
@@ -327,20 +328,30 @@ def iam_resources(
                                         "bedrock:InvokeModel",
                                         "bedrock:InvokeModelWithResponseStream",
                                     ],
-                                    "Resource": [
-                                        {
-                                            "Fn::Sub": (
-                                                "arn:aws:bedrock:us-east-1:"
-                                                "${AWS::AccountId}"
-                                                ":inference-profile/"
-                                                "us.anthropic.claude-sonnet-4-6"
-                                            ),
-                                        },
-                                        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6",
-                                        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
-                                    ],
+                                    "Resource": all_invoke_resources(),
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        # cfn-signal calls cloudformation:SignalResource at
+                        # UserData end. Without this perm the CreationPolicy
+                        # on EmsInstance times out + rolls back even on a
+                        # clean boot.
+                        "PolicyName": f"arcnode-{short}-cfn-signal",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "cloudformation:SignalResource",
+                                    "Resource": {
+                                        "Fn::Sub": (
+                                            "arn:aws:cloudformation:${AWS::Region}:"
+                                            "${AWS::AccountId}:stack/"
+                                            "${AWS::StackName}/*"
+                                        ),
+                                    },
                                 }
                             ],
                         },
@@ -424,9 +435,25 @@ def build_userdata(
         f"-o /opt/arcnode/init-scripts/{s}"
         for s in init_scripts
     )
+    # CFN signaling — without cfn-signal the stack reports CREATE_COMPLETE
+    # the instant the AMI boots, even if every curl in UserData fails. Both
+    # Phase 5 smokes (2026-05-15, 2026-05-16) hit silent UserData failures
+    # while CFN reported green. The trap + signal-resource wraps the whole
+    # script: any non-zero exit signals FAILURE → stack rolls back instead
+    # of leaving a half-deployed instance behind.
+    #
+    # aws-cfn-bootstrap (cfn-signal) is not pre-installed on Amazon Linux
+    # 2023 — pip install at the top so the trap can use it. set -u/-o
+    # pipefail BEFORE the trap; set -e AFTER so install failures don't
+    # silently skip the trap.
     return (
         "#!/bin/bash\n"
-        "set -euo pipefail\n"
+        "set -uo pipefail\n"
+        "pip3 install --quiet aws-cfn-bootstrap\n"
+        "trap '/usr/local/bin/cfn-signal -e 1 "
+        "--stack ${AWS::StackName} --resource EmsInstance "
+        "--region ${AWS::Region}' ERR\n"
+        "set -e\n"
         "mkdir -p /opt/arcnode/init-scripts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
@@ -461,4 +488,7 @@ def build_userdata(
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
         "cd /opt/arcnode && docker compose up -d\n"
         "touch /opt/arcnode/userdata.done\n"
+        "# Tell CFN we made it — stack will mark EmsInstance CREATE_COMPLETE.\n"
+        "/usr/local/bin/cfn-signal -e 0 --stack ${AWS::StackName} "
+        "--resource EmsInstance --region ${AWS::Region}\n"
     )

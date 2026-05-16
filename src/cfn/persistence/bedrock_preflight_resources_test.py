@@ -45,16 +45,18 @@ def test_lambda_role_grants_invoke_on_titan_and_sonnet_cris() -> None:
         )
 
 
-def test_custom_resource_invokes_the_lambda() -> None:
+def test_custom_resource_invokes_the_lambda_with_model_ids() -> None:
+    """CR passes model IDs through ResourceProperties — Lambda reads from event."""
     # Arrange + Act
     resources = bedrock_preflight_resources()
     cr = resources["BedrockPreflightCustomResource"]
 
     # Assert
     assert cr["Type"] == "Custom::BedrockPreflight"
-    assert cr["Properties"]["ServiceToken"] == {
-        "Fn::GetAtt": ["BedrockPreflightLambda", "Arn"]
-    }
+    props = cr["Properties"]
+    assert props["ServiceToken"] == {"Fn::GetAtt": ["BedrockPreflightLambda", "Arn"]}
+    assert "ChatModelId" in props
+    assert "EmbedModelId" in props
 
 
 def test_lambda_inlines_the_source_file() -> None:
@@ -65,5 +67,7 @@ def test_lambda_inlines_the_source_file() -> None:
 
     # Assert
     assert "def handler(" in code_zip
-    assert "TITAN_MODEL" in code_zip
-    assert "CLAUDE_PROFILE" in code_zip
+    # Source now reads from event.ResourceProperties — model IDs are NOT
+    # constants in the Lambda anymore; they're passed in by the CR.
+    assert "ChatModelId" in code_zip
+    assert "EmbedModelId" in code_zip

@@ -11,11 +11,10 @@ We can't probe Bedrock from our account — customers don't and shouldn't
 give us cross-account access. Running the check from a Lambda inside
 their stack solves the trust gap: customer's own role, no shared creds.
 
-Models checked (matches python-mcp-server + ems-analyst-agent + the
-EC2 IAM role granted in cfn_resources.iam_resources):
-
-  - amazon.titan-embed-text-v2:0       (Titan embed for rag_search)
-  - us.anthropic.claude-sonnet-4-6     (Sonnet 4.6 chat via CRIS)
+Model IDs come from event.ResourceProperties — the CFN customer-resource
+passes the canonical values from `platform-api/src/cfn/bedrock_models.py`
+so the Lambda stays generic and there's exactly ONE place to bump on
+model deprecation.
 
 Delete is a no-op — nothing to clean up (Bedrock model access is an
 account-level setting, not a stack resource).
@@ -36,10 +35,8 @@ if TYPE_CHECKING:
     # block stays out of the runtime path entirely.
     from mypy_boto3_bedrock_runtime import BedrockRuntimeClient
 
-# Tiny probe inputs — Bedrock charges per-token, so keep both calls
-# minimal. Titan accepts any text; Claude needs the messages API shape.
-TITAN_MODEL = "amazon.titan-embed-text-v2:0"
-CLAUDE_PROFILE = "us.anthropic.claude-sonnet-4-6"
+# Tiny probe input — Bedrock charges per-token; "ok" is enough to
+# exercise auth + permission resolution without burning tokens.
 PROBE_TEXT = "ok"
 
 
@@ -48,7 +45,11 @@ def handler(event: dict, context: object) -> None:
     physical_id = event.get("PhysicalResourceId", "bedrock-preflight")
     try:
         if request_type == "Create":
-            _probe()
+            props = event["ResourceProperties"]
+            _probe(
+                chat_model_id=props["ChatModelId"],
+                embed_model_id=props["EmbedModelId"],
+            )
             _respond(event, "SUCCESS", physical_id, {})
         else:
             # Update + Delete: no-op. Re-running the probe on every stack
@@ -58,29 +59,29 @@ def handler(event: dict, context: object) -> None:
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
-def _probe() -> None:
+def _probe(*, chat_model_id: str, embed_model_id: str) -> None:
     """Invoke both models once. AccessDeniedException -> raise with link."""
     client = boto3.client("bedrock-runtime")
-    _probe_titan(client)
-    _probe_claude(client)
+    _probe_titan(client, embed_model_id)
+    _probe_claude(client, chat_model_id)
 
 
-def _probe_titan(client: BedrockRuntimeClient) -> None:
+def _probe_titan(client: BedrockRuntimeClient, model_id: str) -> None:
     try:
         client.invoke_model(
-            modelId=TITAN_MODEL,
+            modelId=model_id,
             contentType="application/json",
             accept="application/json",
             body=json.dumps({"inputText": PROBE_TEXT}),
         )
     except client.exceptions.AccessDeniedException as e:
-        raise RuntimeError(_access_denied_message(TITAN_MODEL)) from e
+        raise RuntimeError(_access_denied_message(model_id)) from e
 
 
-def _probe_claude(client: BedrockRuntimeClient) -> None:
+def _probe_claude(client: BedrockRuntimeClient, model_id: str) -> None:
     try:
         client.invoke_model(
-            modelId=CLAUDE_PROFILE,
+            modelId=model_id,
             contentType="application/json",
             accept="application/json",
             body=json.dumps(
@@ -92,7 +93,7 @@ def _probe_claude(client: BedrockRuntimeClient) -> None:
             ),
         )
     except client.exceptions.AccessDeniedException as e:
-        raise RuntimeError(_access_denied_message(CLAUDE_PROFILE)) from e
+        raise RuntimeError(_access_denied_message(model_id)) from e
 
 
 def _access_denied_message(model_id: str) -> str:

@@ -114,6 +114,29 @@ def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
     assert "registry.gitlab.com" not in rendered
 
 
+def test_render_template_userdata_signals_cfn_on_success_and_failure() -> None:
+    """cfn-signal must wrap UserData so stack status reflects real boot state.
+
+    Without this, the stack reports CREATE_COMPLETE the instant the EC2
+    boots — even if every curl in UserData fails. Both Phase 5 smokes
+    in May 2026 hit silent UserData failures while CFN reported green.
+    """
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — aws-cfn-bootstrap installed at the top so the trap works
+    assert "pip3 install --quiet aws-cfn-bootstrap" in rendered
+    # Trap fires cfn-signal -e 1 on ANY error
+    assert "trap '/usr/local/bin/cfn-signal -e 1" in rendered
+    # Success signal at the end
+    assert "cfn-signal -e 0" in rendered
+    # EmsInstance gates CREATE_COMPLETE on the signal
+    assert "CreationPolicy" in rendered
+    assert "ResourceSignal" in rendered
+    # IAM role has the matching cloudformation:SignalResource permission
+    assert "cloudformation:SignalResource" in rendered
+
+
 def test_render_template_outputs_echo_per_order_inputs() -> None:
     """Outputs include the public IP + the order's params for op visibility."""
     # Arrange + Act
