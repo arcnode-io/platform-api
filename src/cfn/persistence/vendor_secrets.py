@@ -74,3 +74,56 @@ def commercial_url_parameters() -> dict[str, dict]:
             ),
         },
     }
+
+
+def agent_api_key_secrets() -> dict[str, dict]:
+    """CFN-native secrets for analyst-agent vendor APIs (both variants).
+
+    OpenAI powers the LLM backbone of the agent; OpenWeatherMap powers
+    the weather-forecast tool. Both variants need them — defense is
+    sovereign on data, not on third-party AI vendors.
+    """
+    return {
+        "OpenaiApiKeySecret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": {
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}/openai-api-key",
+                },
+                "Description": "OpenAI API key consumed by analyst-agent (sk-...).",
+                "SecretString": {"Ref": "OpenaiApiKey"},
+            },
+        },
+        "OpenweathermapApiKeySecret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": {
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}"
+                    "/openweathermap-api-key",
+                },
+                "Description": (
+                    "OpenWeatherMap API key consumed by analyst-agent's "
+                    "weather-forecast tool."
+                ),
+                "SecretString": {"Ref": "OpenweathermapApiKey"},
+            },
+        },
+    }
+
+
+def agent_api_key_parameters() -> dict[str, dict]:
+    """Two NoEcho String CFN params for the agent's vendor API keys."""
+    return {
+        "OpenaiApiKey": {
+            "Type": "String",
+            "NoEcho": True,
+            "MinLength": 1,
+            "Description": "OpenAI API key (starts with sk-).",
+        },
+        "OpenweathermapApiKey": {
+            "Type": "String",
+            "NoEcho": True,
+            "MinLength": 1,
+            "Description": "OpenWeatherMap API key (32-char hex).",
+        },
+    }

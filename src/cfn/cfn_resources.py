@@ -21,8 +21,13 @@ from src.orders.configurator_payload import DeploymentContext
 # analyst services + their seed init container.
 COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("document-url", "DOCUMENT_URL"),
-    # ("vector-url", "VECTOR_URL"),
+    ("vector-url", "VECTOR_URL"),
     ("timeseries-url", "TIMESERIES_URL"),
+    # Agent vendor API keys (analyst-server → analyst-agent → openai/owm).
+    # Same delivery mechanism as URLs: SecretsManager → UserData →
+    # /opt/arcnode/secrets.env → compose env_file.
+    ("openai-api-key", "OPENAI_API_KEY"),
+    ("openweathermap-api-key", "OPENWEATHERMAP_API_KEY"),
 )
 COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("graph-url", "GRAPH_URL"),

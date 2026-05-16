@@ -86,3 +86,18 @@ services:
         condition: service_started
       mock-modbus-server:
         condition: service_started
+
+  # Phase 1 defense smoke: analyst-server hosts the agent which spawns
+  # the mcp-server child. mcp-server self-seeds vector slice on first
+  # boot from public S3 (graph leg lands in Phase 2 with Neptune+AOSS).
+  # Exposes /chat for the end-to-end smoke. Agent calls openai
+  # gpt-4o-mini + OpenWeatherMap; both keys ride secrets.env.
+  analyst-server:
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-server:latest
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      ENV: beta
+      CUSTOMER_ENV: defense
+    ports:
+      - "8000:8000"

@@ -33,6 +33,8 @@ from src.cfn.persistence.aurora_resources import (
 )
 from src.cfn.persistence.neptune_resources import neptune_resources  # noqa: F401
 from src.cfn.persistence.vendor_secrets import (
+    agent_api_key_parameters,
+    agent_api_key_secrets,
     commercial_url_parameters,
     vendor_url_secrets,
 )
@@ -98,35 +100,42 @@ class PersistenceService:
                     slices=COMMERCIAL_SLICES,
                 ),
                 **vendor_url_secrets(),
+                **agent_api_key_secrets(),
             },
-            parameters=commercial_url_parameters(),
+            parameters={
+                **commercial_url_parameters(),
+                **agent_api_key_parameters(),
+            },
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
                 "TimeseriesUrlSecret",
                 "GraphUrlSecret",
+                "OpenaiApiKeySecret",
+                "OpenweathermapApiKeySecret",
             ],
         )
 
     def _defense_build(self, *, short: str) -> PersistenceBuild:  # noqa: ARG002
-        # SMOKE-LEAN: Neptune + AOSS commented out while we focus on the
-        # gateway-publish → broker → measurements-write → subscriber path.
-        # Aurora-only is enough: document slice for device-api's DTM,
-        # timeseries slice (pg_partman) for the EMQX-rule measurements
-        # writes. Restore the commented blocks before bringing the analyst
-        # stack back online.
+        # Phase 1: Aurora full slices (document + vector + timeseries) for
+        # the analyst-server /chat path through to mcp-server's rag_search.
+        # Neptune + AOSS still commented out — Phase 2 brings the graph
+        # leg online (mcp-server's seed_graph_neptune is TODO until then).
         return PersistenceBuild(
             resources={
                 **aurora_cluster_resources(
                     lambda_runtime=self._lambda_runtime,
                     psycopg2_layer_arn_template=self._psycopg2_layer_arn_template,
-                    slices=("document", "timeseries"),
+                    slices=DEFENSE_SLICES,
                 ),
+                **agent_api_key_secrets(),
                 # **neptune_resources(),
                 # **aoss_resources(short=short),
             },
-            parameters={},
+            parameters=agent_api_key_parameters(),
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
+                "OpenaiApiKeySecret",
+                "OpenweathermapApiKeySecret",
                 # "NeptuneInstance",
                 # "AossCollection",
                 # "NeptuneHostParam",

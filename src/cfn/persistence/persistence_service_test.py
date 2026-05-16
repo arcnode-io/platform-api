@@ -29,8 +29,8 @@ def test_commercial_build_returns_aurora_plus_vendor_secrets() -> None:
     assert "AossCollection" not in build.resources
 
 
-def test_commercial_build_declares_two_required_parameters() -> None:
-    """Commercial Parameters block: TimeseriesConnectionUrl + GraphConnectionUrl."""
+def test_commercial_build_declares_required_parameters() -> None:
+    """Commercial Parameters: vendor URLs + agent vendor API keys."""
     # Arrange
     service = PersistenceService()
 
@@ -43,11 +43,13 @@ def test_commercial_build_declares_two_required_parameters() -> None:
     assert set(build.parameters.keys()) == {
         "TimeseriesConnectionUrl",
         "GraphConnectionUrl",
+        "OpenaiApiKey",
+        "OpenweathermapApiKey",
     }
 
 
 def test_commercial_build_lists_ems_instance_dependencies() -> None:
-    """EmsInstance waits for Aurora bootstrap + 2 vendor secrets."""
+    """EmsInstance waits for Aurora bootstrap + vendor secrets + agent keys."""
     # Arrange
     service = PersistenceService()
 
@@ -61,6 +63,8 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "AuroraBootstrapCustomResource",
         "TimeseriesUrlSecret",
         "GraphUrlSecret",
+        "OpenaiApiKeySecret",
+        "OpenweathermapApiKeySecret",
     }
 
 
@@ -84,8 +88,13 @@ def test_defense_build_returns_aurora_plus_neptune_plus_aoss() -> None:
     assert "GraphUrlSecret" not in build.resources
 
 
-def test_defense_build_has_no_parameters() -> None:
-    """Defense variant requires zero customer-supplied params."""
+def test_defense_build_declares_agent_api_key_parameters() -> None:
+    """Defense Parameters: agent vendor API keys (OpenAI + OpenWeatherMap).
+
+    All persistence URLs are CFN-internal (Aurora bootstrap Lambda /
+    Neptune+AOSS IAM). The only customer-supplied secrets defense needs
+    are the agent's third-party API keys.
+    """
     # Arrange
     service = PersistenceService()
 
@@ -95,7 +104,10 @@ def test_defense_build_has_no_parameters() -> None:
     )
 
     # Assert
-    assert build.parameters == {}
+    assert set(build.parameters.keys()) == {
+        "OpenaiApiKey",
+        "OpenweathermapApiKey",
+    }
 
 
 @pytest.mark.skip(reason="SMOKE-LEAN: only AuroraBootstrapCustomResource in deps")

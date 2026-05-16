@@ -41,18 +41,17 @@ def test_compose_parses_and_declares_hivemq(variant_path: Path) -> None:
     assert spec["services"]["hivemq"]["image"].startswith("hivemq/hivemq-ce")
 
 
-def test_defense_has_broker_leg_only() -> None:
-    """Defense ships the broker leg without the analyst stack —
-    ems-analyst-model self-seeds from public S3 when integrated, so
-    platform-api doesn't ship analyst init containers in defense."""
+def test_defense_ships_broker_leg_plus_analyst_server() -> None:
+    """Defense ships broker leg + analyst-server (Phase 1 smoke). No init
+    containers (consumers self-seed). analyst-model lands in Phase 3."""
     # Arrange + Act
     services = yaml.safe_load(DEFENSE_COMPOSE.read_text())["services"]
 
-    # Assert — broker leg present
-    for svc in BROKER_LEG:
+    # Assert — broker leg + analyst-server present
+    for svc in (*BROKER_LEG, "analyst-server"):
         assert svc in services, f"defense missing {svc}"
-    # Assert — no analyst stack and no init containers
-    for absent in (*COMMERCIAL_INITS, *COMMERCIAL_ANALYST):
+    # Assert — no init containers, no analyst-model yet
+    for absent in (*COMMERCIAL_INITS, "analyst-model"):
         assert absent not in services, f"defense should not ship {absent}"
 
 
