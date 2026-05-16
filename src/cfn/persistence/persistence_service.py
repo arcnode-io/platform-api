@@ -110,7 +110,6 @@ class PersistenceService:
                 "AuroraBootstrapCustomResource",
                 "TimeseriesUrlSecret",
                 "GraphUrlSecret",
-                "OpenaiApiKeySecret",
                 "OpenweathermapApiKeySecret",
             ],
         )
@@ -134,7 +133,6 @@ class PersistenceService:
             parameters=agent_api_key_parameters(),
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
-                "OpenaiApiKeySecret",
                 "OpenweathermapApiKeySecret",
                 # "NeptuneInstance",
                 # "AossCollection",

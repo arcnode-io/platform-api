@@ -77,23 +77,13 @@ def commercial_url_parameters() -> dict[str, dict]:
 
 
 def agent_api_key_secrets() -> dict[str, dict]:
-    """CFN-native secrets for analyst-agent vendor APIs (both variants).
+    """CFN-native secrets for analyst-agent vendor APIs.
 
-    OpenAI powers the LLM backbone of the agent; OpenWeatherMap powers
-    the weather-forecast tool. Both variants need them — defense is
-    sovereign on data, not on third-party AI vendors.
+    Per ADR-024 + ADR-025: chat + embed go through Bedrock (cloud) or
+    Ollama (airgapped); the only third-party API key still needed is
+    OpenWeatherMap for the weather-forecast tool.
     """
     return {
-        "OpenaiApiKeySecret": {
-            "Type": "AWS::SecretsManager::Secret",
-            "Properties": {
-                "Name": {
-                    "Fn::Sub": "arcnode-ems-${AWS::StackName}/openai-api-key",
-                },
-                "Description": "OpenAI API key consumed by analyst-agent (sk-...).",
-                "SecretString": {"Ref": "OpenaiApiKey"},
-            },
-        },
         "OpenweathermapApiKeySecret": {
             "Type": "AWS::SecretsManager::Secret",
             "Properties": {
@@ -112,14 +102,8 @@ def agent_api_key_secrets() -> dict[str, dict]:
 
 
 def agent_api_key_parameters() -> dict[str, dict]:
-    """Two NoEcho String CFN params for the agent's vendor API keys."""
+    """One NoEcho String CFN param — OpenWeatherMap (only third-party left)."""
     return {
-        "OpenaiApiKey": {
-            "Type": "String",
-            "NoEcho": True,
-            "MinLength": 1,
-            "Description": "OpenAI API key (starts with sk-).",
-        },
         "OpenweathermapApiKey": {
             "Type": "String",
             "NoEcho": True,

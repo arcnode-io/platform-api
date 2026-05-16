@@ -43,7 +43,6 @@ def test_commercial_build_declares_required_parameters() -> None:
     assert set(build.parameters.keys()) == {
         "TimeseriesConnectionUrl",
         "GraphConnectionUrl",
-        "OpenaiApiKey",
         "OpenweathermapApiKey",
     }
 
@@ -63,7 +62,6 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "AuroraBootstrapCustomResource",
         "TimeseriesUrlSecret",
         "GraphUrlSecret",
-        "OpenaiApiKeySecret",
         "OpenweathermapApiKeySecret",
     }
 
@@ -89,11 +87,11 @@ def test_defense_build_returns_aurora_plus_neptune_plus_aoss() -> None:
 
 
 def test_defense_build_declares_agent_api_key_parameters() -> None:
-    """Defense Parameters: agent vendor API keys (OpenAI + OpenWeatherMap).
+    """Defense Parameters: only OpenWeatherMap remains.
 
-    All persistence URLs are CFN-internal (Aurora bootstrap Lambda /
-    Neptune+AOSS IAM). The only customer-supplied secrets defense needs
-    are the agent's third-party API keys.
+    Per ADR-024 chat + embed go through Bedrock; the only third-party
+    API key the agent still needs is OpenWeatherMap (per ADR-025).
+    All other persistence URLs are CFN-internal.
     """
     # Arrange
     service = PersistenceService()
@@ -104,10 +102,7 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
     )
 
     # Assert
-    assert set(build.parameters.keys()) == {
-        "OpenaiApiKey",
-        "OpenweathermapApiKey",
-    }
+    assert set(build.parameters.keys()) == {"OpenweathermapApiKey"}
 
 
 @pytest.mark.skip(reason="SMOKE-LEAN: only AuroraBootstrapCustomResource in deps")
