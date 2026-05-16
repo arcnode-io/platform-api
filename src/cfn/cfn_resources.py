@@ -308,6 +308,44 @@ def iam_resources(
                             ],
                         },
                     },
+                    {
+                        "PolicyName": f"arcnode-{short}-bedrock-invoke",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    # Bedrock charges per-token; scope to the
+                                    # exact models the analyst uses.
+                                    # Sonnet 4.6 via CRIS (us.* prefix) — direct
+                                    # anthropic.* IDs require provisioned
+                                    # throughput, so we permit ONLY the
+                                    # inference-profile + the 3 underlying
+                                    # foundation-models the profile spans
+                                    # (us-east-1/2 + us-west-2).
+                                    # Titan v2 has no CRIS — single FM arn.
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "bedrock:InvokeModel",
+                                        "bedrock:InvokeModelWithResponseStream",
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": (
+                                                "arn:aws:bedrock:us-east-1:"
+                                                "${AWS::AccountId}"
+                                                ":inference-profile/"
+                                                "us.anthropic.claude-sonnet-4-6"
+                                            ),
+                                        },
+                                        "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-6",
+                                        "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-6",
+                                        "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-6",
+                                        "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
+                                    ],
+                                }
+                            ],
+                        },
+                    },
                     *neptune_data_policy,
                 ],
             },
@@ -410,13 +448,13 @@ def build_userdata(
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
         "# it on boot per system_adr §22 - fatal here so compose never starts\n"
         "# with a missing/stale DTM.\n"
-        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused'{dtm_url}' -o /opt/arcnode/dtm.json\n"
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused '{dtm_url}' -o /opt/arcnode/dtm.json\n"
         "# Install docker + compose plugin (Amazon Linux 2023 ships neither).\n"
         "dnf install -y docker\n"
         "systemctl enable --now docker\n"
         "DOCKER_CLI_PLUGINS=/usr/libexec/docker/cli-plugins\n"
         "mkdir -p $DOCKER_CLI_PLUGINS\n"
-        "curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused"
+        "curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused "
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 "
         "-o $DOCKER_CLI_PLUGINS/docker-compose\n"
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"
