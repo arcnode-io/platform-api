@@ -56,11 +56,16 @@ class SesService:
 
     def _client(self):  # noqa: ANN202
         # Same as S3Service — pass test creds to LocalStack only.
-        kwargs: dict[str, object] = {
-            "endpoint_url": self._endpoint_url,
-            "region_name": self._region,
-        }
         if self._endpoint_url is not None:
-            kwargs["aws_access_key_id"] = "test"  # nosec B105 — LocalStack
-            kwargs["aws_secret_access_key"] = "test"  # noqa: S105  # nosec B105
-        return self._session.client("ses", **kwargs)
+            return self._session.client(
+                "ses",
+                endpoint_url=self._endpoint_url,
+                region_name=self._region,
+                aws_access_key_id="test",  # nosec B105 — LocalStack
+                aws_secret_access_key="test",  # noqa: S106  # nosec B106
+            )
+        return self._session.client(
+            "ses",
+            endpoint_url=self._endpoint_url,
+            region_name=self._region,
+        )

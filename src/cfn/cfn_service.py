@@ -23,6 +23,9 @@ from src.cfn.cfn_resources import (
     iam_resources,
     network_resources,
 )
+from src.cfn.persistence.bedrock_preflight_resources import (
+    bedrock_preflight_resources,
+)
 from src.cfn.persistence.persistence_service import PersistenceService
 from src.orders.configurator_payload import DeploymentContext
 
@@ -53,17 +56,35 @@ class CfnService:
             deployment_context=deployment_context,
             short=short,
         )
+        # CFN Description is the first thing operators see in the AWS console
+        # before deploying — surface the Bedrock prereq here so they don't get
+        # a runtime AccessDeniedException after the stack is up. CFN truncates
+        # Description at 1024 chars; keep the prereq one-liner tight.
+        bedrock_prereq = (
+            " | Requires Bedrock model access (us-east-1) for: "
+            "amazon.titan-embed-text-v2:0, anthropic.claude-sonnet-4-6 (CRIS). "
+            "Grant via console > Bedrock > Model access BEFORE deploy."
+        )
         template = {
             "AWSTemplateFormatVersion": "2010-09-09",
-            "Description": f"ARCNODE EMS deployment — {deployment_uuid}",
+            "Description": (
+                f"ARCNODE EMS deployment — {deployment_uuid}{bedrock_prereq}"
+            ),
             "Parameters": persistence.parameters,
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short, deployment_context=deployment_context),
+                # Preflight Bedrock model access before any other resource
+                # spins up — fails fast with a console link rather than
+                # leaving a half-deployed stack hung on persistence wait.
+                **bedrock_preflight_resources(),
                 **persistence.resources,
                 "EmsInstance": {
                     "Type": "AWS::EC2::Instance",
-                    "DependsOn": persistence.ems_instance_depends_on,
+                    "DependsOn": [
+                        "BedrockPreflightCustomResource",
+                        *persistence.ems_instance_depends_on,
+                    ],
                     "Properties": {
                         "InstanceType": "t3.medium",
                         "ImageId": AMI_SSM_PARAMETER,
