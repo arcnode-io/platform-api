@@ -27,7 +27,7 @@ from typing import Final
 from src.cfn.persistence.aoss_resources import aoss_resources  # noqa: F401
 from src.cfn.persistence.aurora_resources import (
     COMMERCIAL_SLICES,
-    DEFENSE_SLICES,  # noqa: F401
+    DEFENSE_SLICES,
     PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
 )
