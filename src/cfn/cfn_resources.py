@@ -472,15 +472,16 @@ def build_userdata(
     # script: any non-zero exit signals FAILURE → stack rolls back instead
     # of leaving a half-deployed instance behind.
     #
-    # aws-cfn-bootstrap (cfn-signal) is not pre-installed on Amazon Linux
-    # 2023 — pip install at the top so the trap can use it. set -u/-o
-    # pipefail BEFORE the trap; set -e AFTER so install failures don't
-    # silently skip the trap.
+    # AL2023 doesn't ship aws-cfn-bootstrap; install via dnf (NOT pip — the
+    # PyPI `aws-cfn-bootstrap` is the 2014 python2 build, lands `cfn-signal`
+    # nowhere usable). dnf installs at /usr/bin/cfn-signal.
+    # set -u/-o pipefail BEFORE the trap; set -e AFTER so install failures
+    # don't silently skip the trap.
     return (
         "#!/bin/bash\n"
         "set -uo pipefail\n"
-        "pip3 install --quiet aws-cfn-bootstrap\n"
-        "trap '/usr/local/bin/cfn-signal -e 1 "
+        "dnf install -y aws-cfn-bootstrap\n"
+        "trap '/usr/bin/cfn-signal -e 1 "
         "--stack ${AWS::StackName} --resource EmsInstance "
         "--region ${AWS::Region}' ERR\n"
         "set -e\n"
@@ -519,6 +520,6 @@ def build_userdata(
         "cd /opt/arcnode && docker compose up -d\n"
         "touch /opt/arcnode/userdata.done\n"
         "# Tell CFN we made it — stack will mark EmsInstance CREATE_COMPLETE.\n"
-        "/usr/local/bin/cfn-signal -e 0 --stack ${AWS::StackName} "
+        "/usr/bin/cfn-signal -e 0 --stack ${AWS::StackName} "
         "--resource EmsInstance --region ${AWS::Region}\n"
     )

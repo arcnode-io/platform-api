@@ -123,10 +123,11 @@ def test_render_template_userdata_signals_cfn_on_success_and_failure() -> None:
     # Arrange + Act
     rendered = _render()
 
-    # Assert — aws-cfn-bootstrap installed at the top so the trap works
-    assert "pip3 install --quiet aws-cfn-bootstrap" in rendered
+    # Assert — aws-cfn-bootstrap installed via dnf (NOT pip — see comment
+    # in cfn_resources.build_userdata). Lands at /usr/bin/cfn-signal.
+    assert "dnf install -y aws-cfn-bootstrap" in rendered
     # Trap fires cfn-signal -e 1 on ANY error
-    assert "trap '/usr/local/bin/cfn-signal -e 1" in rendered
+    assert "trap '/usr/bin/cfn-signal -e 1" in rendered
     # Success signal at the end
     assert "cfn-signal -e 0" in rendered
     # EmsInstance gates CREATE_COMPLETE on the signal

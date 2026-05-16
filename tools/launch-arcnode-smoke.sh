@@ -47,12 +47,17 @@ print(f'template_size={len(yaml)} bytes')
 "
 
 echo "→ creating stack: $STACK_NAME"
+# --on-failure DO_NOTHING: keep failed instance up so we can SSM in and
+# read cloud-init logs. Cost note: this leaves Aurora/Neptune running on
+# failure — use teardown-arcnode-smoke.sh to clean up manually if a
+# create fails.
 aws cloudformation create-stack \
     --stack-name "$STACK_NAME" \
     --template-body "file://${TEMPLATE_FILE}" \
     --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
     --parameters "ParameterKey=OpenweathermapApiKey,ParameterValue=${OWM_KEY}" \
     --tags Key=arcnode-smoke,Value=phase5 Key=auto-teardown,Value=true \
+    --on-failure DO_NOTHING \
     --output text --query 'StackId'
 
 echo "$STACK_NAME"
