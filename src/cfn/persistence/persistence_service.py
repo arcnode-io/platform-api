@@ -21,17 +21,14 @@ CFN-provisioned, zero customer params.
 from dataclasses import dataclass, field
 from typing import Final
 
-# SMOKE-LEAN: aoss_resources, neptune_resources, DEFENSE_SLICES are unused
-# while the analyst stack is commented out in _defense_build. Imports kept
-# so restoring is a comment-uncomment, not a missing-symbol re-add.
-from src.cfn.persistence.aoss_resources import aoss_resources  # noqa: F401
+from src.cfn.persistence.aoss_resources import aoss_resources
 from src.cfn.persistence.aurora_resources import (
     COMMERCIAL_SLICES,
     DEFENSE_SLICES,
     PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
 )
-from src.cfn.persistence.neptune_resources import neptune_resources  # noqa: F401
+from src.cfn.persistence.neptune_resources import neptune_resources
 from src.cfn.persistence.vendor_secrets import (
     agent_api_key_parameters,
     agent_api_key_secrets,
@@ -114,11 +111,11 @@ class PersistenceService:
             ],
         )
 
-    def _defense_build(self, *, short: str) -> PersistenceBuild:  # noqa: ARG002
-        # Phase 1: Aurora full slices (document + vector + timeseries) for
-        # the analyst-server /chat path through to mcp-server's rag_search.
-        # Neptune + AOSS still commented out — Phase 2 brings the graph
-        # leg online (mcp-server's seed_graph_neptune is TODO until then).
+    def _defense_build(self, *, short: str) -> PersistenceBuild:
+        """Aurora (3 slices) + Neptune Serverless + AOSS — the full defense
+        persistence stack. EmsInstance waits for each so UserData can read
+        the SSM hostnames + Aurora secrets at boot.
+        """
         return PersistenceBuild(
             resources={
                 **aurora_cluster_resources(
@@ -127,17 +124,17 @@ class PersistenceService:
                     slices=DEFENSE_SLICES,
                 ),
                 **agent_api_key_secrets(),
-                # **neptune_resources(),
-                # **aoss_resources(short=short),
+                **neptune_resources(),
+                **aoss_resources(short=short),
             },
             parameters=agent_api_key_parameters(),
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
                 "OpenweathermapApiKeySecret",
-                # "NeptuneInstance",
-                # "AossCollection",
-                # "NeptuneHostParam",
-                # "NeptuneLoaderRoleArnParam",
-                # "AossHostParam",
+                "NeptuneInstance",
+                "AossCollection",
+                "NeptuneHostParam",
+                "NeptuneLoaderRoleArnParam",
+                "AossHostParam",
             ],
         )

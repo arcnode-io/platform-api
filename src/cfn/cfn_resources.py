@@ -34,12 +34,10 @@ COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
 )
 # SSM Parameter Store entries → env-var name. No creds — IAM/sigv4 auth
 # via the EC2 instance profile.
-#
-# SMOKE-LEAN: Neptune + AOSS commented out alongside their CFN resources.
 DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
-    # ("neptune-host", "NEPTUNE_HOST"),
-    # ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
-    # ("aoss-host", "AOSS_HOST"),
+    ("neptune-host", "NEPTUNE_HOST"),
+    ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
+    ("aoss-host", "AOSS_HOST"),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
@@ -197,14 +195,9 @@ def network_resources() -> dict[str, object]:
 def _neptune_data_policy(*, short: str) -> dict[str, object]:
     """neptune-db:* on the Neptune cluster ResourceId — defense-only.
 
-    The seed-graph init container uses boto3 sigv4-auth to stamp and read
-    the ArcnodeSeedMarker. Requires Read / Write / Delete on the cluster's
-    data plane plus the loader-job pair for the seed bulk-load.
-
-    Currently unused: defense's PersistenceService build comments out the
-    Neptune resources for the SMOKE-LEAN phase. When Neptune comes back,
-    re-enable this in `iam_resources` by appending its return value to
-    the policy list.
+    The mcp-server seed_graph_neptune path uses sigv4 to stamp the
+    ArcnodeSeedMarker and call StartLoaderJob/GetLoaderJobStatus for
+    bulk-loading the pre-baked CSVs from arcnode-public.
     """
     return {
         "PolicyName": f"arcnode-{short}-neptune-data",
@@ -234,19 +227,46 @@ def _neptune_data_policy(*, short: str) -> dict[str, object]:
     }
 
 
+def _aoss_data_policy(*, short: str) -> dict[str, object]:
+    """aoss:APIAccessAll on the SEARCH collection — defense-only.
+
+    Graphiti's NeptuneDriver hits AOSS for keyword search on graph
+    nodes. APIAccessAll is the data-plane action; the data-access
+    policy on the collection (in aoss_resources) handles index-level
+    grants.
+    """
+    return {
+        "PolicyName": f"arcnode-{short}-aoss-data",
+        "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "aoss:APIAccessAll",
+                    "Resource": {
+                        "Fn::GetAtt": ["AossCollection", "Arn"],
+                    },
+                }
+            ],
+        },
+    }
+
+
 def iam_resources(
-    *, short: str, deployment_context: DeploymentContext  # noqa: ARG001
+    *, short: str, deployment_context: DeploymentContext
 ) -> dict[str, object]:
     """Instance role with SecretsManager + SSM Parameter Store read for persistence
     plus AmazonSSMManagedInstanceCore so operators can `aws ssm start-session`
     into the EC2 for boot diagnostics without provisioning SSH keys.
 
-    SMOKE-LEAN: neptune-db:* policy intentionally not appended — defense's
-    PersistenceService build has no NeptuneCluster to ref. Restore by
-    appending `_neptune_data_policy(short=short)` to the policy list when
-    Neptune comes back.
+    Defense adds Neptune (graph DB-data API) + AOSS (sigv4 against the
+    SEARCH collection) policies; commercial leaves them off.
     """
     neptune_data_policy: list[dict[str, object]] = []
+    aoss_data_policy: list[dict[str, object]] = []
+    if deployment_context != DeploymentContext.COMMERCIAL:
+        neptune_data_policy = [_neptune_data_policy(short=short)]
+        aoss_data_policy = [_aoss_data_policy(short=short)]
     return {
         "EmsInstanceRole": {
             "Type": "AWS::IAM::Role",
@@ -357,6 +377,7 @@ def iam_resources(
                         },
                     },
                     *neptune_data_policy,
+                    *aoss_data_policy,
                 ],
             },
         },

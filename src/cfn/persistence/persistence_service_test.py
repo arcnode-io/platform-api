@@ -1,7 +1,5 @@
 """Tests for PersistenceService variant routing."""
 
-import pytest
-
 from src.cfn.persistence.persistence_service import (
     PersistenceBuild,
     PersistenceService,
@@ -66,7 +64,6 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
     }
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: defense build is Aurora-only for the smoke phase")
 def test_defense_build_returns_aurora_plus_neptune_plus_aoss() -> None:
     """Defense variant: Aurora doc+vector+timeseries + Neptune + AOSS, no vendor secrets."""
     # Arrange
@@ -105,7 +102,6 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
     assert set(build.parameters.keys()) == {"OpenweathermapApiKey"}
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: only AuroraBootstrapCustomResource in deps")
 def test_defense_build_lists_ems_instance_dependencies() -> None:
     """EmsInstance waits for Aurora bootstrap + Neptune + AOSS + 3 SSM params."""
     # Arrange
@@ -119,6 +115,7 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
     # Assert
     assert set(build.ems_instance_depends_on) == {
         "AuroraBootstrapCustomResource",
+        "OpenweathermapApiKeySecret",
         "NeptuneInstance",
         "AossCollection",
         "NeptuneHostParam",

@@ -11,7 +11,6 @@ happens when the operator actually runs the stack — out of scope here.
 """
 
 from cfnlint import api as cfnlint_api
-import pytest
 
 from src.cfn.cfn_service import CfnService
 from src.cfn.persistence.persistence_service import PersistenceService
@@ -197,9 +196,6 @@ def test_commercial_template_declares_two_vendor_url_parameters() -> None:
     assert "AWS::OpenSearchServerless::Collection" not in rendered
 
 
-@pytest.mark.skip(
-    reason="SMOKE-LEAN: Neptune+AOSS commented out for gateway-publish smoke"
-)
 def test_defense_template_includes_neptune_and_aoss_resources() -> None:
     """Defense variant: Neptune cluster + AOSS collection, no vendor params."""
     # Arrange + Act
@@ -213,7 +209,6 @@ def test_defense_template_includes_neptune_and_aoss_resources() -> None:
     assert "GraphConnectionUrl:" not in rendered
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: defense build no longer includes Neptune+AOSS")
 def test_sovereign_government_routes_to_defense_variant() -> None:
     """SOVEREIGN_GOVERNMENT shares the defense template (Neptune + AOSS)."""
     # Arrange + Act
@@ -239,7 +234,6 @@ def test_commercial_userdata_writes_graph_url_into_secrets_env() -> None:
     assert "aoss-host" not in rendered
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: Neptune+AOSS SSM params commented out")
 def test_defense_userdata_writes_neptune_aoss_loader_role_into_config_env() -> None:
     """Defense UserData reads 3 SSM params + writes NEPTUNE_HOST / AOSS_HOST / NEPTUNE_LOADER_ROLE_ARN into config.env."""
     # Arrange + Act
@@ -258,7 +252,6 @@ def test_defense_userdata_writes_neptune_aoss_loader_role_into_config_env() -> N
     assert "/graph-url" not in rendered
 
 
-@pytest.mark.skip(reason="SMOKE-LEAN: slot list trimmed for the smoke phase")
 def test_userdata_keeps_secrets_and_config_in_separate_env_files() -> None:
     """Credentials live in secrets.env; non-secret config lives in config.env.
 
