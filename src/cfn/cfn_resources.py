@@ -213,6 +213,12 @@ def _neptune_data_policy(*, short: str) -> dict[str, object]:
                         "neptune-db:GetEngineStatus",
                         "neptune-db:StartLoaderJob",
                         "neptune-db:GetLoaderJobStatus",
+                        # graphiti's NeptuneDriver calls GetPropertygraphSummary
+                        # at session-open to discover labels/edge-types.
+                        # Without this, search_knowledge / verify_fact /
+                        # combined_search all 500 with AccessDeniedException
+                        # (Phase 10 smoke 2026-05-16).
+                        "neptune-db:GetGraphSummary",
                     ],
                     "Resource": {
                         "Fn::Sub": (

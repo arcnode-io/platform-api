@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/dtm-smoke.json}"
+DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/dtm-smoke.json}"
 OWM_KEY="${OWM_KEY:-00000000000000000000000000000000}"  # dummy — non-weather smoke
 STACK_NAME="${1:-arcnode-smoke-defense-$(date -u +%Y%m%d-%H%M%S)}"
 
