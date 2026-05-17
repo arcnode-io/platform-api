@@ -39,8 +39,28 @@ services:
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
 
+  # Industrial-fixtures mocks — full set covers every protocol the
+  # smoke DTM (industrial-fixtures.json) references. Bindings point
+  # at these compose service names; gateway connects on the standard
+  # protocol ports. See ems-industrial-fixtures repo for the impls.
   mock-modbus-server:
     image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+
+  mock-snmp-agent:
+    image: public.ecr.aws/y1d2j6a8/mock-snmp-agent:latest
+    restart: unless-stopped
+
+  mock-redfish-service:
+    image: public.ecr.aws/y1d2j6a8/mock-redfish-service:latest
+    restart: unless-stopped
+
+  mock-dnp3-outstation:
+    image: public.ecr.aws/y1d2j6a8/mock-dnp3-outstation:latest
+    restart: unless-stopped
+
+  mock-bacnet-device:
+    image: public.ecr.aws/y1d2j6a8/mock-bacnet-device:latest
     restart: unless-stopped
 
   # MQTT → Aurora bridge. HiveMQ CE doesn't ship a Postgres connector
@@ -82,6 +102,14 @@ services:
       device-api:
         condition: service_started
       mock-modbus-server:
+        condition: service_started
+      mock-snmp-agent:
+        condition: service_started
+      mock-redfish-service:
+        condition: service_started
+      mock-dnp3-outstation:
+        condition: service_started
+      mock-bacnet-device:
         condition: service_started
 
   # Phase 1 defense smoke: analyst-server hosts the agent which spawns

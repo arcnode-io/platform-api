@@ -7,7 +7,7 @@
 #
 # DTM is the gotcha: UserData curls --fail-on-error on the URL before
 # starting docker compose. example.invalid kills the script. We use
-# the smoke fixture pre-uploaded to s3://arcnode-public/dtm-smoke.json.
+# the industrial-fixtures DTM pre-uploaded to s3://arcnode-public/seed/.
 #
 # Usage:
 #   ./launch-arcnode-smoke.sh                          # auto-pick stack name
@@ -18,7 +18,7 @@
 
 set -euo pipefail
 
-DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/dtm-smoke.json}"
+DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/industrial-fixtures.json}"
 OWM_KEY="${OWM_KEY:-00000000000000000000000000000000}"  # dummy — non-weather smoke
 SITE_ID="${SITE_ID:-arcnode_smoke}"
 STACK_NAME="${1:-arcnode-smoke-defense-$(date -u +%Y%m%d-%H%M%S)}"

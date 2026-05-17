@@ -17,7 +17,7 @@ set -euo pipefail
 : "${AURA_CONNECTION_STRING:?must export AURA_CONNECTION_STRING}"
 : "${TIGERDATA_CONNECTION_STRING:?must export TIGERDATA_CONNECTION_STRING}"
 
-DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/dtm-smoke.json}"
+DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/industrial-fixtures.json}"
 OWM_KEY="${OWM_KEY:-00000000000000000000000000000000}"  # dummy — non-weather smoke
 SITE_ID="${SITE_ID:-arcnode_smoke}"
 STACK_NAME="${1:-arcnode-smoke-commercial-$(date -u +%Y%m%d-%H%M%S)}"
