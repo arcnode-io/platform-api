@@ -27,11 +27,12 @@ INSERT_SQL = (
     "VALUES (%s::timestamptz, %s, %s, %s, %s, %s::jsonb)"
 )
 
-# Idempotent schema bootstrap — runs every restart, fails-fast if Tiger
-# rejects the SQL. Tiger Cloud ships TimescaleDB preinstalled; commercial
-# customers use create_hypertable for partitioning (vs defense's
-# pg_partman, which the Aurora bootstrap Lambda runs). Same INSERT
-# signature so consumer code doesn't branch.
+# Idempotent schema bootstrap — runs every restart, three-tier safe.
+# Defense uses Aurora + pg_partman (no TimescaleDB), so the hypertable
+# call must be conditional on the extension being present. Tiger Cloud
+# ships TimescaleDB preinstalled; airgapped operators install it on
+# their self-hosted Postgres. Same INSERT signature everywhere so
+# consumer code doesn't branch.
 SCHEMA_SQL: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS measurements (
@@ -43,7 +44,13 @@ SCHEMA_SQL: tuple[str, ...] = (
         value       JSONB       NOT NULL
     )
     """,
-    "SELECT create_hypertable('measurements', 'ts', if_not_exists => TRUE)",
+    """
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+            PERFORM create_hypertable('measurements', 'ts', if_not_exists => TRUE);
+        END IF;
+    END $$
+    """,
     """
     CREATE INDEX IF NOT EXISTS idx_measurements_lookup
         ON measurements (site_id, device_id, measurement, ts DESC)
