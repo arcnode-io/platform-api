@@ -27,6 +27,29 @@ INSERT_SQL = (
     "VALUES (%s::timestamptz, %s, %s, %s, %s, %s::jsonb)"
 )
 
+# Idempotent schema bootstrap — runs every restart, fails-fast if Tiger
+# rejects the SQL. Tiger Cloud ships TimescaleDB preinstalled; commercial
+# customers use create_hypertable for partitioning (vs defense's
+# pg_partman, which the Aurora bootstrap Lambda runs). Same INSERT
+# signature so consumer code doesn't branch.
+SCHEMA_SQL: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS measurements (
+        ts          TIMESTAMPTZ NOT NULL,
+        site_id     TEXT        NOT NULL,
+        device_id   TEXT        NOT NULL,
+        measurement TEXT        NOT NULL,
+        unit        TEXT        NOT NULL,
+        value       JSONB       NOT NULL
+    )
+    """,
+    "SELECT create_hypertable('measurements', 'ts', if_not_exists => TRUE)",
+    """
+    CREATE INDEX IF NOT EXISTS idx_measurements_lookup
+        ON measurements (site_id, device_id, measurement, ts DESC)
+    """,
+)
+
 
 def on_message(
     _client: mqtt.Client,
@@ -61,6 +84,10 @@ def on_message(
 
 conn = psycopg2.connect(TIMESERIES_URL)
 conn.autocommit = True
+with conn.cursor() as _cur:
+    for _stmt in SCHEMA_SQL:
+        _cur.execute(_stmt)
+print("measurements table + hypertable ready", flush=True)
 # paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
 # supported callback shape for new code (extra `properties` arg, etc.).
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
