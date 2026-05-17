@@ -56,6 +56,8 @@ services:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
     restart: unless-stopped
     <<: *env-files
+    environment:
+      ENV: beta
     depends_on:
       hivemq:
         condition: service_started
