@@ -81,6 +81,21 @@ class AwsPartition(StrEnum):
     NONE = "none"
 
 
+class WholesaleMarket(StrEnum):
+    """ISO / RTO the deployment participates in. v1 ships ERCOT only.
+
+    Mirrors edp-api/src/shared/enums.py:WholesaleMarket exactly.
+    """
+
+    ERCOT = "ercot"
+    CAISO = "caiso"
+    MISO = "miso"
+    PJM = "pjm"
+    ISO_NE = "isone"
+    NYISO = "nyiso"
+    SPP = "spp"
+
+
 class ConfiguratorPayload(BaseModel):
     """Operator-submitted configuration. Forwarded verbatim to edp-api."""
 
@@ -98,3 +113,6 @@ class ConfiguratorPayload(BaseModel):
     climate_zone: ClimateZone
     deployment_context: DeploymentContext
     aws_partition: AwsPartition
+    wholesale_market: WholesaleMarket
+    # Free-form; the edp-api side validates (ISO, hub) compatibility.
+    settlement_point: str

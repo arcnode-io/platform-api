@@ -123,5 +123,11 @@ services:
     <<: *env-files
     environment:
       ENV: beta
+      # ems-analyst-agent's loader merges this YAML over the baked
+      # cfg.defaults.yml at startup (see ems-analyst-agent/config.py).
+      # UserData writes the file with the customer's market values.
+      CFG_CUSTOMER_PATH: /app/cfg.customer.yml
+    volumes:
+      - /opt/arcnode/analyst-cfg.customer.yml:/app/cfg.customer.yml:ro
     ports:
       - "8000:8000"

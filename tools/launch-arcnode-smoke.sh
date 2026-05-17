@@ -21,6 +21,8 @@ set -euo pipefail
 DTM_URL="${DTM_URL:-https://arcnode-public.s3.us-east-1.amazonaws.com/seed/industrial-fixtures.json}"
 OWM_KEY="${OWM_KEY:-00000000000000000000000000000000}"  # dummy — non-weather smoke
 SITE_ID="${SITE_ID:-arcnode_smoke}"
+WHOLESALE_MARKET="${WHOLESALE_MARKET:-ercot}"
+SETTLEMENT_POINT="${SETTLEMENT_POINT:-HB_NORTH}"
 STACK_NAME="${1:-arcnode-smoke-defense-$(date -u +%Y%m%d-%H%M%S)}"
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -41,6 +43,8 @@ yaml = CfnService(persistence=PersistenceService()).render_template(
     dtm_url='${DTM_URL}',
     ems_mode='sim',
     site_id='${SITE_ID}',
+    wholesale_market='${WHOLESALE_MARKET}',
+    settlement_point='${SETTLEMENT_POINT}',
     deployment_context=DeploymentContext.DEFENSE_FORWARD,
 )
 with open('${TEMPLATE_FILE}', 'w') as f:

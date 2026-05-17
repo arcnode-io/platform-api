@@ -27,6 +27,8 @@ JS_PAYLOAD: dict[str, object] = {
     "climate_zone": "temperate",
     "deployment_context": "commercial",
     "aws_partition": "standard",
+    "wholesale_market": "ercot",
+    "settlement_point": "HB_NORTH",
 }
 
 
@@ -44,6 +46,8 @@ def test_configurator_js_payload_validates_against_pydantic_schema() -> None:
     assert payload.climate_zone.value == "temperate"
     assert payload.deployment_context.value == "commercial"
     assert payload.aws_partition.value == "standard"
+    assert payload.wholesale_market.value == "ercot"
+    assert payload.settlement_point == "HB_NORTH"
 
 
 def test_configurator_js_payload_covers_every_select_enum_value() -> None:
@@ -73,6 +77,15 @@ def test_configurator_js_payload_covers_every_select_enum_value() -> None:
             "defense_forward",
         },
         "aws_partition": {"standard", "govcloud", "none"},
+        "wholesale_market": {
+            "ercot",
+            "caiso",
+            "miso",
+            "pjm",
+            "isone",
+            "nyiso",
+            "spp",
+        },
     }
 
     # Each set must equal the Python enum's full value surface

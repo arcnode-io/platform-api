@@ -44,6 +44,8 @@ class CfnService:
         dtm_url: str,
         ems_mode: str,
         site_id: str,
+        wholesale_market: str,
+        settlement_point: str,
         deployment_context: DeploymentContext,
     ) -> str:
         """Return the per-order CFN template (yaml) with all inputs baked in.
@@ -51,6 +53,10 @@ class CfnService:
         ``site_id`` is the slugified ConfiguratorPayload.deployment_site_name.
         Flows into config.env on EC2 boot and overrides the gateway's baked
         cfg.yml default — every customer publishes to ``sites/{site_id}/...``.
+
+        ``wholesale_market`` + ``settlement_point`` scope analyst-server's
+        LMP queries — flow into config.env so the agent's system prompt
+        can pin queries to the customer's market without LLM-side guessing.
         """
         short = deployment_uuid.split("-", 1)[0]
         userdata = build_userdata(
@@ -58,6 +64,8 @@ class CfnService:
             dtm_url=dtm_url,
             ems_mode=ems_mode,
             site_id=site_id,
+            wholesale_market=wholesale_market,
+            settlement_point=settlement_point,
             deployment_context=deployment_context,
         )
         persistence = self._persistence.build(

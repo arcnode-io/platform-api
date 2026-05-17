@@ -411,8 +411,17 @@ def build_userdata(
     dtm_url: str,
     ems_mode: str,
     site_id: str,
+    wholesale_market: str,
+    settlement_point: str,
     deployment_context: DeploymentContext,
 ) -> str:
+    """Build EC2 UserData. Threads cross-cutting env into config.env and
+    writes per-service cfg.customer.yml files (cardinal rule from CLAUDE.md).
+    Compose mounts each customer YAML into the matching service and sets
+    CFG_CUSTOMER_PATH so the service's loader deep-merges it over the
+    baked cfg.defaults.yml. Pattern: analyst-server first; gateway +
+    mcp-server migrate as they grow per-deploy config beyond a flag or two.
+    """
     """UserData: fetch arcnode-public artifacts, write env files, fetch DTM, run compose.
 
     ``persistence.env`` exposes one env var per persistence slice — the
@@ -503,6 +512,11 @@ def build_userdata(
         "AWS_REGION=${AWS::Region}\n"
         "AWS_DEFAULT_REGION=${AWS::Region}\n"
         "ENV\n"
+        "cat > /opt/arcnode/analyst-cfg.customer.yml <<YML\n"
+        f"market:\n"
+        f"  wholesale_market: {wholesale_market}\n"
+        f"  settlement_point: {settlement_point}\n"
+        "YML\n"
         f"{ssm_lines}\n"
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"

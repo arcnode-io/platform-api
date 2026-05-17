@@ -85,6 +85,8 @@ def _render_with_test_stack_name(deployment_context: DeploymentContext) -> str:
         dtm_url=DTM_URL,
         ems_mode=EMS_MODE,
         site_id="test_site",
+        wholesale_market="ercot",
+        settlement_point="HB_NORTH",
         deployment_context=deployment_context,
     )
     return raw.replace("${AWS::StackName}", TEST_STACK)

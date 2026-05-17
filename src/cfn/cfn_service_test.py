@@ -30,6 +30,8 @@ def _render(
         dtm_url=DTM_URL,
         ems_mode=EMS_MODE,
         site_id=SITE_ID,
+        wholesale_market="ercot",
+        settlement_point="HB_NORTH",
         deployment_context=deployment_context,
     )
 
