@@ -85,18 +85,19 @@ def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
 def test_all_services_consume_split_env_files(variant_path: Path) -> None:
-    """Every service except mock-modbus-server consumes both env files.
+    """Every service except mock-* protocol fixtures consumes both env files.
 
     Split surfaces the secret/non-secret distinction at the file level so
     operators can see which file holds what without running the container.
+    Mocks are standalone protocol listeners — no env_file needed.
     """
     # Arrange + Act
     services = yaml.safe_load(variant_path.read_text())["services"]
 
     # Assert
     for name, svc in services.items():
-        if name == "mock-modbus-server":
-            continue  # no env consumption
+        if name.startswith("mock-"):
+            continue  # protocol fixtures have no env config
         env_files = svc.get("env_file", [])
         assert (
             "/opt/arcnode/config.env" in env_files
