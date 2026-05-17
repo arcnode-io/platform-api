@@ -170,7 +170,19 @@ def aurora_cluster_resources(
         },
         "AuroraBootstrapCustomResource": {
             "Type": "Custom::AuroraBootstrap",
-            "DependsOn": "AuroraInstance",
+            # The endpoint DependsOn entries are NOT for create-time wiring —
+            # they're so CFN keeps the endpoints alive long enough for the
+            # delete-handler invocation. CFN deletes in reverse-dependency
+            # order, so listing the endpoints here ensures Lambda still has
+            # a route to S3 (CFN ResponseURL) and Secrets Manager when the
+            # Delete handler fires. Without this, the endpoints can race-delete
+            # in parallel with the Lambda invocation -> Lambda urlopen times
+            # out -> custom resource stuck DELETE_FAILED -> stack blocked.
+            "DependsOn": [
+                "AuroraInstance",
+                "S3VpcEndpoint",
+                "SecretsManagerVpcEndpoint",
+            ],
             "Properties": {
                 "ServiceToken": {"Fn::GetAtt": ["AuroraBootstrapLambda", "Arn"]},
                 "ClusterEndpoint": {
