@@ -55,6 +55,9 @@ services:
   industrial-gateway:
     image: public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest
     restart: unless-stopped
+    # env_file MUST come before environment: so SITE_ID from config.env
+    # (operator-supplied) overrides any baked default; explicit ENV: beta
+    # selects the cfg.yml stage with hivemq/device-api hostnames.
     <<: *env-files
     environment:
       ENV: beta

@@ -74,6 +74,7 @@ def test_commercial_template_passes_aws_validate_template() -> None:
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
             ems_mode=EMS_MODE,
+            site_id="test_site",
             deployment_context=DeploymentContext.COMMERCIAL,
         )
 
@@ -111,6 +112,7 @@ def test_commercial_create_fails_when_required_params_missing() -> None:
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
             ems_mode=EMS_MODE,
+            site_id="test_site",
             deployment_context=DeploymentContext.COMMERCIAL,
         )
 

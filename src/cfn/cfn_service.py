@@ -43,14 +43,21 @@ class CfnService:
         deployment_uuid: str,
         dtm_url: str,
         ems_mode: str,
+        site_id: str,
         deployment_context: DeploymentContext,
     ) -> str:
-        """Return the per-order CFN template (yaml) with all inputs baked in."""
+        """Return the per-order CFN template (yaml) with all inputs baked in.
+
+        ``site_id`` is the slugified ConfiguratorPayload.deployment_site_name.
+        Flows into config.env on EC2 boot and overrides the gateway's baked
+        cfg.yml default — every customer publishes to ``sites/{site_id}/...``.
+        """
         short = deployment_uuid.split("-", 1)[0]
         userdata = build_userdata(
             deployment_uuid=deployment_uuid,
             dtm_url=dtm_url,
             ems_mode=ems_mode,
+            site_id=site_id,
             deployment_context=deployment_context,
         )
         persistence = self._persistence.build(

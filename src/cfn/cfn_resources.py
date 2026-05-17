@@ -408,6 +408,7 @@ def build_userdata(
     deployment_uuid: str,
     dtm_url: str,
     ems_mode: str,
+    site_id: str,
     deployment_context: DeploymentContext,
 ) -> str:
     """UserData: fetch arcnode-public artifacts, write env files, fetch DTM, run compose.
@@ -496,6 +497,7 @@ def build_userdata(
         "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
         f"EMS_MODE={ems_mode}\n"
+        f"SITE_ID={site_id}\n"
         "AWS_REGION=${AWS::Region}\n"
         "AWS_DEFAULT_REGION=${AWS::Region}\n"
         "ENV\n"

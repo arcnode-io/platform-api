@@ -8,6 +8,7 @@ Per NestJS clean-orchestrator conventions:
 """
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -161,6 +162,7 @@ class OrchestratorService:
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
             ems_mode="sim",  # edp-api always emits SIM; ems-device-api flips post-deploy
+            site_id=_slugify_site_id(payload.deployment_site_name),
             deployment_context=payload.deployment_context,
         )
         template_url = await self._s3.upload_yaml(
@@ -300,3 +302,25 @@ class OrchestratorService:
             if ref.kind == ArtifactKind.DTM:
                 return ref.url
         raise ValueError("DTM url missing in archived artifacts")
+
+
+_SITE_ID_RX = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_site_id(name: str) -> str:
+    """Operator's site name -> ascii snake_case slug for MQTT topics + DB.
+
+    Strips ALL non-ascii-alnum runs to underscores: emojis, accents, kanji,
+    cyrillic — all gone. Lowercase. Empty result raises (e.g. all-emoji input)
+    so a bad submission fails the order instead of writing 'sites//devices/...'.
+
+    Examples:
+      'Nevada Facility 2' -> 'nevada_facility_2'
+      'Brookside DC-1'    -> 'brookside_dc_1'
+      'Café 🔥 Site'      -> 'caf_site'
+      '🔥💯'              -> ValueError
+    """
+    slug = _SITE_ID_RX.sub("_", name.lower()).strip("_")
+    if not slug:
+        raise ValueError(f"deployment_site_name slugifies to empty: {name!r}")
+    return slug
