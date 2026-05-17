@@ -32,7 +32,6 @@ services:
     environment:
       BOOT_DTM_PATH: /app/dtm.json
       ENV: beta
-      CUSTOMER_ENV: commercial
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
 
