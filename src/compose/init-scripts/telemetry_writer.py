@@ -91,10 +91,19 @@ def on_message(
 
 conn = psycopg2.connect(TIMESERIES_URL)
 conn.autocommit = True
+# Per-statement try: on defense the Aurora bootstrap Lambda already
+# created the table + index as the master user, and telemetry-writer
+# connects as ems_ts_app (GRANT ALL, but not the owner). Postgres
+# requires ownership for CREATE INDEX even with IF NOT EXISTS — log
+# and continue. On commercial (Tiger) + airgapped (self-hosted) the
+# writer creates first → owns → all statements succeed.
 with conn.cursor() as _cur:
     for _stmt in SCHEMA_SQL:
-        _cur.execute(_stmt)
-print("measurements table + hypertable ready", flush=True)
+        try:
+            _cur.execute(_stmt)
+        except psycopg2.Error as _e:
+            print(f"schema bootstrap skip: {_e}", flush=True)
+print("measurements bootstrap done", flush=True)
 # paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
 # supported callback shape for new code (extra `properties` arg, etc.).
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
