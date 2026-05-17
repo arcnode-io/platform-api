@@ -17,7 +17,7 @@ LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 # once a stable arcnode-hosted layer is available; arn shown is a known
 # community publisher — region must be substituted at template-render time.
 PSYCOPG2_LAYER_ARN_TEMPLATE: Final[str] = (
-    "arn:aws:lambda:${AWS::Region}:878287304298:layer:psycopg2-py313:1"
+    "arn:${AWS::Partition}:lambda:${AWS::Region}:878287304298:layer:psycopg2-py313:1"
 )
 DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
 
@@ -126,7 +126,9 @@ def aurora_cluster_resources(
                     ],
                 },
                 "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                    {
+                        "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
+                    },
                 ],
                 "Policies": [
                     {

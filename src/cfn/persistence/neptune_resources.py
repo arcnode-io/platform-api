@@ -23,7 +23,7 @@ NEPTUNE_LOADER_ROLE_SSM_PARAM: Final[str] = (
     "/arcnode-ems/${AWS::StackName}/neptune-loader-role-arn"
 )
 ARCNODE_PUBLIC_SEED_PREFIX: Final[str] = (
-    "arn:aws:s3:::arcnode-public/seed/graph-neptune/*"
+    "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*"
 )
 
 
@@ -82,8 +82,10 @@ def neptune_resources(
                                     "Effect": "Allow",
                                     "Action": ["s3:GetObject", "s3:ListBucket"],
                                     "Resource": [
-                                        "arn:aws:s3:::arcnode-public",
-                                        ARCNODE_PUBLIC_SEED_PREFIX,
+                                        {
+                                            "Fn::Sub": "arn:${AWS::Partition}:s3:::arcnode-public",
+                                        },
+                                        {"Fn::Sub": ARCNODE_PUBLIC_SEED_PREFIX},
                                     ],
                                 }
                             ],

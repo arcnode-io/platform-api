@@ -24,14 +24,20 @@ def test_chat_inference_profile_uses_cris_prefix() -> None:
 
 
 def test_chat_arns_cover_all_cris_spanned_regions() -> None:
-    """CRIS IAM requires a FM arn per spanned region."""
+    """CRIS IAM requires a FM arn per spanned region.
+
+    ARNs are Fn::Sub dicts so ${AWS::Partition} resolves per-deploy
+    (aws | aws-us-gov). Look in the Sub template string for the region.
+    """
     # Arrange + Act
     arns = chat_foundation_model_arns()
 
     # Assert
     assert len(arns) == len(BEDROCK_CHAT_CRIS_REGIONS)
     for region in BEDROCK_CHAT_CRIS_REGIONS:
-        assert any(f":{region}:" in arn for arn in arns), f"missing arn for {region}"
+        assert any(
+            f":{region}:" in arn["Fn::Sub"] for arn in arns
+        ), f"missing arn for {region}"
 
 
 def test_all_invoke_resources_combines_chat_profile_chat_fms_embed_fm() -> None:

@@ -39,8 +39,9 @@ def test_lambda_role_grants_invoke_on_titan_and_sonnet_cris() -> None:
     assert "us.anthropic.claude-sonnet-4-6" in joined  # CRIS profile
     assert "amazon.titan-embed-text-v2:0" in joined  # Titan FM
     for region in ("us-east-1", "us-east-2", "us-west-2"):
+        # ${AWS::Partition} resolves per-deploy (aws | aws-us-gov)
         assert (
-            f"arn:aws:bedrock:{region}::foundation-model/anthropic.claude-sonnet-4-6"
+            f"arn:${{AWS::Partition}}:bedrock:{region}::foundation-model/anthropic.claude-sonnet-4-6"
             in joined
         )
 

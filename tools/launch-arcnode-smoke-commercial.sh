@@ -48,6 +48,11 @@ print(f'template_size={len(yaml)} bytes')
 "
 
 echo "→ creating stack: $STACK_NAME"
+# Default ROLLBACK on failure → CFN tears everything down, no AWS spend
+# after a bad launch. Set KEEP_FAILED=1 to override with DO_NOTHING for
+# active debug.
+ON_FAILURE="${KEEP_FAILED:+DO_NOTHING}"
+ON_FAILURE="${ON_FAILURE:-ROLLBACK}"
 aws cloudformation create-stack \
     --stack-name "$STACK_NAME" \
     --template-body "file://${TEMPLATE_FILE}" \
@@ -57,7 +62,7 @@ aws cloudformation create-stack \
         "ParameterKey=GraphConnectionUrl,ParameterValue=${AURA_CONNECTION_STRING}" \
         "ParameterKey=TimeseriesConnectionUrl,ParameterValue=${TIGERDATA_CONNECTION_STRING}" \
     --tags Key=arcnode-smoke,Value=commercial Key=auto-teardown,Value=true \
-    --on-failure DO_NOTHING \
+    --on-failure "$ON_FAILURE" \
     --output text --query 'StackId'
 
 echo "$STACK_NAME"

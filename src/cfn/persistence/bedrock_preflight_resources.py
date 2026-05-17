@@ -57,7 +57,9 @@ def bedrock_preflight_resources(
                     ],
                 },
                 "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                    {
+                        "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+                    },
                 ],
                 "Policies": [
                     {

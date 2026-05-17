@@ -222,7 +222,7 @@ def _neptune_data_policy(*, short: str) -> dict[str, object]:
                     ],
                     "Resource": {
                         "Fn::Sub": (
-                            "arn:aws:neptune-db:${AWS::Region}:"
+                            "arn:${AWS::Partition}:neptune-db:${AWS::Region}:"
                             "${AWS::AccountId}:"
                             "${NeptuneCluster.ClusterResourceId}/*"
                         ),
@@ -257,7 +257,7 @@ def _aoss_data_policy(*, short: str) -> dict[str, object]:
                     "Action": "aoss:APIAccessAll",
                     "Resource": {
                         "Fn::Sub": (
-                            "arn:aws:aoss:${AWS::Region}:"
+                            "arn:${AWS::Partition}:aoss:${AWS::Region}:"
                             "${AWS::AccountId}:collection/*"
                         ),
                     },
@@ -297,7 +297,9 @@ def iam_resources(
                     ],
                 },
                 "ManagedPolicyArns": [
-                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                    {
+                        "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                    },
                 ],
                 "Policies": [
                     {
@@ -310,7 +312,7 @@ def iam_resources(
                                     "Action": "secretsmanager:GetSecretValue",
                                     "Resource": {
                                         "Fn::Sub": (
-                                            "arn:aws:secretsmanager:"
+                                            "arn:${AWS::Partition}:secretsmanager:"
                                             "${AWS::Region}:${AWS::AccountId}"
                                             ":secret:arcnode-ems-"
                                             "${AWS::StackName}/*"
@@ -333,7 +335,7 @@ def iam_resources(
                                     ],
                                     "Resource": {
                                         "Fn::Sub": (
-                                            "arn:aws:ssm:${AWS::Region}:"
+                                            "arn:${AWS::Partition}:ssm:${AWS::Region}:"
                                             "${AWS::AccountId}:parameter"
                                             "/arcnode-ems/"
                                             "${AWS::StackName}/*"
@@ -382,7 +384,7 @@ def iam_resources(
                                     "Action": "cloudformation:SignalResource",
                                     "Resource": {
                                         "Fn::Sub": (
-                                            "arn:aws:cloudformation:${AWS::Region}:"
+                                            "arn:${AWS::Partition}:cloudformation:${AWS::Region}:"
                                             "${AWS::AccountId}:stack/"
                                             "${AWS::StackName}/*"
                                         ),

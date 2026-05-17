@@ -43,23 +43,33 @@ def chat_inference_profile_arn_sub() -> dict[str, str]:
     """CFN Fn::Sub for the CRIS inference-profile arn (account-scoped)."""
     return {
         "Fn::Sub": (
-            f"arn:aws:bedrock:{BEDROCK_EMBED_REGION}:${{AWS::AccountId}}"
+            f"arn:${{AWS::Partition}}:bedrock:{BEDROCK_EMBED_REGION}:${{AWS::AccountId}}"
             f":inference-profile/{BEDROCK_CHAT_INFERENCE_PROFILE}"
         ),
     }
 
 
-def chat_foundation_model_arns() -> list[str]:
-    """Foundation-model arns for each CRIS-spanned region."""
+def chat_foundation_model_arns() -> list[dict[str, str]]:
+    """Foundation-model arns for each CRIS-spanned region. ${AWS::Partition} = aws | aws-us-gov."""
     return [
-        f"arn:aws:bedrock:{region}::foundation-model/{BEDROCK_CHAT_FOUNDATION_MODEL}"
+        {
+            "Fn::Sub": (
+                f"arn:${{AWS::Partition}}:bedrock:{region}::"
+                f"foundation-model/{BEDROCK_CHAT_FOUNDATION_MODEL}"
+            ),
+        }
         for region in BEDROCK_CHAT_CRIS_REGIONS
     ]
 
 
-def embed_foundation_model_arn() -> str:
+def embed_foundation_model_arn() -> dict[str, str]:
     """Foundation-model arn for the embed model (single-region; no CRIS)."""
-    return f"arn:aws:bedrock:{BEDROCK_EMBED_REGION}::foundation-model/{BEDROCK_EMBED_FOUNDATION_MODEL}"
+    return {
+        "Fn::Sub": (
+            f"arn:${{AWS::Partition}}:bedrock:{BEDROCK_EMBED_REGION}::"
+            f"foundation-model/{BEDROCK_EMBED_FOUNDATION_MODEL}"
+        ),
+    }
 
 
 def all_invoke_resources() -> list[object]:
