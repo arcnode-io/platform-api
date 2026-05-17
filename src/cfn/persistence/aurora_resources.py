@@ -170,19 +170,18 @@ def aurora_cluster_resources(
         },
         "AuroraBootstrapCustomResource": {
             "Type": "Custom::AuroraBootstrap",
-            # The endpoint DependsOn entries are NOT for create-time wiring —
-            # they're so CFN keeps the endpoints alive long enough for the
-            # delete-handler invocation. CFN deletes in reverse-dependency
-            # order, so listing the endpoints here ensures Lambda still has
-            # a route to S3 (CFN ResponseURL) and Secrets Manager when the
-            # Delete handler fires. Without this, the endpoints can race-delete
-            # in parallel with the Lambda invocation -> Lambda urlopen times
-            # out -> custom resource stuck DELETE_FAILED -> stack blocked.
-            "DependsOn": [
-                "AuroraInstance",
-                "S3VpcEndpoint",
-                "SecretsManagerVpcEndpoint",
-            ],
+            # DeletionPolicy + UpdateReplacePolicy = Retain: CFN does NOT
+            # invoke the Lambda on stack delete. The Aurora cluster is being
+            # deleted anyway, so the per-slice DBs + app users go with it —
+            # the Delete handler is a no-op in our code. Skipping it dodges
+            # an upstream Lambda-in-VPC bug where the Hyperplane ENI loses
+            # its route to the S3 CFN ResponseURL after sitting idle ~20min
+            # post-create, causing the Lambda to time out and CFN to hang
+            # ~1hr before declaring DELETE_FAILED. Verified live 2026-05-17:
+            # CREATE works in 4s, DELETE timed out at 246s on same ENI.
+            "DeletionPolicy": "Retain",
+            "UpdateReplacePolicy": "Retain",
+            "DependsOn": "AuroraInstance",
             "Properties": {
                 "ServiceToken": {"Fn::GetAtt": ["AuroraBootstrapLambda", "Arn"]},
                 "ClusterEndpoint": {
