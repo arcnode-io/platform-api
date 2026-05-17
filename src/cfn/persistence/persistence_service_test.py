@@ -61,6 +61,7 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "TimeseriesUrlSecret",
         "GraphUrlSecret",
         "OpenweathermapApiKeySecret",
+        "CustomerUrlPreflightCustomResource",
     }
 
 

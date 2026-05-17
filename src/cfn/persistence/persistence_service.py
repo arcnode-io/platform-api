@@ -28,6 +28,9 @@ from src.cfn.persistence.aurora_resources import (
     PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
 )
+from src.cfn.persistence.customer_url_preflight_resources import (
+    customer_url_preflight_resources,
+)
 from src.cfn.persistence.neptune_resources import neptune_resources
 from src.cfn.persistence.vendor_secrets import (
     agent_api_key_parameters,
@@ -98,6 +101,9 @@ class PersistenceService:
                 ),
                 **vendor_url_secrets(),
                 **agent_api_key_secrets(),
+                **customer_url_preflight_resources(
+                    lambda_runtime=self._lambda_runtime,
+                ),
             },
             parameters={
                 **commercial_url_parameters(),
@@ -108,6 +114,7 @@ class PersistenceService:
                 "TimeseriesUrlSecret",
                 "GraphUrlSecret",
                 "OpenweathermapApiKeySecret",
+                "CustomerUrlPreflightCustomResource",
             ],
         )
 

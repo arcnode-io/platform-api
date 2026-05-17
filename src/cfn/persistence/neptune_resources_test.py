@@ -65,9 +65,7 @@ def test_loader_role_trusts_neptune_service_with_arcnode_public_read() -> None:
     # ARN is Fn::Sub-wrapped so ${AWS::Partition} resolves per-deploy.
     policy = role["Properties"]["Policies"][0]["PolicyDocument"]["Statement"][0]
     sub_strs = [r["Fn::Sub"] for r in policy["Resource"]]
-    assert (
-        "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*" in sub_strs
-    )
+    assert "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*" in sub_strs
 
 
 def test_neptune_cluster_associates_loader_role() -> None:
