@@ -38,6 +38,22 @@ def handler(event: dict, context: object) -> None:
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
+def _permissive_tls_context() -> ssl.SSLContext:
+    """TLS context that skips cert verification.
+
+    Preflight validates REACHABILITY + speaks-TLS, not chain trust —
+    Tiger Cloud and many managed Postgres providers use intermediate
+    cert chains that Python's default bundle doesn't trust but psycopg2
+    / neo4j-python (libpq + their own ssl wiring) accept. Validating
+    chain trust here triggers false positives that block deploys for
+    URLs the actual consumer would happily use.
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
 def _check_postgres(url: str) -> None:
     """TCP connect + (if sslmode=require) TLS handshake."""
     parts = urlsplit(url)
@@ -51,8 +67,7 @@ def _check_postgres(url: str) -> None:
     try:
         if require_tls:
             try:
-                ctx = ssl.create_default_context()
-                sock = ctx.wrap_socket(sock, server_hostname=host)
+                sock = _permissive_tls_context().wrap_socket(sock, server_hostname=host)
             except Exception as e:
                 raise RuntimeError(
                     f"TimeseriesUrl: TLS handshake failed for {host}:{port} ({e})"
@@ -74,8 +89,7 @@ def _check_neo4j(url: str) -> None:
     try:
         if require_tls:
             try:
-                ctx = ssl.create_default_context()
-                sock = ctx.wrap_socket(sock, server_hostname=host)
+                sock = _permissive_tls_context().wrap_socket(sock, server_hostname=host)
             except Exception as e:
                 raise RuntimeError(
                     f"GraphUrl: TLS handshake failed for {host}:{port} ({e})"
