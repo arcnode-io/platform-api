@@ -33,8 +33,9 @@ dev = [
     "pip>=25.1.1",
     "testcontainers[postgres,localstack]>=4.8.1",
     "cfn-lint>=1.49.3",
-    "boto3-stubs[bedrock-runtime]>=1.35.0",
+    "boto3-stubs[bedrock-runtime,cloudformation]>=1.35.0",
     "mypy-boto3-bedrock-runtime>=1.35.0",
+    "mypy-boto3-cloudformation>=1.35.0",
 ]
 
 [tool.poe.tasks]
@@ -53,6 +54,15 @@ cover = "pytest -vv --cov=src src/*"
 test = ["unit", "integration"]
 review = "claude 'run code-reviewer agent against diff for quality and elegance'"
 commit = "bash -c 'uv run poe checks && uv run poe test && uv run poe review && git add -A && git cz && git push'"
+
+[tool.pytest.ini_options]
+# `smoke` = real-AWS e2e (~$0.10/run, ~20min). Excluded from the
+# default test run so `uv run pytest` stays fast + free; CI smoke job
+# selects with `-m smoke` on nightly cron + manual.
+markers = [
+    "smoke: real-AWS end-to-end deploy + assert + teardown",
+]
+addopts = "-m 'not smoke'"
 
 [tool.coverage.run]
 omit = ["*/test_*.py", "tests/*"]

@@ -276,6 +276,7 @@ dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/35/21/c81de9b74be84e7a1f35998adae6e0560862da00328cf6375dfaacb9737d/boto3_stubs-1.43.9.tar.gz", hash = "sha256:afb9de061aa5667ca3247c47057fc792bf03b4c483da1659697c32317e1d2efa", size = 102691, upload-time = "2026-05-15T20:09:55.809Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d5/ad/bfd434b0e4f16169efd174e3e8a000fd04f35c1baf683e343b0c2b778380/boto3_stubs-1.43.9-py3-none-any.whl", hash = "sha256:d046be3b956f494134e0c59af630b327319c9eb72fae4032e586e8057b986010", size = 70652, upload-time = "2026-05-15T20:09:50.647Z" },
 ]
@@ -283,6 +284,9 @@ wheels = [
 [package.optional-dependencies]
 bedrock-runtime = [
     { name = "mypy-boto3-bedrock-runtime" },
+]
+cloudformation = [
+    { name = "mypy-boto3-cloudformation" },
 ]
 
 [[package]]
@@ -880,6 +884,15 @@ wheels = [
 ]
 
 [[package]]
+name = "mypy-boto3-cloudformation"
+version = "1.43.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bc/62/31c099df8c79b2c78a1f48a883049ae5a22a0bf5cf8a22bd332497a3ce1f/mypy_boto3_cloudformation-1.43.0.tar.gz", hash = "sha256:5be845bc3dc1b9cdbd8b6b071fad7c42d0221d4087ac0cc7c5b9dd219b324606", size = 61202, upload-time = "2026-04-29T22:58:21.903Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3e/c6/b53e4541b63499663a2ef0e6bcfb6e5ff4be067cea0393844eb031ba217e/mypy_boto3_cloudformation-1.43.0-py3-none-any.whl", hash = "sha256:bcb2f8b8231f6bd96cc18d17c1c72ea0dfa6dc8156966d8d12495445f5041f4c", size = 72215, upload-time = "2026-04-29T22:58:20.293Z" },
+]
+
+[[package]]
 name = "mypy-extensions"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1010,10 +1023,11 @@ dev = [
     { name = "asyncpg-stubs" },
     { name = "bandit" },
     { name = "black", extra = ["d"] },
-    { name = "boto3-stubs", extra = ["bedrock-runtime"] },
+    { name = "boto3-stubs", extra = ["bedrock-runtime", "cloudformation"] },
     { name = "cfn-lint" },
     { name = "deptry" },
     { name = "mypy-boto3-bedrock-runtime" },
+    { name = "mypy-boto3-cloudformation" },
     { name = "pip" },
     { name = "pip-audit" },
     { name = "poethepoet" },
@@ -1046,10 +1060,11 @@ dev = [
     { name = "asyncpg-stubs", specifier = ">=0.29" },
     { name = "bandit", specifier = ">=1.8.0" },
     { name = "black", extras = ["d"], specifier = ">=26.3.1" },
-    { name = "boto3-stubs", extras = ["bedrock-runtime"], specifier = ">=1.35.0" },
+    { name = "boto3-stubs", extras = ["bedrock-runtime", "cloudformation"], specifier = ">=1.35.0" },
     { name = "cfn-lint", specifier = ">=1.49.3" },
     { name = "deptry", specifier = ">=0.23.0" },
     { name = "mypy-boto3-bedrock-runtime", specifier = ">=1.35.0" },
+    { name = "mypy-boto3-cloudformation", specifier = ">=1.35.0" },
     { name = "pip", specifier = ">=25.1.1" },
     { name = "pip-audit", specifier = ">=2.6.1" },
     { name = "poethepoet", specifier = ">=0.32.0" },
