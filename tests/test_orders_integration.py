@@ -62,6 +62,8 @@ VALID_PAYLOAD: dict[str, object] = {
     "climate_zone": "temperate",
     "deployment_context": "commercial",
     "aws_partition": "standard",
+    "wholesale_market": "ercot",
+    "settlement_point": "HB_NORTH",
 }
 
 # 6 min — outer wrapper around EdpClientService's 5 min inner poll, with

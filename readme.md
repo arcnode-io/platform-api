@@ -99,7 +99,7 @@ Per-deploy values flow through layered YAML, not env vars.
 | Value type | Lives in |
 |---|---|
 | Constant | hardcoded in app |
-| Stage-varying (local / demo / staging / beta) | `cfg.defaults.yml` |
+| Stage-varying (local / demo / beta) | `cfg.defaults.yml` |
 | Per-customer (from ConfiguratorPayload) | `cfg.customer.yml` — written by UserData, mounted by compose |
 | Secret | `secrets.env` |
 | Stage selector | `ENV` env |
@@ -111,9 +111,16 @@ pydantic validates.
 
 ## Stages
 
-| ENV | Use | DTM | HMI |
-|---|---|---|---|
-| `local` | dev box, no AWS | fixture | mock data |
-| `demo` | self-hosted demo | fixture | mock data |
-| `staging` | our cloud e2e through the device boundary | `industrial-fixtures.json` (mocks at compose-DNS hostnames) | live data from mocks |
-| `beta` | customer prod | customer DTM (devices, no `connection` until commissioning POST) | renders devices, `--` until topology POST |
+| ENV | Use |
+|---|---|
+| `local` | dev box, no AWS, mocks everything |
+| `demo` | self-hosted demo with bundled seed |
+| `beta` | every AWS deploy — our smokes AND customer prod. Same code path; distinguished by AWS account + DTM contents + per-deploy creds. |
+
+## e2e scenarios (all run under `ENV=beta`)
+
+| Scenario | DTM | Expected |
+|---|---|---|
+| **Fixtures smoke** | `industrial-fixtures.json` (mocks at compose-DNS hostnames) | `measurements > 0` within ~30s |
+| **Bare deploy** | customer-shape DTM (devices, no `connection`) | `measurements == 0`; `GET /topology` returns DTM; gateway quiet |
+| **Commissioning** | bare → `POST /topology` with real `connection` | `measurements > 0` after the POST |
