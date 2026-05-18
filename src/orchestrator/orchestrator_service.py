@@ -161,7 +161,6 @@ class OrchestratorService:
         template = self._cfn.render_template(
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
-            ems_mode="sim",  # edp-api always emits SIM; ems-device-api flips post-deploy
             site_id=_slugify_site_id(payload.deployment_site_name),
             wholesale_market=payload.wholesale_market.value,
             settlement_point=payload.settlement_point,

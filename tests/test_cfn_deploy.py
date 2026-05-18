@@ -31,7 +31,6 @@ from tests.fixtures.containers import start_localstack
 STACK_NAME: str = "arcnode-cfn-deploy-commercial"
 DEPLOYMENT_UUID: str = "cfn-deploy-test-001"
 DTM_URL: str = "https://example.com/dtm.json"
-EMS_MODE: str = "sim"
 
 
 @pytest.mark.skipif(
@@ -73,7 +72,6 @@ def test_commercial_template_passes_aws_validate_template() -> None:
         ).render_template(
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
-            ems_mode=EMS_MODE,
             site_id="test_site",
             wholesale_market="ercot",
             settlement_point="HB_NORTH",
@@ -113,7 +111,6 @@ def test_commercial_create_fails_when_required_params_missing() -> None:
         ).render_template(
             deployment_uuid=DEPLOYMENT_UUID,
             dtm_url=DTM_URL,
-            ems_mode=EMS_MODE,
             site_id="test_site",
             wholesale_market="ercot",
             settlement_point="HB_NORTH",

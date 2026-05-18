@@ -91,3 +91,29 @@ artifact_s3 --> delivery : page_url
 delivery -> ses : send email { page_url }
 ses -> customer : delivery email
 ```
+
+## Config rules
+
+Per-deploy values flow through layered YAML, not env vars.
+
+| Value type | Lives in |
+|---|---|
+| Constant | hardcoded in app |
+| Stage-varying (local / demo / staging / beta) | `cfg.defaults.yml` |
+| Per-customer (from ConfiguratorPayload) | `cfg.customer.yml` — written by UserData, mounted by compose |
+| Secret | `secrets.env` |
+| Stage selector | `ENV` env |
+| AWS SDK contracts | `AWS_REGION` / `AWS_DEFAULT_REGION` env |
+
+Service loader reads `cfg.defaults.yml`; if `CFG_CUSTOMER_PATH` env
+points at a file, deep-merges it over the matching stage block before
+pydantic validates.
+
+## Stages
+
+| ENV | Use | DTM | HMI |
+|---|---|---|---|
+| `local` | dev box, no AWS | fixture | mock data |
+| `demo` | self-hosted demo | fixture | mock data |
+| `staging` | our cloud e2e through the device boundary | `industrial-fixtures.json` (mocks at compose-DNS hostnames) | live data from mocks |
+| `beta` | customer prod | customer DTM (devices, no `connection` until commissioning POST) | renders devices, `--` until topology POST |

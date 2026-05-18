@@ -1,7 +1,7 @@
 """CfnService — renders the per-order CloudFormation template.
 
 Each order gets its own `ems-stack.yaml` with deployment_uuid / dtm_url /
-ems_mode baked in. Variant is derived from the order's DeploymentContext and
+site_id baked in. Variant is derived from the order's DeploymentContext and
 threaded into PersistenceService, which publishes the variant's Resources +
 Parameters + EmsInstance DependsOn list.
 
@@ -42,7 +42,6 @@ class CfnService:
         *,
         deployment_uuid: str,
         dtm_url: str,
-        ems_mode: str,
         site_id: str,
         wholesale_market: str,
         settlement_point: str,
@@ -62,7 +61,6 @@ class CfnService:
         userdata = build_userdata(
             deployment_uuid=deployment_uuid,
             dtm_url=dtm_url,
-            ems_mode=ems_mode,
             site_id=site_id,
             wholesale_market=wholesale_market,
             settlement_point=settlement_point,
@@ -132,7 +130,6 @@ class CfnService:
                 },
                 "DeploymentUuid": {"Value": deployment_uuid},
                 "DtmUrl": {"Value": dtm_url},
-                "EmsMode": {"Value": ems_mode},
             },
         }
         if not template["Parameters"]:

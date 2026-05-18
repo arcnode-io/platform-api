@@ -38,7 +38,6 @@ from src.orders.configurator_payload import DeploymentContext
 
 DEPLOYMENT_UUID = "lifecycle-test-001"
 DTM_URL = "https://example.com/dtm.json"
-EMS_MODE = "sim"
 TEST_STACK = "lifecycletest"
 
 # Tiny shim that replaces /usr/bin/aws inside the container. Returns
@@ -83,7 +82,6 @@ def _render_with_test_stack_name(deployment_context: DeploymentContext) -> str:
     raw = build_userdata(
         deployment_uuid=DEPLOYMENT_UUID,
         dtm_url=DTM_URL,
-        ems_mode=EMS_MODE,
         site_id="test_site",
         wholesale_market="ercot",
         settlement_point="HB_NORTH",

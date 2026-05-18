@@ -18,7 +18,6 @@ from src.orders.configurator_payload import DeploymentContext
 
 DEPLOYMENT_UUID: str = "abcd1234-5678-90ef-1234-567890abcdef"
 DTM_URL: str = "https://platform-api-artifacts.example/orders/o1/dtm.json"
-EMS_MODE: str = "sim"
 SITE_ID: str = "test_site"
 
 
@@ -28,7 +27,6 @@ def _render(
     return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID,
         dtm_url=DTM_URL,
-        ems_mode=EMS_MODE,
         site_id=SITE_ID,
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
@@ -149,7 +147,6 @@ def test_render_template_outputs_echo_per_order_inputs() -> None:
     # Assert — `safe_dump(sort_keys=False)` produces stable `Value:` lines
     assert f"Value: {DEPLOYMENT_UUID}" in rendered
     assert f"Value: {DTM_URL}" in rendered
-    assert f"Value: {EMS_MODE}" in rendered
     assert "Fn::GetAtt" in rendered  # PublicIp pulled via GetAtt
 
 

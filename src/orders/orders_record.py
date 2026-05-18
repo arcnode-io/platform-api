@@ -35,15 +35,12 @@ def derive_delivery_path(partition: AwsPartition) -> DeliveryPath:
 class OrderEmsDelivery(BaseModel):
     """Platform-api's per-order delivery shape.
 
-    Path derived from `aws_partition`. `ems_mode` is always `"sim"` at delivery
-    time — ems-device-api flips to live post-deploy via DTM revision. Platform-api
-    renders a per-order CFN template (CFN paths) and exposes its S3 URL as
-    `template_url`. ISO path leaves `template_url=None` until the v1 ISO build
-    lands.
+    Path derived from `aws_partition`. Platform-api renders a per-order CFN
+    template (CFN paths) and exposes its S3 URL as `template_url`. ISO path
+    leaves `template_url=None` until the v1 ISO build lands.
     """
 
     path: DeliveryPath
-    ems_mode: str = "sim"
     template_url: Optional[str] = None
 
 

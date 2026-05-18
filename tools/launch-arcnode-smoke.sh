@@ -41,7 +41,6 @@ print(f'deployment_uuid={duid}')
 yaml = CfnService(persistence=PersistenceService()).render_template(
     deployment_uuid=duid,
     dtm_url='${DTM_URL}',
-    ems_mode='sim',
     site_id='${SITE_ID}',
     wholesale_market='${WHOLESALE_MARKET}',
     settlement_point='${SETTLEMENT_POINT}',

@@ -409,7 +409,6 @@ def build_userdata(
     *,
     deployment_uuid: str,
     dtm_url: str,
-    ems_mode: str,
     site_id: str,
     wholesale_market: str,
     settlement_point: str,
@@ -507,7 +506,6 @@ def build_userdata(
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         f"DEPLOYMENT_UUID={deployment_uuid}\n"
-        f"EMS_MODE={ems_mode}\n"
         f"SITE_ID={site_id}\n"
         "AWS_REGION=${AWS::Region}\n"
         "AWS_DEFAULT_REGION=${AWS::Region}\n"
