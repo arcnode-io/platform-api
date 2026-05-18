@@ -1,6 +1,7 @@
 stages:
   - check
-  - publish 
+  - publish
+  - smoke
   - mirror
 
 checks:
@@ -43,6 +44,28 @@ publish_compose:
     - aws s3 rm s3://arcnode-public/seed/dtm-smoke.json || true
   only:
     - main
+
+smoke_commercial:
+  # Real-AWS e2e — deploys the commercial stack, asserts gateway publishes
+  # via industrial-fixtures mocks into Tiger Cloud, tears down. Catches
+  # CFN / UserData / VPC / IAM bugs unit + integration tests can't.
+  # Cost: ~$0.50/run, ~10min cycle.
+  stage: smoke
+  variables:
+    SMOKE_STACK: "smoke-ci-$CI_PIPELINE_ID"
+    # Slugified for both compose-DNS topic prefixes (sites/<id>/...) and
+    # row scoping in Tiger so concurrent CI runs don't collide.
+    SITE_ID: "ci_$CI_PIPELINE_ID"
+  script:
+    - bash tools/launch-arcnode-smoke-commercial.sh "$SMOKE_STACK"
+    - bash tools/smoke-wait-stack-ready.sh "$SMOKE_STACK"
+    - bash tools/smoke-validate-commercial.sh
+  after_script:
+    # Idempotent — kicks off DELETE whether or not earlier steps passed.
+    - aws cloudformation delete-stack --stack-name "$SMOKE_STACK" --region us-east-1 || true
+  only:
+    - main
+  timeout: 30 minutes
 
 mirror:
   stage: mirror
