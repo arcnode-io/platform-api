@@ -63,6 +63,61 @@ def site_id() -> str:
 
 
 @pytest.fixture
+def defense_stack(cfn: CloudFormationClient, site_id: str) -> Iterator[dict[str, str]]:
+    """Deploys a defense smoke stack, yields {name, site_id, public_ip}, tears down.
+
+    Defense provisions Aurora + Neptune + AOSS via CFN — zero customer
+    secret params. Longer CREATE timeout (Neptune Serverless v2 ~5min +
+    AOSS ~2min on top of EC2 + image pulls).
+    """
+    duid = str(uuid.uuid4())
+    stack_name = f"smoke-defense-{duid.split('-')[0]}"
+
+    template = CfnService(persistence=PersistenceService()).render_template(
+        deployment_uuid=duid,
+        dtm_url=DTM_URL,
+        site_id=site_id,
+        wholesale_market="ercot",
+        settlement_point="HB_NORTH",
+        deployment_context=DeploymentContext.DEFENSE_FORWARD,
+    )
+
+    cfn.create_stack(
+        StackName=stack_name,
+        TemplateBody=template,
+        Capabilities=["CAPABILITY_IAM", "CAPABILITY_AUTO_EXPAND"],
+        Parameters=[
+            {
+                "ParameterKey": "OpenweathermapApiKey",
+                "ParameterValue": "0" * 32,
+            },
+        ],
+        Tags=[
+            {"Key": "arcnode-smoke", "Value": "ci-defense"},
+            {"Key": "auto-teardown", "Value": "true"},
+        ],
+        OnFailure="ROLLBACK",
+    )
+    try:
+        # Defense ~30min: Aurora ~5min + Neptune ~5min + AOSS ~2min +
+        # EC2 boot + docker pulls + mcp-server seed (Neptune bulk load).
+        _wait_for_terminal(cfn, stack_name, "CREATE", STACK_READY_TIMEOUT_S * 2)
+        outputs = {
+            o["OutputKey"]: o["OutputValue"]
+            for o in cfn.describe_stacks(StackName=stack_name)["Stacks"][0].get(
+                "Outputs", []
+            )
+        }
+        yield {
+            "name": stack_name,
+            "site_id": site_id,
+            "public_ip": outputs["PublicIp"],
+        }
+    finally:
+        cfn.delete_stack(StackName=stack_name)
+
+
+@pytest.fixture
 def commercial_stack(
     cfn: CloudFormationClient, aura_url: str, tiger_url: str, site_id: str
 ) -> Iterator[dict[str, str]]:
