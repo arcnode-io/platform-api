@@ -154,7 +154,17 @@ def commercial_stack(
     )
     try:
         _wait_for_terminal(cfn, stack_name, "CREATE", STACK_READY_TIMEOUT_S)
-        yield {"name": stack_name, "site_id": site_id}
+        outputs = {
+            o["OutputKey"]: o["OutputValue"]
+            for o in cfn.describe_stacks(StackName=stack_name)["Stacks"][0].get(
+                "Outputs", []
+            )
+        }
+        yield {
+            "name": stack_name,
+            "site_id": site_id,
+            "public_ip": outputs["PublicIp"],
+        }
     finally:
         # Idempotent — runs even if create timed out or assertions failed.
         cfn.delete_stack(StackName=stack_name)

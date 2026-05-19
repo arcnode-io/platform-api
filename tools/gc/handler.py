@@ -13,11 +13,12 @@ Idempotent. Logs every action. Exits 0 even on partial failures so a
 single AWS hiccup doesn't skip the next category.
 """
 
+# ruff: noqa: ANN401, ARG001 — Lambda runtime ABI uses Any/event
 from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import boto3
@@ -27,7 +28,7 @@ logger.setLevel(logging.INFO)
 
 MAX_AGE_HOURS = 6
 STACK_NAME_PATTERNS = ("arcnode-smoke-", "smoke-defense-", "smoke-ci-")
-SECRET_NAME_PREFIX = "arcnode-ems-"
+SECRET_NAME_PREFIX = "arcnode-ems-"  # noqa: S105 — name prefix, not a secret value
 SSM_PATH_PREFIX = "/arcnode-ems/"
 
 ALIVE_STACK_STATUSES = [
@@ -47,7 +48,7 @@ ALIVE_STACK_STATUSES = [
 
 def handler(event: dict[str, Any], _context: Any) -> dict[str, Any]:
     """EventBridge cron entry point. Returns a summary of actions taken."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(hours=MAX_AGE_HOURS)
 
     cfn = boto3.client("cloudformation")
@@ -103,8 +104,8 @@ def _sweep_stacks(
                 cfn.delete_stack(StackName=name)
                 actions.append(f"stack:delete:{name}")
                 active_stack_names.discard(name)
-            except Exception as exc:
-                logger.exception("failed to delete stack %s: %s", name, exc)
+            except Exception:
+                logger.exception("failed to delete stack %s", name)
 
 
 def _sweep_secrets(
@@ -127,8 +128,8 @@ def _sweep_secrets(
             try:
                 sm.delete_secret(SecretId=name, ForceDeleteWithoutRecovery=True)
                 actions.append(f"secret:delete:{name}")
-            except Exception as exc:
-                logger.exception("failed to delete secret %s: %s", name, exc)
+            except Exception:
+                logger.exception("failed to delete secret %s", name)
 
 
 def _sweep_ssm_params(
@@ -153,8 +154,8 @@ def _sweep_ssm_params(
             try:
                 ssm.delete_parameter(Name=name)
                 actions.append(f"ssm:delete:{name}")
-            except Exception as exc:
-                logger.exception("failed to delete ssm param %s: %s", name, exc)
+            except Exception:
+                logger.exception("failed to delete ssm param %s", name)
 
 
 def _matches_smoke_pattern(name: str) -> bool:

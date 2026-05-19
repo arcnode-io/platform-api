@@ -123,6 +123,8 @@ services:
       CFG_CUSTOMER_PATH: /app/cfg.customer.yml
     volumes:
       - /opt/arcnode/analyst-cfg.customer.yml:/app/cfg.customer.yml:ro
+    ports:
+      - "8000:8000"
 
   analyst-model:
     image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest

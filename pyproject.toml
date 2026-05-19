@@ -40,7 +40,7 @@ dev = [
 
 [tool.poe.tasks]
 dev = "python -m src.main"
-depcheck = "deptry . --per-rule-ignores DEP001=cfnlint,DEP004=pytest|cfnlint,DEP002=asyncpg --extend-exclude 'src/cfn/persistence/lambda_code|src/compose/init-scripts'"
+depcheck = "deptry . --per-rule-ignores DEP001=cfnlint,DEP004=pytest|cfnlint,DEP002=asyncpg,DEP003=boto3 --extend-exclude 'src/cfn/persistence/lambda_code|src/compose/init-scripts'"
 format = "black ."
 lint = "ruff check"
 typecheck = "ty check"
