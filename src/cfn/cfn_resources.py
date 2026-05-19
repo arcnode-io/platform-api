@@ -407,7 +407,6 @@ def iam_resources(
 
 def build_userdata(
     *,
-    deployment_uuid: str,
     dtm_url: str,
     site_id: str,
     wholesale_market: str,
@@ -505,7 +504,6 @@ def build_userdata(
         "mkdir -p /opt/arcnode/init-scripts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
-        f"DEPLOYMENT_UUID={deployment_uuid}\n"
         f"SITE_ID={site_id}\n"
         "AWS_REGION=${AWS::Region}\n"
         "AWS_DEFAULT_REGION=${AWS::Region}\n"

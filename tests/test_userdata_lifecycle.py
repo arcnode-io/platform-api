@@ -36,7 +36,6 @@ from testcontainers.core.waiting_utils import wait_for_logs
 from src.cfn.cfn_resources import ARCNODE_PUBLIC_BASE_URL, build_userdata
 from src.orders.configurator_payload import DeploymentContext
 
-DEPLOYMENT_UUID = "lifecycle-test-001"
 DTM_URL = "https://example.com/dtm.json"
 TEST_STACK = "lifecycletest"
 
@@ -80,7 +79,6 @@ def _render_with_test_stack_name(deployment_context: DeploymentContext) -> str:
     here.
     """
     raw = build_userdata(
-        deployment_uuid=DEPLOYMENT_UUID,
         dtm_url=DTM_URL,
         site_id="test_site",
         wholesale_market="ercot",

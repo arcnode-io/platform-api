@@ -59,7 +59,6 @@ class CfnService:
         """
         short = deployment_uuid.split("-", 1)[0]
         userdata = build_userdata(
-            deployment_uuid=deployment_uuid,
             dtm_url=dtm_url,
             site_id=site_id,
             wholesale_market=wholesale_market,
