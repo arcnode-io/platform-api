@@ -1,7 +1,7 @@
 stages:
   - check
   - publish
-  - smoke
+  - e2e
   - mirror
 
 checks:
@@ -45,8 +45,8 @@ publish_compose:
   only:
     - main
 
-smoke:
-  # Real-AWS e2e — pytest suite under tests/smoke/ deploys the commercial
+e2e:
+  # Real-AWS e2e — pytest suite under tests/e2e/ deploys the commercial
   # stack with the industrial-fixtures DTM, asserts gateway → MQTT → writer
   # → Tiger persistence, tears down. Catches CFN/UserData/VPC/IAM bugs the
   # unit + integration suites can't. ~$0.10/run, ~20min wall clock.
@@ -54,16 +54,16 @@ smoke:
   # AURA_CONNECTION_STRING + TIGERDATA_CONNECTION_STRING must be set in
   # project CI/CD variables (masked + protected). AWS creds come from the
   # runner's role (same as publish_compose).
-  stage: smoke
+  stage: e2e
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'   # nightly cron
     - if: '$CI_PIPELINE_SOURCE == "web"'         # manual "Run pipeline"
   script:
-    - uv run pytest -m smoke -v --junitxml=junit-smoke.xml
+    - uv run pytest -m e2e -v --junitxml=junit-e2e.xml
   artifacts:
     when: always
     reports:
-      junit: junit-smoke.xml
+      junit: junit-e2e.xml
   timeout: 45 minutes
 
 mirror:

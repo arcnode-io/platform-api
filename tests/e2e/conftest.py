@@ -1,4 +1,4 @@
-"""Fixtures for real-AWS e2e smoke tests.
+"""Fixtures for real-AWS e2e tests.
 
 Deploys a commercial stack with the industrial-fixtures DTM, yields the
 stack identity to the test, tears down on session end. Scoped by

@@ -5,7 +5,7 @@ contract directly. Each gets its own fresh stack (session-scoped CFN
 client, function-scoped stack) so concurrent CI runs don't poison
 each other.
 
-Run: ``uv run pytest -m smoke``
+Run: ``uv run pytest -m e2e``
 """
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ ROW_COUNT_SQL = "SELECT COUNT(*) FROM measurements WHERE site_id = %s"
 DELETE_FOR_SITE_SQL = "DELETE FROM measurements WHERE site_id = %s"
 
 
-@pytest.mark.smoke
-def test_fixtures_smoke_publishes_to_tiger(
+@pytest.mark.e2e
+def test_fixtures_e2e_publishes_to_tiger(
     commercial_stack: dict[str, str],
     tiger_conn: psycopg2.extensions.connection,
 ) -> None:

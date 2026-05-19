@@ -115,12 +115,12 @@ pydantic validates.
 |---|---|
 | `local` | dev box, no AWS, mocks everything |
 | `demo` | self-hosted demo with bundled seed |
-| `beta` | every AWS deploy — our smokes AND customer prod. Same code path; distinguished by AWS account + DTM contents + per-deploy creds. |
+| `beta` | every AWS deploy — our e2e runs AND customer prod. Same code path; distinguished by AWS account + DTM contents + per-deploy creds. |
 
 ## e2e scenarios (all run under `ENV=beta`)
 
 | Scenario | DTM | Expected |
 |---|---|---|
-| **Fixtures smoke** | `industrial-fixtures.json` (mocks at compose-DNS hostnames) | `measurements > 0` within ~30s |
+| **Fixtures e2e** | `industrial-fixtures.json` (mocks at compose-DNS hostnames) | `measurements > 0` within ~30s |
 | **Bare deploy** | customer-shape DTM (devices, no `connection`) | `measurements == 0`; `GET /topology` returns DTM; gateway quiet |
 | **Commissioning** | bare → `POST /topology` with real `connection` | `measurements > 0` after the POST |
