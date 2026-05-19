@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  arcnode-gc — daily safety-net sweep for orphan smoke resources.
+  Single Lambda + EventBridge cron. Bills ~$0/mo (free tier).
+
+Resources:
+  GcLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: arcnode-gc-lambda
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: { Service: lambda.amazonaws.com }
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: gc-sweep
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DeleteStack
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:ListSecrets
+                Resource: "*"
+              # Restrict deletes to arcnode-ems-* secrets only — no
+              # collateral on real credentials.
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DeleteSecret
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:arcnode-ems-*"
+              - Effect: Allow
+                Action:
+                  - ssm:DescribeParameters
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - ssm:DeleteParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/arcnode-ems/*"
+
+  GcLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: arcnode-gc
+      Runtime: python3.13
+      Handler: index.handler  # ZipFile inline → Lambda writes index.py
+      Role: !GetAtt GcLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          PLACEHOLDER_REPLACED_BY_DEPLOY_SCRIPT
+
+  GcSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: arcnode-gc-daily
+      Description: Run arcnode-gc daily at 08:00 UTC.
+      ScheduleExpression: cron(0 8 * * ? *)
+      State: ENABLED
+      Targets:
+        - Id: gc-lambda
+          Arn: !GetAtt GcLambda.Arn
+
+  GcSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GcLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt GcSchedule.Arn
+
+Outputs:
+  LambdaName:
+    Value: !Ref GcLambda
+  LambdaArn:
+    Value: !GetAtt GcLambda.Arn

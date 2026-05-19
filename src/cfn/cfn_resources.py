@@ -179,7 +179,7 @@ def network_resources() -> dict[str, object]:
         "EmsSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "ARCNODE EMS HMI inbound",
+                "GroupDescription": "ARCNODE EMS HMI + analyst-server inbound",
                 "VpcId": {"Ref": "EmsVpc"},
                 "SecurityGroupIngress": [
                     {
@@ -187,7 +187,16 @@ def network_resources() -> dict[str, object]:
                         "FromPort": 80,
                         "ToPort": 80,
                         "CidrIp": "0.0.0.0/0",
-                    }
+                    },
+                    # analyst-server health + chat (defense compose binds
+                    # 8000:8000). e2e probes /health to prove mcp-server
+                    # seed completed.
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 8000,
+                        "ToPort": 8000,
+                        "CidrIp": "0.0.0.0/0",
+                    },
                 ],
             },
         },
