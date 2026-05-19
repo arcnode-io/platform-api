@@ -96,6 +96,9 @@ services:
     <<: *env-files
     environment:
       ENV: beta
+      CFG_CUSTOMER_PATH: /app/cfg.customer.yml
+    volumes:
+      - /opt/arcnode/gateway-cfg.customer.yml:/app/cfg.customer.yml:ro
     depends_on:
       hivemq:
         condition: service_started

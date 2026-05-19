@@ -504,14 +504,21 @@ def build_userdata(
         "mkdir -p /opt/arcnode/init-scripts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
-        f"SITE_ID={site_id}\n"
         "AWS_REGION=${AWS::Region}\n"
         "AWS_DEFAULT_REGION=${AWS::Region}\n"
         "ENV\n"
+        # analyst-server's cfg.customer.yml — site_id + market scope per
+        # ConfiguratorPayload. ems-analyst-agent's loader merges this over
+        # cfg.defaults.yml at startup.
         "cat > /opt/arcnode/analyst-cfg.customer.yml <<YML\n"
+        f"site_id: {site_id}\n"
         f"market:\n"
         f"  wholesale_market: {wholesale_market}\n"
         f"  settlement_point: {settlement_point}\n"
+        "YML\n"
+        # gateway's cfg.customer.yml — only site_id today.
+        "cat > /opt/arcnode/gateway-cfg.customer.yml <<YML\n"
+        f"site_id: {site_id}\n"
         "YML\n"
         f"{ssm_lines}\n"
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
