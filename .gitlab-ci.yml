@@ -58,6 +58,7 @@ e2e:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'   # nightly cron
     - if: '$CI_PIPELINE_SOURCE == "web"'         # manual "Run pipeline"
+    - if: '$CI_PIPELINE_SOURCE == "api" && $RUN_DEFENSE_E2E == "1"'  # on-demand defense
   script:
     - uv run pytest -m e2e -v --junitxml=junit-e2e.xml
   artifacts:
