@@ -32,8 +32,10 @@ COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
 COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("graph-url", "GRAPH_URL"),
 )
-# SSM Parameter Store entries → env-var name. No creds — IAM/sigv4 auth
-# via the EC2 instance profile.
+# Defense-only SSM params → shell var name. No creds — IAM/sigv4 auth.
+# UserData fetches each into a shell var, then writes the graph block
+# into analyst-cfg.customer.yml so python-mcp-server picks them up via
+# the cfg.graph discriminator (CFG_CUSTOMER_PATH deep-merge).
 DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
     ("neptune-host", "NEPTUNE_HOST"),
     ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
@@ -439,20 +441,17 @@ def build_userdata(
     ``${AWS::StackName}`` is left intact for CFN ``Fn::Sub`` substitution.
     """
     # `variant` drives which compose path we fetch from arcnode-public.
-    # Not propagated as an env var into containers — the per-variant compose
-    # file's env-var set is itself the signal (presence of GRAPH_URL vs
-    # NEPTUNE_HOST), so consumer code just branches on what's there.
+    # Not propagated as an env var into containers — the per-variant
+    # compose file already wires the right services.
     variant = (
         "commercial"
         if deployment_context == DeploymentContext.COMMERCIAL
         else "defense"
     )
     url_slots = list(COMMON_URL_SLOTS)
-    ssm_params: list[tuple[str, str]] = []
-    if deployment_context == DeploymentContext.COMMERCIAL:
+    is_commercial = deployment_context == DeploymentContext.COMMERCIAL
+    if is_commercial:
         url_slots.extend(COMMERCIAL_ONLY_URL_SLOTS)
-    else:
-        ssm_params.extend(DEFENSE_ONLY_SSM_PARAMS)
 
     # secrets.env — credential-bearing connection URLs from Secrets Manager.
     # Each line writes one ENV_VAR=<URL>.
@@ -462,14 +461,28 @@ def build_userdata(
         f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
     )
-    # config.env — non-secret config from SSM Parameter Store + UserData
-    # literals (deployment uuid, dtm url, ems mode). No creds in this file.
-    ssm_lines = "\n".join(
-        f'echo "{env_name}=$(aws ssm get-parameter '
-        f"--name /arcnode-ems/${{AWS::StackName}}/{slot} "
-        f'--query Parameter.Value --output text)" >> /opt/arcnode/config.env'
-        for slot, env_name in ssm_params
-    )
+    # Defense graph block — fetch SSM params into shell vars, append to
+    # the analyst cfg so python-mcp-server's cfg.graph discriminator
+    # resolves to NeptuneGraph. Empty string for commercial.
+    if is_commercial:
+        graph_block = ""
+    else:
+        ssm_fetches = "\n".join(
+            f"{env_name}=$(aws ssm get-parameter "
+            f"--name /arcnode-ems/${{AWS::StackName}}/{slot} "
+            f"--query Parameter.Value --output text)"
+            for slot, env_name in DEFENSE_ONLY_SSM_PARAMS
+        )
+        graph_block = (
+            f"{ssm_fetches}\n"
+            "cat >> /opt/arcnode/analyst-cfg.customer.yml <<YML\n"
+            "graph:\n"
+            "  backend: neptune\n"
+            "  neptune_host: $NEPTUNE_HOST\n"
+            "  aoss_host: $AOSS_HOST\n"
+            "  loader_role_arn: $NEPTUNE_LOADER_ROLE_ARN\n"
+            "YML"
+        )
     # Init scripts compose mounts at /opt/arcnode/init-scripts/. All
     # data seeding (vector, graph, ercot) lives in consumer services —
     # mcp-server pkg loaded by analyst-server seeds vector + graph;
@@ -520,7 +533,7 @@ def build_userdata(
         "cat > /opt/arcnode/gateway-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
         "YML\n"
-        f"{ssm_lines}\n"
+        f"{graph_block}\n"
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"

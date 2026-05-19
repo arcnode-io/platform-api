@@ -236,20 +236,22 @@ def test_commercial_userdata_writes_graph_url_into_secrets_env() -> None:
     assert "aoss-host" not in rendered
 
 
-def test_defense_userdata_writes_neptune_aoss_loader_role_into_config_env() -> None:
-    """Defense UserData reads 3 SSM params + writes NEPTUNE_HOST / AOSS_HOST / NEPTUNE_LOADER_ROLE_ARN into config.env."""
+def test_defense_userdata_writes_neptune_graph_block_into_analyst_cfg() -> None:
+    """Defense UserData reads 3 SSM params + appends a neptune graph block
+    to analyst-cfg.customer.yml so python-mcp-server picks NeptuneGraph."""
     # Arrange + Act
     rendered = _render(DeploymentContext.DEFENSE_FORWARD)
 
-    # Assert — SSM lookups
+    # Assert — SSM lookups still happen
     assert "/arcnode-ems/${AWS::StackName}/neptune-host" in rendered
     assert "/arcnode-ems/${AWS::StackName}/aoss-host" in rendered
     assert "/arcnode-ems/${AWS::StackName}/neptune-loader-role-arn" in rendered
-    # Assert — env vars surface in config.env (no creds — IAM-auth hosts)
-    assert "NEPTUNE_HOST=" in rendered
-    assert "AOSS_HOST=" in rendered
-    assert "NEPTUNE_LOADER_ROLE_ARN=" in rendered
-    assert "/opt/arcnode/config.env" in rendered
+    # Assert — values flow into the analyst customer cfg under a graph block
+    assert "backend: neptune" in rendered
+    assert "neptune_host: $NEPTUNE_HOST" in rendered
+    assert "aoss_host: $AOSS_HOST" in rendered
+    assert "loader_role_arn: $NEPTUNE_LOADER_ROLE_ARN" in rendered
+    assert ">> /opt/arcnode/analyst-cfg.customer.yml" in rendered
     # Defense doesn't fetch a graph-url secret (Neptune is IAM-auth)
     assert "/graph-url" not in rendered
 
@@ -294,11 +296,9 @@ def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
 
 
 def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
-    """No ARCNODE_VARIANT env — containers branch on env-var presence instead.
-
-    The compose file already encodes the variant (commercial sets GRAPH_URL,
-    defense sets NEPTUNE_HOST + AOSS_HOST). A separate flag would be a
-    redundant + mismatch-prone signal.
+    """No ARCNODE_VARIANT env — the per-variant compose file already
+    encodes the deployment shape, and python-mcp-server dispatches off
+    cfg.graph.backend. A separate flag would be a redundant signal.
     """
     # Arrange + Act
     commercial = _render(DeploymentContext.COMMERCIAL)
