@@ -20,6 +20,7 @@ import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Final
+from urllib.parse import urlencode
 
 import pytest
 import urllib3
@@ -87,11 +88,17 @@ def test_defense_telemetry_persists_to_aurora(
     # 5min window so even a slow first publish lands in range
     end = datetime.now(UTC)
     start = end - timedelta(minutes=5)
-    url = (
-        f"http://{public_ip}:8000/sites/{site_id}/measurements"
-        f"?device_id=meter_01&measurement=kwh_delivered"
-        f"&start={start.isoformat()}&end={end.isoformat()}"
+    # urlencode escapes the `+` in `+00:00` so the server parses it back
+    # as a tz-aware datetime instead of a space-separated date+time.
+    qs = urlencode(
+        {
+            "device_id": "meter_01",
+            "measurement": "kwh_delivered",
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+        }
     )
+    url = f"http://{public_ip}:8000/sites/{site_id}/measurements?{qs}"
     resp = _http().request("GET", url, timeout=urllib3.Timeout(connect=5, read=15))
     assert resp.status == 200, f"unexpected status {resp.status}: {resp.data!r}"
     body = resp.json()
