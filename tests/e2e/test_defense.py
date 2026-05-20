@@ -18,7 +18,7 @@ import json as json_lib
 import os
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import pytest
@@ -84,10 +84,12 @@ def test_defense_telemetry_persists_to_aurora(
     _wait_for_health(public_ip)
     time.sleep(TELEMETRY_SETTLE_S)
 
-    # 5min window so even a slow first publish lands in range. Endpoint
-    # takes Unix epoch ints — no datetime URL-encoding footgun.
-    end = int(datetime.now(UTC).timestamp())
-    start = end - 300
+    # 5min window so even a slow first publish lands in range. ISO with
+    # a `Z` suffix — Z is alphanumeric so it survives the query string
+    # untouched, unlike a `+00:00` offset where `+` decodes to space.
+    now = datetime.now(UTC)
+    end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
     url = (
         f"http://{public_ip}:8000/sites/{site_id}/measurements"
         f"?device_id=meter_01&measurement=kwh_delivered&start={start}&end={end}"
