@@ -62,8 +62,17 @@ def site_id() -> str:
     return f"ci_{pid}_{uuid.uuid4().hex[:6]}"
 
 
-@pytest.fixture
-def defense_stack(cfn: CloudFormationClient, site_id: str) -> Iterator[dict[str, str]]:
+@pytest.fixture(scope="session")
+def defense_site_id() -> str:
+    """Stable site_id across all session-scoped defense tests."""
+    pid = os.environ.get("CI_PIPELINE_ID", uuid.uuid4().hex[:8])
+    return f"ci_{pid}_{uuid.uuid4().hex[:6]}"
+
+
+@pytest.fixture(scope="session")
+def defense_stack(
+    cfn: CloudFormationClient, defense_site_id: str
+) -> Iterator[dict[str, str]]:
     """Deploys a defense smoke stack, yields {name, site_id, public_ip}, tears down.
 
     Defense provisions Aurora + Neptune + AOSS via CFN — zero customer
@@ -76,7 +85,7 @@ def defense_stack(cfn: CloudFormationClient, site_id: str) -> Iterator[dict[str,
     template = CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=duid,
         dtm_url=DTM_URL,
-        site_id=site_id,
+        site_id=defense_site_id,
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
         deployment_context=DeploymentContext.DEFENSE_FORWARD,
@@ -110,7 +119,7 @@ def defense_stack(cfn: CloudFormationClient, site_id: str) -> Iterator[dict[str,
         }
         yield {
             "name": stack_name,
-            "site_id": site_id,
+            "site_id": defense_site_id,
             "public_ip": outputs["PublicIp"],
         }
     finally:
