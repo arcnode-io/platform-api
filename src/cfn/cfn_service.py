@@ -46,6 +46,7 @@ class CfnService:
         wholesale_market: str,
         settlement_point: str,
         deployment_context: DeploymentContext,
+        e2e: bool = False,
     ) -> str:
         """Return the per-order CFN template (yaml) with all inputs baked in.
 
@@ -64,6 +65,7 @@ class CfnService:
             wholesale_market=wholesale_market,
             settlement_point=settlement_point,
             deployment_context=deployment_context,
+            e2e=e2e,
         )
         persistence = self._persistence.build(
             deployment_context=deployment_context,

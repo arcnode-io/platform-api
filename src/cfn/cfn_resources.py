@@ -423,6 +423,7 @@ def build_userdata(
     wholesale_market: str,
     settlement_point: str,
     deployment_context: DeploymentContext,
+    e2e: bool = False,
 ) -> str:
     """Build EC2 UserData. Threads cross-cutting env into config.env and
     writes per-service cfg.customer.yml files (cardinal rule from CLAUDE.md).
@@ -430,6 +431,10 @@ def build_userdata(
     CFG_CUSTOMER_PATH so the service's loader deep-merges it over the
     baked cfg.defaults.yml. Pattern: analyst-server first; gateway +
     mcp-server migrate as they grow per-deploy config beyond a flag or two.
+
+    ``e2e=True`` writes ``e2e: true`` into analyst-cfg.customer.yml — the
+    mcp-server child reads the same file and seeds the small 153-node
+    graph fixture instead of the full 96MB dump (CI speed + determinism).
     """
     """UserData: fetch arcnode-public artifacts, write env files, fetch DTM, run compose.
 
@@ -461,6 +466,9 @@ def build_userdata(
     is_commercial = deployment_context == DeploymentContext.COMMERCIAL
     if is_commercial:
         url_slots.extend(COMMERCIAL_ONLY_URL_SLOTS)
+
+    # e2e deployments seed the small graph fixture; empty for production.
+    e2e_line = "e2e: true\n" if e2e else ""
 
     # secrets.env — credential-bearing connection URLs from Secrets Manager.
     # Each line writes one ENV_VAR=<URL>.
@@ -531,12 +539,14 @@ def build_userdata(
         "ENV\n"
         # analyst-server's cfg.customer.yml — site_id + market scope per
         # ConfiguratorPayload. ems-analyst-agent's loader merges this over
-        # cfg.defaults.yml at startup.
+        # cfg.defaults.yml at startup; the mcp-server child reads the same
+        # file, so `e2e: true` flows through to the seed-fixture choice.
         "cat > /opt/arcnode/analyst-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
         f"market:\n"
         f"  wholesale_market: {wholesale_market}\n"
         f"  settlement_point: {settlement_point}\n"
+        f"{e2e_line}"
         "YML\n"
         # gateway's cfg.customer.yml — only site_id today.
         "cat > /opt/arcnode/gateway-cfg.customer.yml <<YML\n"

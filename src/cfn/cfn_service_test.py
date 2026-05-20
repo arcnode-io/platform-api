@@ -23,6 +23,8 @@ SITE_ID: str = "test_site"
 
 def _render(
     deployment_context: DeploymentContext = DeploymentContext.COMMERCIAL,
+    *,
+    e2e: bool = False,
 ) -> str:
     return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID,
@@ -31,7 +33,26 @@ def _render(
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
         deployment_context=deployment_context,
+        e2e=e2e,
     )
+
+
+def test_e2e_flag_writes_e2e_true_into_analyst_cfg() -> None:
+    """render_template(e2e=True) → `e2e: true` in analyst-cfg.customer.yml.
+
+    The mcp-server child reads that file; the flag makes its seed pull
+    the small graph-neo4j-e2e.cypher.gz fixture instead of the 96MB dump.
+    """
+    # Arrange + Act
+    with_e2e = _render(e2e=True)
+    without = _render(e2e=False)
+
+    # Assert — flag present only when requested, scoped to the analyst
+    # cfg heredoc body (between the `<<YML` opener and its `YML` close).
+    analyst_block = with_e2e.split("analyst-cfg.customer.yml")[1]
+    heredoc_body = analyst_block.split("YML")[1]
+    assert "e2e: true" in heredoc_body
+    assert "e2e: true" not in without
 
 
 def test_render_template_passes_cfn_lint() -> None:

@@ -89,6 +89,7 @@ def defense_stack(
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
         deployment_context=DeploymentContext.DEFENSE_FORWARD,
+        e2e=True,
     )
 
     cfn.create_stack(
@@ -141,6 +142,7 @@ def commercial_stack(
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
         deployment_context=DeploymentContext.COMMERCIAL,
+        e2e=True,
     )
 
     cfn.create_stack(
