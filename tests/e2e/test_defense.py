@@ -80,11 +80,11 @@ def test_defense_telemetry_persists_to_aurora(
 ) -> None:
     """Gateway → MQTT → telemetry-writer → Aurora.
 
-    Reads back through analyst-server's /sites/.../measurements so the
-    test doesn't need direct VPC-private Aurora access.
+    Reads back through analyst-server's GET /measurements so the test
+    doesn't need direct VPC-private Aurora access. Single-site deploy:
+    the server knows its own site_id from cfg — no site path segment.
     """
     public_ip = defense_stack["public_ip"]
-    site_id = defense_stack["site_id"]
     _wait_for_health(public_ip)
     time.sleep(TELEMETRY_SETTLE_S)
 
@@ -95,7 +95,7 @@ def test_defense_telemetry_persists_to_aurora(
     end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     start = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
     url = (
-        f"http://{public_ip}:8000/sites/{site_id}/measurements"
+        f"http://{public_ip}:8000/measurements"
         f"?device_id=meter_01&measurement=kwh_delivered&start={start}&end={end}"
     )
     resp = _http().request("GET", url, timeout=urllib3.Timeout(connect=5, read=15))
