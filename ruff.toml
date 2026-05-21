@@ -67,6 +67,8 @@ max-statements = 30
 # ANN401) — same model as Lambda code.
 "src/compose/init-scripts/*.py" = ["S310", "ANN001", "ANN401"]
 # Test files: missing docstrings, unused lambda args (mock context managers),
-# hardcoded test passwords, urllib mocks all expected.
-"**/*_test.py" = ["D101", "D102", "D103", "ANN001", "ANN201", "ANN202", "ARG001", "ARG005", "S105", "S106", "S310", "SIM117"]
-"tests/**/*.py" = ["D101", "D102", "D103", "ANN001", "ANN201", "ANN202", "ARG001", "ARG005", "S105", "S106", "S310", "SIM117"]
+# hardcoded test passwords, urllib mocks all expected. F811 — pytest fixtures
+# imported into a test module collide with the test fn's parameter of the
+# same name (the explicit-import alternative to conftest auto-discovery).
+"**/*_test.py" = ["D101", "D102", "D103", "ANN001", "ANN201", "ANN202", "ARG001", "ARG005", "S105", "S106", "S310", "SIM117", "F811"]
+"tests/**/*.py" = ["D101", "D102", "D103", "ANN001", "ANN201", "ANN202", "ARG001", "ARG005", "S105", "S106", "S310", "SIM117", "F811"]

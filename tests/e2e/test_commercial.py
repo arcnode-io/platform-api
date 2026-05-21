@@ -19,6 +19,18 @@ import psycopg2.extensions
 import pytest
 import urllib3
 
+# Explicit fixture imports — no conftest.py auto-discovery. commercial_stack
+# pulls in cfn/aura_url/tiger_url/site_id transitively, so all must be in
+# scope here for pytest's resolver.
+from .fixtures import (  # noqa: F401
+    aura_url,
+    cfn,
+    commercial_stack,
+    site_id,
+    tiger_conn,
+    tiger_url,
+)
+
 POST_BOOT_SETTLE_S = 60
 ROW_COUNT_SQL = "SELECT COUNT(*) FROM measurements WHERE site_id = %s"
 DELETE_FOR_SITE_SQL = "DELETE FROM measurements WHERE site_id = %s"

@@ -24,6 +24,10 @@ from typing import Final
 import pytest
 import urllib3
 
+# Explicit fixture imports — no conftest.py auto-discovery. defense_stack
+# pulls in cfn + defense_site_id transitively.
+from .fixtures import cfn, defense_site_id, defense_stack  # noqa: F401
+
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_DEFENSE_E2E") != "1",
     reason="defense e2e is on-demand only (Neptune+AOSS cost)",
