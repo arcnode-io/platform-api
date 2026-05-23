@@ -511,6 +511,16 @@ def build_userdata(
         f"-o /opt/arcnode/init-scripts/{s}"
         for s in init_scripts
     )
+    # Observability config (prometheus + grafana provisioning) compose
+    # mounts at /opt/arcnode/observability/. mlflow gets its own data
+    # dirs; no shipped config (sqlite + filesystem artifact root, set
+    # in compose `command:`).
+    observability_files = ["prometheus.yml"]
+    observability_lines = "\n".join(
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/observability/{f} "
+        f"-o /opt/arcnode/observability/{f}"
+        for f in observability_files
+    )
     # CFN signaling — without cfn-signal the stack reports CREATE_COMPLETE
     # the instant the AMI boots, even if every curl in UserData fails. Both
     # Phase 5 smokes (2026-05-15, 2026-05-16) hit silent UserData failures
@@ -531,7 +541,9 @@ def build_userdata(
         "--stack ${AWS::StackName} --resource EmsInstance "
         "--region ${AWS::Region}' ERR\n"
         "set -e\n"
-        "mkdir -p /opt/arcnode/init-scripts\n"
+        "mkdir -p /opt/arcnode/init-scripts /opt/arcnode/observability/prometheus-data "
+        "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
+        "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         "AWS_REGION=${AWS::Region}\n"
@@ -560,6 +572,7 @@ def build_userdata(
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
         f"{init_script_lines}\n"
+        f"{observability_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
         "# it on boot per system_adr §22 - fatal here so compose never starts\n"

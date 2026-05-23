@@ -1,0 +1,19 @@
+# Minimal scrape config for both cloud + ISO. Operator extends as
+# services grow /metrics endpoints. UserData / first-boot script syncs
+# this file into /opt/arcnode/observability/prometheus.yml and the
+# prometheus container bind-mounts it read-only.
+#
+# TODO as services instrument:
+#   - industrial-gateway (Rust — wire `prometheus` crate when added)
+#   - device-api (TypeScript — wire `prom-client`)
+#   - analyst-server (FastAPI — wire `prometheus-fastapi-instrumentator`)
+#   - hivemq (CE exposes /api/v1/metrics but not Prometheus format;
+#     needs `mqtt-exporter` sidecar or HiveMQ Enterprise)
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

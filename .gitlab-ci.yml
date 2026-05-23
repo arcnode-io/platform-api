@@ -40,6 +40,7 @@ publish_compose:
     - aws s3 sync src/compose/commercial/    s3://arcnode-public/compose/commercial/    --delete --exclude "__pycache__/*" --exclude "*.pyc"
     - aws s3 sync src/compose/defense/       s3://arcnode-public/compose/defense/       --delete --exclude "__pycache__/*" --exclude "*.pyc"
     - aws s3 sync src/compose/init-scripts/  s3://arcnode-public/init-scripts/          --delete --exclude "__pycache__/*" --exclude "*.pyc" --exclude "*_test.py"
+    - aws s3 sync src/compose/observability/ s3://arcnode-public/observability/         --delete
     - aws s3 cp src/compose/industrial-fixtures.json s3://arcnode-public/seed/industrial-fixtures.json
     - aws s3 rm s3://arcnode-public/seed/dtm-smoke.json || true
   only:

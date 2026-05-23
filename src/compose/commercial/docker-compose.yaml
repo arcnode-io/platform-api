@@ -130,3 +130,44 @@ services:
     image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
     restart: unless-stopped
     <<: *env-files
+
+  # Observability + ML tracking — added across cloud + ISO so every
+  # deployment ships with the same on-box telemetry surface. Cloud
+  # customers usually have their own observability stack and can ignore;
+  # the cost is one container each, internal-only ports.
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - /opt/arcnode/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /opt/arcnode/observability/prometheus-data:/prometheus
+    # Port 9090 NOT exposed — accessed via grafana proxy / kubectl-style
+    # port-forward when an operator needs raw queries.
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-arcnode}
+    volumes:
+      - /opt/arcnode/observability/grafana-data:/var/lib/grafana
+      - /opt/arcnode/observability/grafana-provisioning:/etc/grafana/provisioning:ro
+    # Port 3000 NOT exposed publicly — operator port-forwards or HMI proxies.
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    restart: unless-stopped
+    volumes:
+      - /opt/arcnode/mlflow/mlflow-data:/mlflow/mlruns
+      - /opt/arcnode/mlflow/mlflow-artifacts:/mlflow/artifacts
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////mlflow/mlruns/mlflow.db
+      --default-artifact-root file:///mlflow/artifacts
+      --host 0.0.0.0 --port 5000
+    # Port 5000 NOT exposed publicly — analyst-model logs to mlflow:5000
+    # over the compose network only.
