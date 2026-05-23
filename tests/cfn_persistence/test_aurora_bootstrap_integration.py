@@ -79,6 +79,16 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
         )
         master_arn = master_secret["ARN"]
 
+        # Mirror real CFN: per-slice secrets are CFN-native resources that
+        # exist before the Lambda runs. The Lambda PutSecretValues into them
+        # (no CreateSecret). Create the placeholders here so the bootstrap
+        # path doesn't ResourceNotFoundException.
+        for slice_name in ("document", "vector"):
+            sm_client.create_secret(
+                Name=f"arcnode-ems-{DEPLOYMENT_UUID}/{slice_name}-url",
+                SecretString="cfn-placeholder",
+            )
+
         event = {
             "RequestType": "Create",
             "ResponseURL": "https://cfn-response.example/path",
