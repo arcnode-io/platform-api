@@ -22,6 +22,7 @@ from src.edp_client.edp_artifacts import (
 )
 from src.edp_client.edp_client_service import EdpClientService
 from src.iso_bake.iso_bake_service import IsoBakeService
+from src.iso_bake.iso_pipeline_service import IsoPipelineService
 from src.manifest.artifact_metadata import MOCK_SYSTEM_IMAGE_TEMPLATES
 from src.manifest.manifest_record import ManifestArtifact, ManifestFile
 from src.manifest.manifest_service import ManifestService
@@ -58,6 +59,7 @@ class OrchestratorService:
         portal: PortalService,
         manifest: ManifestService,
         iso_bake: IsoBakeService,
+        iso_pipeline: IsoPipelineService,
         ems_hmi_apk_url: str,
     ) -> None:
         self._edp = edp_client
@@ -67,6 +69,7 @@ class OrchestratorService:
         self._portal = portal
         self._manifest = manifest
         self._iso_bake = iso_bake
+        self._iso_pipeline = iso_pipeline
         self._ems_hmi_apk_url = ems_hmi_apk_url
 
     # Public — business intent
@@ -159,7 +162,20 @@ class OrchestratorService:
         path = derive_delivery_path(payload.aws_partition)
         if path == DeliveryPath.ISO:
             overlay_url = await self._build_iso_overlay(order_id, payload, archived)
-            return OrderEmsDelivery(path=path, iso_overlay_url=overlay_url)
+            pipeline_id = await self._iso_pipeline.trigger(
+                order_id=order_id, overlay_url=overlay_url
+            )
+            # Reason: deterministic key — URL 404s until the bake uploads, then
+            # resolves. Portal links to it immediately so the customer's bookmark
+            # works once the build finishes (no portal re-render needed).
+            iso_key = self._iso_pipeline.iso_key(order_id=order_id)
+            iso_image_url = await self._s3.generate_presigned_url(iso_key)
+            return OrderEmsDelivery(
+                path=path,
+                iso_overlay_url=overlay_url,
+                iso_image_url=iso_image_url,
+                iso_pipeline_id=pipeline_id,
+            )
         self._find_dtm_url(archived)  # validate it exists
         dtm_key = f"orders/{order_id}/dtm.json"
         dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
@@ -262,7 +278,6 @@ class OrchestratorService:
         )
 
         # Cloud paths get the per-order CFN yaml as a System Images artifact.
-        # ISO path: no CFN; A2 stays absent until the ISO build pipeline lands.
         if delivery.template_url:
             cfn_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["aws_deployment"]
             cfn_size = await self._s3.head_size(delivery.template_url)
@@ -276,6 +291,25 @@ class OrchestratorService:
                             format="YAML",
                             size_bytes=cfn_size,
                             url=delivery.template_url,
+                        )
+                    ],
+                )
+            )
+
+        # ISO path: link to the per-customer .iso. Size unknown at portal-render
+        # time (build still running); 0 renders as "—" in the file-size chip.
+        if delivery.iso_image_url:
+            iso_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["on_prem_appliance"]
+            artifacts.append(
+                ManifestArtifact(
+                    code="",
+                    name=iso_meta.name,
+                    subtitle=iso_meta.subtitle,
+                    files=[
+                        ManifestFile(
+                            format="ISO",
+                            size_bytes=0,
+                            url=delivery.iso_image_url,
                         )
                     ],
                 )

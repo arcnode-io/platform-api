@@ -15,6 +15,10 @@ local:
   cors_origins:
     - '*'  # local dev — any origin
   iso_version: '1.0.0-beta'
+  iso_pipeline_url: 'https://gitlab.com'
+  iso_pipeline_project_path: 'arcnode-io/platform-ems-iso'
+  iso_image_bucket: 'arcnode-public'
+  iso_image_prefix: 'iso/customers'
 
 beta:
   log_level: INFO
@@ -34,3 +38,7 @@ beta:
     - 'https://arcnode.io'
     - 'https://www.arcnode.io'
   iso_version: '1.0.0-beta'
+  iso_pipeline_url: 'https://gitlab.com'
+  iso_pipeline_project_path: 'arcnode-io/platform-ems-iso'
+  iso_image_bucket: 'arcnode-public'
+  iso_image_prefix: 'iso/customers'
