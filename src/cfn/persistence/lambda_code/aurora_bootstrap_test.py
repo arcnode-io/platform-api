@@ -62,3 +62,34 @@ def test_measurements_schema_creates_partitioned_table_and_partman_parent() -> N
     assert "retention = '7 days'" in sql_block
     # Q3 lock: JSONB value column, not DOUBLE PRECISION
     assert "value       JSONB" in sql_block
+
+
+def test_put_secret_overwrites_cfn_placeholder_not_creates() -> None:
+    """The slice secrets are CFN-native — Lambda overwrites via PutSecretValue.
+
+    Calling create_secret would (a) fail (secret already exists), and (b)
+    re-create the orphan-leak class the CFN-native shift eliminates. Make
+    sure the helper takes the right path.
+    """
+    # Arrange — fake SM client tracking which method was called
+    calls: list[tuple[str, dict]] = []
+
+    class _FakeSM:
+        def put_secret_value(self, **kw: object) -> None:
+            calls.append(("put", kw))
+
+        def create_secret(self, **kw: object) -> None:
+            calls.append(("create", kw))
+
+    mod = _load_module()
+
+    # Act
+    mod._put_secret(_FakeSM(), "arcnode-ems-stack/vector-url", "postgres://x")
+
+    # Assert
+    assert len(calls) == 1
+    assert calls[0][0] == "put"
+    assert calls[0][1] == {
+        "SecretId": "arcnode-ems-stack/vector-url",
+        "SecretString": "postgres://x",
+    }

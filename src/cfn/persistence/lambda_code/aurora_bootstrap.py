@@ -212,10 +212,15 @@ def _create_user_if_missing(cur: Any, user: str, password: str) -> None:
 
 
 def _put_secret(sm: Any, name: str, value: str) -> None:
-    try:
-        sm.create_secret(Name=name, SecretString=value)
-    except sm.exceptions.ResourceExistsException:
-        sm.put_secret_value(SecretId=name, SecretString=value)
+    """Overwrite the CFN-created secret's placeholder with the real URL.
+
+    The per-slice secrets are declared as CFN AWS::SecretsManager::Secret
+    resources in aurora_resources.py — created with a GenerateSecretString
+    placeholder before the bootstrap Lambda runs. This call only writes
+    the real value; CFN owns the lifecycle (delete cleans automatically,
+    no orphans).
+    """
+    sm.put_secret_value(SecretId=name, SecretString=value)
 
 
 def _respond(event: dict, status: str, physical_id: str, data: dict) -> None:

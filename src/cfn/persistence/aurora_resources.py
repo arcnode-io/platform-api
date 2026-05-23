@@ -49,7 +49,36 @@ def aurora_cluster_resources(
     deploy uses this because LocalStack community can't fetch shared layers
     from real AWS (Pro-only feature). Prod always sets the layer.
     """
+    # Per-slice connection-URL secrets, CFN-native. Pre-creating them as
+    # CFN resources (with a placeholder value generated at CREATE) lets the
+    # stack OWN their lifecycle — delete cleans automatically, no orphans.
+    # The bootstrap Lambda overwrites the placeholder via PutSecretValue
+    # with the real `postgres://app_user:pw@endpoint:5432/db` URL once
+    # Aurora is up and the per-slice DB + app user are provisioned.
+    #
+    # Naming: `arcnode-ems-{STACK}/<slice>-url` — UserData curls these by
+    # name into /opt/arcnode/secrets.env, unchanged from the old path.
+    slice_secrets = {
+        f"AuroraSlice{slice_name.title()}Secret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": {
+                    "Fn::Sub": (f"arcnode-ems-${{AWS::StackName}}/{slice_name}-url"),
+                },
+                "Description": (
+                    f"Aurora {slice_name} slice connection URL "
+                    "(populated by AuroraBootstrapLambda PutSecretValue)."
+                ),
+                "GenerateSecretString": {
+                    "PasswordLength": 16,
+                    "ExcludePunctuation": True,
+                },
+            },
+        }
+        for slice_name in slices
+    }
     return {
+        **slice_secrets,
         "AuroraMasterSecret": {
             "Type": "AWS::SecretsManager::Secret",
             "Properties": {
@@ -140,7 +169,6 @@ def aurora_cluster_resources(
                                     "Effect": "Allow",
                                     "Action": [
                                         "secretsmanager:GetSecretValue",
-                                        "secretsmanager:CreateSecret",
                                         "secretsmanager:PutSecretValue",
                                     ],
                                     "Resource": "*",
@@ -183,7 +211,12 @@ def aurora_cluster_resources(
             # CREATE works in 4s, DELETE timed out at 246s on same ENI.
             "DeletionPolicy": "Retain",
             "UpdateReplacePolicy": "Retain",
-            "DependsOn": "AuroraInstance",
+            # Lambda writes connection URLs into the slice secrets via
+            # PutSecretValue → they must exist before invoke.
+            "DependsOn": [
+                "AuroraInstance",
+                *(f"AuroraSlice{s.title()}Secret" for s in slices),
+            ],
             "Properties": {
                 "ServiceToken": {"Fn::GetAtt": ["AuroraBootstrapLambda", "Arn"]},
                 "ClusterEndpoint": {

@@ -82,6 +82,42 @@ def test_master_secret_is_aws_secretsmanager_secret() -> None:
     assert gen["GenerateStringKey"] == "password"
 
 
+def test_slice_secrets_cfn_native_per_slice() -> None:
+    """One AWS::SecretsManager::Secret per slice — CFN owns the lifecycle
+    so stack delete cleans them. Bootstrap Lambda PutSecretValues the
+    real URL into the placeholder."""
+    # Arrange + Act
+    resources = aurora_cluster_resources(slices=("document", "vector", "timeseries"))
+
+    # Assert — three resources, names match the consumer (UserData) convention
+    for slice_name in ("document", "vector", "timeseries"):
+        key = f"AuroraSlice{slice_name.title()}Secret"
+        assert key in resources, f"missing CFN secret resource for {slice_name}"
+        secret = resources[key]
+        assert secret["Type"] == "AWS::SecretsManager::Secret"
+        # Name carries the `arcnode-ems-${AWS::StackName}/<slice>-url` shape
+        # — same path UserData curls into /opt/arcnode/secrets.env.
+        assert (
+            f"arcnode-ems-${{AWS::StackName}}/{slice_name}-url"
+            in secret["Properties"]["Name"]["Fn::Sub"]
+        )
+        # GenerateSecretString placeholder — Lambda overwrites it.
+        assert "GenerateSecretString" in secret["Properties"]
+
+
+def test_bootstrap_custom_resource_depends_on_slice_secrets() -> None:
+    """Lambda PutSecretValues into the slice secrets — they must exist first."""
+    # Arrange + Act
+    resources = aurora_cluster_resources(slices=("document", "vector"))
+    cr = resources["AuroraBootstrapCustomResource"]
+
+    # Assert
+    deps = cr["DependsOn"]
+    assert "AuroraInstance" in deps  # Aurora must be up before the Lambda DB ops
+    assert "AuroraSliceDocumentSecret" in deps
+    assert "AuroraSliceVectorSecret" in deps
+
+
 def test_returns_subnet_group_and_security_group() -> None:
     """Aurora needs a subnet group + SG; both reference the existing VPC."""
     # Arrange + Act
