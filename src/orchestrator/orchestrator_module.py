@@ -8,6 +8,7 @@ Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `PortalModule`, and
 from src.aws.aws_module import AwsModule
 from src.cfn.cfn_module import CfnModule
 from src.edp_client.edp_client_module import EdpClientModule
+from src.iso_bake.iso_bake_module import IsoBakeModule
 from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_service import OrchestratorService
 from src.portal.portal_module import PortalModule
@@ -24,6 +25,7 @@ class OrchestratorModule:
         cfn: CfnModule,
         portal: PortalModule,
         manifest: ManifestModule,
+        iso_bake: IsoBakeModule,
         ems_hmi_apk_url: str,
     ) -> None:
         self.service = OrchestratorService(
@@ -33,5 +35,6 @@ class OrchestratorModule:
             cfn=cfn.service,
             portal=portal.service,
             manifest=manifest.service,
+            iso_bake=iso_bake.service,
             ems_hmi_apk_url=ems_hmi_apk_url,
         )

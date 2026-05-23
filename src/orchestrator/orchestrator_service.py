@@ -21,6 +21,7 @@ from src.edp_client.edp_artifacts import (
     JobResult,
 )
 from src.edp_client.edp_client_service import EdpClientService
+from src.iso_bake.iso_bake_service import IsoBakeService
 from src.manifest.artifact_metadata import MOCK_SYSTEM_IMAGE_TEMPLATES
 from src.manifest.manifest_record import ManifestArtifact, ManifestFile
 from src.manifest.manifest_service import ManifestService
@@ -56,6 +57,7 @@ class OrchestratorService:
         cfn: CfnService,
         portal: PortalService,
         manifest: ManifestService,
+        iso_bake: IsoBakeService,
         ems_hmi_apk_url: str,
     ) -> None:
         self._edp = edp_client
@@ -64,6 +66,7 @@ class OrchestratorService:
         self._cfn = cfn
         self._portal = portal
         self._manifest = manifest
+        self._iso_bake = iso_bake
         self._ems_hmi_apk_url = ems_hmi_apk_url
 
     # Public — business intent
@@ -145,16 +148,18 @@ class OrchestratorService:
         payload: ConfiguratorPayload,
         archived: list[tuple[ArtifactRef, int]],
     ) -> OrderEmsDelivery:
-        """Render + upload per-order CFN template; expose its S3 URL.
+        """Render + upload per-order delivery artifacts; expose their S3 URLs.
 
-        ISO path: skip CFN bits entirely (air-gapped delivery is a future build).
-        CFN paths: same yaml — operator downloads and runs from their partition.
-        DTM is fetched via presigned URL so the operator's instance doesn't need
-        AWS credentials.
+        ISO path: render install.json + cfg.customer.yml + stash DTM under
+        orders/{order_id}/iso-overlay/. The build pipeline downloads these
+        into live-build's includes.chroot/etc/arcnode/ before `lb build`.
+
+        CFN paths: yaml + presigned DTM URL — operator runs from their partition.
         """
         path = derive_delivery_path(payload.aws_partition)
         if path == DeliveryPath.ISO:
-            return OrderEmsDelivery(path=path)
+            overlay_url = await self._build_iso_overlay(order_id, payload, archived)
+            return OrderEmsDelivery(path=path, iso_overlay_url=overlay_url)
         self._find_dtm_url(archived)  # validate it exists
         dtm_key = f"orders/{order_id}/dtm.json"
         dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
@@ -170,6 +175,42 @@ class OrchestratorService:
             f"orders/{order_id}/ems-stack.yaml", template
         )
         return OrderEmsDelivery(path=path, template_url=template_url)
+
+    async def _build_iso_overlay(
+        self,
+        order_id: str,
+        payload: ConfiguratorPayload,
+        archived: list[tuple[ArtifactRef, int]],
+    ) -> str:
+        """Stage the per-customer ISO overlay in S3, return its dir URL.
+
+        install.json + cfg.customer.yml uploaded under iso-overlay/. DTM
+        archived alongside (already uploaded by _archive — we re-key it into
+        the overlay dir for the build runner's single-prefix download).
+        """
+        install_json = self._iso_bake.render_install_json(
+            payload=payload, order_id=order_id
+        )
+        customer_cfg = self._iso_bake.render_customer_cfg(
+            payload=payload, order_id=order_id
+        )
+        overlay_prefix = f"orders/{order_id}/iso-overlay"
+        await self._s3.upload_json(
+            f"{overlay_prefix}/install.json", install_json
+        )
+        await self._s3.upload_yaml(
+            f"{overlay_prefix}/cfg.customer.yml", customer_cfg
+        )
+        # Reason: DTM already lives under orders/{order_id}/ from _archive;
+        # the build runner downloads the WHOLE overlay/ prefix, so we make
+        # a sibling copy here rather than reach across prefixes at build time.
+        dtm_src_url = self._find_dtm_url(archived)
+        dtm_filename = dtm_src_url.rsplit("/", 1)[-1]
+        await self._s3.archive_from_url(
+            dtm_src_url, key=f"{overlay_prefix}/{dtm_filename}"
+        )
+        # Return the dir-level presigned URL (the build runner appends file names)
+        return await self._s3.generate_presigned_url(f"{overlay_prefix}/")
 
     async def _publish_portal(
         self,

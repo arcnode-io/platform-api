@@ -42,6 +42,13 @@ class OrderEmsDelivery(BaseModel):
 
     path: DeliveryPath
     template_url: Optional[str] = None
+    # ISO path only: presigned S3 URL of the per-customer overlay dir
+    # (install.json + cfg.customer.yml + dtm.json). Build pipeline downloads
+    # these into live-build's includes.chroot before `lb build`.
+    iso_overlay_url: Optional[str] = None
+    # ISO path only: presigned S3 URL of the finished arcnode-ems-*.iso once
+    # the build pipeline uploads it. None until the bake completes.
+    iso_image_url: Optional[str] = None
 
 
 class PostOrderResponse(BaseModel):
