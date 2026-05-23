@@ -109,12 +109,6 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
         name="AWS Deployment",
         subtitle="MOCK CloudFormation template (per-order)",
     ),
-    # ISO path's system image — air-gapped appliance .iso baked per-customer.
-    "on_prem_appliance": ArtifactMetadata(
-        section=ManifestSection.SYSTEM_IMAGES,
-        name="On-Prem Appliance",
-        subtitle="Debian Bookworm · hybrid ISO · 8c/32GB/256GB SSD min",
-    ),
 }
 
 

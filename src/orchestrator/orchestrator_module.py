@@ -36,6 +36,5 @@ class OrchestratorModule:
             portal=portal.service,
             manifest=manifest.service,
             iso_bake=iso_bake.service,
-            iso_pipeline=iso_bake.pipeline_service,
             ems_hmi_apk_url=ems_hmi_apk_url,
         )

@@ -43,16 +43,10 @@ class OrderEmsDelivery(BaseModel):
     path: DeliveryPath
     template_url: Optional[str] = None
     # ISO path only: presigned S3 URL of the per-customer overlay dir
-    # (install.json + cfg.customer.yml + dtm.json). Build pipeline downloads
-    # these into live-build's includes.chroot before `lb build`.
+    # (install.json + cfg.customer.yml + dtm.json). Future bake worker
+    # picks this up to produce a personalized ISO; until then the customer
+    # downloads the reference ISO and the wizard reads cfg.customer.yml.
     iso_overlay_url: Optional[str] = None
-    # ISO path only: presigned S3 URL of the finished arcnode-ems-*.iso once
-    # the build pipeline uploads it. Set optimistically to the deterministic
-    # key — URL 404s until the bake completes, then resolves.
-    iso_image_url: Optional[str] = None
-    # ISO path only: gitlab pipeline id for the bake. Lets the orders GET
-    # endpoint poll status without needing to keep its own job ledger.
-    iso_pipeline_id: Optional[int] = None
 
 
 class PostOrderResponse(BaseModel):

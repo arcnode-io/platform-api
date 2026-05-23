@@ -40,15 +40,7 @@ class AppModule:
         self.cfn_module = CfnModule()
         self.portal_module = PortalModule()
         self.manifest_module = ManifestModule()
-        self.iso_bake_module = IsoBakeModule(
-            iso_version=self.config.iso_version,
-            gitlab_url=self.config.iso_pipeline_url,
-            project_path=self.config.iso_pipeline_project_path,
-            # Reason: trigger token is a secret — env, not cfg. Missing-env
-            # fails fast with KeyError; never silently disables the bake.
-            trigger_token=os.environ.get("GITLAB_TRIGGER_TOKEN", ""),
-            iso_bucket_prefix=self.config.iso_image_prefix,
-        )
+        self.iso_bake_module = IsoBakeModule(iso_version=self.config.iso_version)
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,

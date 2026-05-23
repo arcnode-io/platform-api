@@ -37,10 +37,6 @@ class Config(BaseModel):  # noqa: D101
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
     cors_origins: list[str]  # Allowed origins for browser fetches (e.g. arcnode.io)
     iso_version: str  # platform-ems-iso semver — baked into install.json per order
-    iso_pipeline_url: str  # gitlab base URL (https://gitlab.com)
-    iso_pipeline_project_path: str  # "arcnode-io/platform-ems-iso"
-    iso_image_bucket: str  # S3 bucket the bake pipeline uploads ISOs to
-    iso_image_prefix: str  # key prefix under the bucket (e.g. "iso/customers")
 
 
 class _ConfigMap(BaseModel):
