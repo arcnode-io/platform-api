@@ -288,6 +288,9 @@ bedrock-runtime = [
 cloudformation = [
     { name = "mypy-boto3-cloudformation" },
 ]
+lambda = [
+    { name = "mypy-boto3-lambda" },
+]
 
 [[package]]
 name = "botocore"
@@ -893,6 +896,15 @@ wheels = [
 ]
 
 [[package]]
+name = "mypy-boto3-lambda"
+version = "1.43.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f8/d9/de2ca1f584ca9522ba94a7b3fd76ecde609d6a67ce3c598d2da705c1067f/mypy_boto3_lambda-1.43.0.tar.gz", hash = "sha256:a58de26b5c13be54deab31723ee9ab7aaa922be1dfbd093dc3a4ca12cc853157", size = 51934, upload-time = "2026-04-29T23:02:24.512Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/2a/f7c67471c63314ef1ab68099d1137ba2337bbbde1e2166fb9e0b9556d894/mypy_boto3_lambda-1.43.0-py3-none-any.whl", hash = "sha256:847b8f12b74f881c743464cd0010a04e2b21201b39ac92b1040c6cd276bac4e6", size = 60308, upload-time = "2026-04-29T23:02:21.409Z" },
+]
+
+[[package]]
 name = "mypy-extensions"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1023,11 +1035,12 @@ dev = [
     { name = "asyncpg-stubs" },
     { name = "bandit" },
     { name = "black", extra = ["d"] },
-    { name = "boto3-stubs", extra = ["bedrock-runtime", "cloudformation"] },
+    { name = "boto3-stubs", extra = ["bedrock-runtime", "cloudformation", "lambda"] },
     { name = "cfn-lint" },
     { name = "deptry" },
     { name = "mypy-boto3-bedrock-runtime" },
     { name = "mypy-boto3-cloudformation" },
+    { name = "mypy-boto3-lambda" },
     { name = "pip" },
     { name = "pip-audit" },
     { name = "poethepoet" },
@@ -1060,11 +1073,12 @@ dev = [
     { name = "asyncpg-stubs", specifier = ">=0.29" },
     { name = "bandit", specifier = ">=1.8.0" },
     { name = "black", extras = ["d"], specifier = ">=26.3.1" },
-    { name = "boto3-stubs", extras = ["bedrock-runtime", "cloudformation"], specifier = ">=1.35.0" },
+    { name = "boto3-stubs", extras = ["bedrock-runtime", "cloudformation", "lambda"], specifier = ">=1.35.0" },
     { name = "cfn-lint", specifier = ">=1.49.3" },
     { name = "deptry", specifier = ">=0.23.0" },
     { name = "mypy-boto3-bedrock-runtime", specifier = ">=1.35.0" },
     { name = "mypy-boto3-cloudformation", specifier = ">=1.35.0" },
+    { name = "mypy-boto3-lambda", specifier = ">=1.43.0" },
     { name = "pip", specifier = ">=25.1.1" },
     { name = "pip-audit", specifier = ">=2.6.1" },
     { name = "poethepoet", specifier = ">=0.32.0" },

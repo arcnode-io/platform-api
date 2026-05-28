@@ -33,9 +33,10 @@ dev = [
     "pip>=25.1.1",
     "testcontainers[postgres,localstack]>=4.8.1",
     "cfn-lint>=1.49.3",
-    "boto3-stubs[bedrock-runtime,cloudformation]>=1.35.0",
+    "boto3-stubs[bedrock-runtime,cloudformation,lambda]>=1.35.0",
     "mypy-boto3-bedrock-runtime>=1.35.0",
     "mypy-boto3-cloudformation>=1.35.0",
+    "mypy-boto3-lambda>=1.43.0",
 ]
 
 [tool.poe.tasks]
