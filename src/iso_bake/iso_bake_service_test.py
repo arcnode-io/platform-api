@@ -24,7 +24,7 @@ ORDER_ID = "11111111-2222-3333-4444-555555555555"
 
 def _payload(**overrides: object) -> ConfiguratorPayload:
     """Minimal valid payload — override per test."""
-    base = {
+    base: dict[str, object] = {
         "operator_org": "Brookside Energy LLC",
         "deployment_site_name": "Brookside DC-1",
         "contact_email": "ops@brookside.energy",

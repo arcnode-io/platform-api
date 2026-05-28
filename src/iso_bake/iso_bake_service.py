@@ -47,7 +47,9 @@ class IsoBakeService:
     ) -> str:
         """install.json shape matches the wizard's InstallIdentity contract."""
         # Designer's middle-dot ("·") separates market name and hub on Step 1.
-        market = f"{payload.wholesale_market.value.upper()} · {payload.settlement_point}"
+        market = (
+            f"{payload.wholesale_market.value.upper()} · {payload.settlement_point}"
+        )
         body = {
             "customer": payload.operator_org,
             "site": payload.deployment_site_name,

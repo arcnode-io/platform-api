@@ -201,12 +201,8 @@ class OrchestratorService:
             payload=payload, order_id=order_id
         )
         overlay_prefix = f"orders/{order_id}/iso-overlay"
-        await self._s3.upload_json(
-            f"{overlay_prefix}/install.json", install_json
-        )
-        await self._s3.upload_yaml(
-            f"{overlay_prefix}/cfg.customer.yml", customer_cfg
-        )
+        await self._s3.upload_json(f"{overlay_prefix}/install.json", install_json)
+        await self._s3.upload_yaml(f"{overlay_prefix}/cfg.customer.yml", customer_cfg)
         # Reason: DTM already lives under orders/{order_id}/ from _archive;
         # the build runner downloads the WHOLE overlay/ prefix, so we make
         # a sibling copy here rather than reach across prefixes at build time.
