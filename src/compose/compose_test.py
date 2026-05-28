@@ -41,6 +41,28 @@ def test_compose_parses_and_declares_hivemq(variant_path: Path) -> None:
     assert spec["services"]["hivemq"]["image"].startswith("hivemq/hivemq-ce")
 
 
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_telemetry_writer_uses_baked_image_not_runtime_pip(
+    variant_path: Path,
+) -> None:
+    """telemetry-writer must reference the ECR image (deps baked in), not
+    python:3.13-alpine + runtime pip install.
+
+    Reason: runtime `pip install paho-mqtt psycopg2-binary` 404s on
+    pypi.org if the instance reboots offline → container restart-loops →
+    telemetry ingest dies. Same image consumed by appliance (platform-
+    ems-iso) — bug fix lands once, propagates everywhere.
+    """
+    # Arrange + Act
+    svc = yaml.safe_load(variant_path.read_text())["services"]["telemetry-writer"]
+
+    # Assert — ECR image is owned by platform-api's build_telemetry_writer
+    # CI job; see src/compose/images/telemetry-writer/Dockerfile.
+    assert svc["image"] == "public.ecr.aws/y1d2j6a8/ems-telemetry-writer:latest"
+    assert "command" not in svc, "image has CMD baked in; no override needed"
+    assert "volumes" not in svc, "script lives in image; no bind-mount needed"
+
+
 def test_defense_ships_broker_leg_plus_analyst_server() -> None:
     """Defense ships broker leg + analyst-server (Phase 1 smoke). No init
     containers (consumers self-seed). analyst-model lands in Phase 3."""

@@ -38,16 +38,15 @@ services:
   # MQTT → Tiger Cloud bridge. HiveMQ CE doesn't ship a Postgres connector
   # (Enterprise-only, sales-gated); we own the bridge as a tiny subscriber
   # instead. Same `INSERT INTO measurements ...` SQL as defense.
+  #
+  # Image bakes paho-mqtt + psycopg2-binary preinstalled (see
+  # src/compose/images/telemetry-writer/Dockerfile). No runtime pip
+  # install → restart-clean on instance reboot, no resilience tax on
+  # transient pypi outages.
   telemetry-writer:
-    image: python:3.13-alpine
+    image: public.ecr.aws/y1d2j6a8/ems-telemetry-writer:latest
     restart: unless-stopped
     <<: *env-files
-    volumes:
-      - /opt/arcnode/init-scripts:/scripts:ro
-    command:
-      - sh
-      - -c
-      - "pip install --quiet paho-mqtt psycopg2-binary && python /scripts/telemetry_writer.py"
     depends_on:
       hivemq:
         condition: service_started

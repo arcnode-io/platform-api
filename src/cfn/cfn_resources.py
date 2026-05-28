@@ -500,17 +500,14 @@ def build_userdata(
             "  loader_role_arn: $NEPTUNE_LOADER_ROLE_ARN\n"
             "YML"
         )
-    # Init scripts compose mounts at /opt/arcnode/init-scripts/. All
-    # data seeding (vector, graph, ercot) lives in consumer services —
-    # mcp-server pkg loaded by analyst-server seeds vector + graph;
-    # analyst-model seeds ercot. Only telemetry-writer (the MQTT →
-    # Postgres bridge) ships from platform-api.
-    init_scripts = ["telemetry_writer.py"]
-    init_script_lines = "\n".join(
-        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/init-scripts/{s} "
-        f"-o /opt/arcnode/init-scripts/{s}"
-        for s in init_scripts
-    )
+    # Init scripts: previously /opt/arcnode/init-scripts/telemetry_writer.py
+    # was curl-fetched + bind-mounted into a python:3.13-alpine container
+    # that did `pip install paho-mqtt psycopg2-binary` at startup. Replaced
+    # by the public ECR image ems-telemetry-writer (built from
+    # src/compose/images/telemetry-writer/Dockerfile) — script + deps baked
+    # in. No UserData fetch needed. All data seeding (vector, graph, ercot)
+    # lives in consumer services (mcp-server in analyst-server seeds vector +
+    # graph; analyst-model seeds ercot).
     # Observability config (prometheus + grafana provisioning) compose
     # mounts at /opt/arcnode/observability/. mlflow gets its own data
     # dirs; no shipped config (sqlite + filesystem artifact root, set
@@ -541,7 +538,7 @@ def build_userdata(
         "--stack ${AWS::StackName} --resource EmsInstance "
         "--region ${AWS::Region}' ERR\n"
         "set -e\n"
-        "mkdir -p /opt/arcnode/init-scripts /opt/arcnode/observability/prometheus-data "
+        "mkdir -p /opt/arcnode/observability/prometheus-data "
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
         "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
@@ -568,10 +565,9 @@ def build_userdata(
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
-        "# Fetch arcnode-public artifacts (compose + init scripts).\n"
+        "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
-        f"{init_script_lines}\n"
         f"{observability_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"

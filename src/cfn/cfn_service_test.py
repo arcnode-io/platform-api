@@ -310,10 +310,13 @@ def test_userdata_fetches_arcnode_public_static_artifacts() -> None:
     assert "arcnode-public.s3" in commercial
     assert "/compose/commercial/docker-compose.yaml" in commercial
     assert "/compose/defense/docker-compose.yaml" in defense
-    # Assert — telemetry-writer init script common to both. All seed
-    # init scripts (vector/graph/ercot) moved to consumer-self-seed.
-    assert "/init-scripts/telemetry_writer.py" in commercial
-    assert "/init-scripts/telemetry_writer.py" in defense
+    # Assert — UserData no longer curl-fetches the telemetry-writer script.
+    # ems-telemetry-writer image (built in build_telemetry_writer CI job)
+    # ships the script + deps preinstalled, referenced by both composes.
+    assert "/init-scripts/telemetry_writer.py" not in commercial
+    assert "/init-scripts/telemetry_writer.py" not in defense
+    assert "mkdir -p /opt/arcnode/init-scripts" not in commercial
+    assert "mkdir -p /opt/arcnode/init-scripts" not in defense
 
 
 def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
