@@ -14,18 +14,43 @@ expired, hostname mismatch, wrong-protocol-on-port.
 
 Runtime: python3.13 outside VPC. boto3 + urllib.request + socket + ssl
 are all built-in.
+
+Hard deadline: HANDLER_DEADLINE_S (25s) via SIGALRM wraps the whole
+handler. `socket.create_connection`'s `timeout=` only bounds the TCP
+connect phase — DNS lookup is unbounded and can block forever if the
+host doesn't resolve. SIGALRM catches that and any other hang so the
+function ALWAYS responds to CFN (SUCCESS or FAILED) instead of dying
+silently at Lambda's 30s ceiling. Previously a DNS-block left CFN
+waiting ~50 min for retries before giving up.
 """
 
 import json
+import signal
 import socket
 import ssl
 import urllib.request
 from urllib.parse import urlsplit
 
+# Leave ~5s headroom for _respond's PUT to the CFN response URL.
+HANDLER_DEADLINE_S = 25
+
+
+class HandlerTimeoutError(Exception):
+    """Raised by SIGALRM when the handler exceeds its deadline."""
+
 
 def handler(event: dict, context: object) -> None:
     request_type = event["RequestType"]
     physical_id = event.get("PhysicalResourceId", "customer-url-preflight")
+
+    def _on_alarm(_signum: int, _frame: object) -> None:
+        raise HandlerTimeoutError(
+            f"preflight exceeded {HANDLER_DEADLINE_S}s deadline "
+            "(DNS hang on customer URL?)"
+        )
+
+    signal.signal(signal.SIGALRM, _on_alarm)
+    signal.alarm(HANDLER_DEADLINE_S)
     try:
         if request_type == "Create":
             props = event["ResourceProperties"]
@@ -33,8 +58,10 @@ def handler(event: dict, context: object) -> None:
             _check_neo4j(props["GraphUrl"])
         # Update + Delete are no-ops: the URLs are validated at Create;
         # updates re-fire only if ProbeVersion bumps, which we don't here.
+        signal.alarm(0)
         _respond(event, "SUCCESS", physical_id, {})
     except Exception as e:
+        signal.alarm(0)
         _respond(event, "FAILED", physical_id, {"Reason": str(e)})
 
 
@@ -131,4 +158,7 @@ def _respond(event: dict, status: str, physical_id: str, data: dict) -> None:
         method="PUT",
         headers={"content-type": "", "content-length": str(len(body))},
     )
-    urllib.request.urlopen(req)
+    # Defensive timeout — S3 PUT should be <1s; bound at 5s so even if
+    # something goes sideways we hit Lambda's 30s ceiling cleanly with a
+    # proper error rather than mid-stream hang.
+    urllib.request.urlopen(req, timeout=5)
