@@ -181,7 +181,11 @@ def commercial_stack(
         OnFailure="ROLLBACK",
     )
     try:
-        _wait_for_terminal(cfn, stack_name, "CREATE", STACK_READY_TIMEOUT_S)
+        # *2 like defense_stack — real-AWS CFN creates have hit 25-30 min
+        # on Aurora alone (verified by pipeline 2562482036). Doubling gives
+        # headroom for transient slowdowns without making the test
+        # arbitrarily long.
+        _wait_for_terminal(cfn, stack_name, "CREATE", STACK_READY_TIMEOUT_S * 2)
         outputs = {
             o["OutputKey"]: o["OutputValue"]
             for o in cfn.describe_stacks(StackName=stack_name)["Stacks"][0].get(
