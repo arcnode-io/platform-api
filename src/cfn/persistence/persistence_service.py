@@ -79,43 +79,58 @@ class PersistenceService:
         self._psycopg2_layer_arn_template = psycopg2_layer_arn_template
 
     def build(
-        self, *, deployment_context: DeploymentContext, short: str
+        self, *, deployment_context: DeploymentContext, short: str, e2e: bool = False
     ) -> PersistenceBuild:
         """Return the per-variant persistence build.
 
         ``short`` is the 8-char prefix of the deployment uuid used for
         AWS-resource names that have tight length limits (e.g. AOSS
         policies cap at 32 chars — full StackName blows the limit).
+
+        ``e2e`` skips the customer-URL preflight resource. The preflight
+        Lambda runs from a random AWS public IP; if the customer's
+        Tiger Cloud / Aura allowlist (a per-tenant setting on their
+        account, not ours) excludes Lambda ranges, preflight fails
+        even when the actual EC2-side connection would succeed. e2e
+        tests run against accounts we control where opening the
+        allowlist is the operator's responsibility, not the CFN
+        template's.
         """
         if deployment_context == DeploymentContext.COMMERCIAL:
-            return self._commercial_build()
+            return self._commercial_build(e2e=e2e)
         return self._defense_build(short=short)
 
-    def _commercial_build(self) -> PersistenceBuild:
+    def _commercial_build(self, *, e2e: bool = False) -> PersistenceBuild:
+        resources: dict[str, dict] = {
+            **aurora_cluster_resources(
+                lambda_runtime=self._lambda_runtime,
+                psycopg2_layer_arn_template=self._psycopg2_layer_arn_template,
+                slices=COMMERCIAL_SLICES,
+            ),
+            **vendor_url_secrets(),
+            **agent_api_key_secrets(),
+        }
+        if not e2e:
+            resources.update(
+                customer_url_preflight_resources(
+                    lambda_runtime=self._lambda_runtime,
+                )
+            )
+        depends_on = [
+            "AuroraBootstrapCustomResource",
+            "TimeseriesUrlSecret",
+            "GraphUrlSecret",
+            "OpenweathermapApiKeySecret",
+        ]
+        if not e2e:
+            depends_on.append("CustomerUrlPreflightCustomResource")
         return PersistenceBuild(
-            resources={
-                **aurora_cluster_resources(
-                    lambda_runtime=self._lambda_runtime,
-                    psycopg2_layer_arn_template=self._psycopg2_layer_arn_template,
-                    slices=COMMERCIAL_SLICES,
-                ),
-                **vendor_url_secrets(),
-                **agent_api_key_secrets(),
-                **customer_url_preflight_resources(
-                    lambda_runtime=self._lambda_runtime,
-                ),
-            },
+            resources=resources,
             parameters={
                 **commercial_url_parameters(),
                 **agent_api_key_parameters(),
             },
-            ems_instance_depends_on=[
-                "AuroraBootstrapCustomResource",
-                "TimeseriesUrlSecret",
-                "GraphUrlSecret",
-                "OpenweathermapApiKeySecret",
-                "CustomerUrlPreflightCustomResource",
-            ],
+            ems_instance_depends_on=depends_on,
         )
 
     def _defense_build(self, *, short: str) -> PersistenceBuild:

@@ -70,6 +70,7 @@ class CfnService:
         persistence = self._persistence.build(
             deployment_context=deployment_context,
             short=short,
+            e2e=e2e,
         )
         # CFN Description is the first thing operators see in the AWS console
         # before deploying — surface the Bedrock prereq here so they don't get
