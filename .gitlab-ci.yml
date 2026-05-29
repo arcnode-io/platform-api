@@ -83,7 +83,10 @@ e2e_commercial:
   script:
     # pyproject default addopts = "-m 'not e2e'" → must opt-in explicitly.
     - uv run pytest -m e2e tests/e2e/test_commercial.py -v --junitxml=junit-e2e.xml
-  timeout: 30 minutes
+  # commercial_stack is session-scoped (one stack across both tests).
+  # Budget: 25 min CFN create + 10 min /health + (2 × ~5 min test work) +
+  # ~10 min teardown ≈ 55 min. 90 min for AWS-flake headroom.
+  timeout: 90 minutes
 
 e2e_defense:
   # Real-AWS e2e — deploys the defense stack (Aurora + Neptune + AOSS)

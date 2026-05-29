@@ -20,13 +20,13 @@ import pytest
 import urllib3
 
 # Explicit fixture imports — no conftest.py auto-discovery. commercial_stack
-# pulls in cfn/aura_url/tiger_url/site_id transitively, so all must be in
-# scope here for pytest's resolver.
+# pulls in cfn/aura_url/tiger_url/commercial_site_id transitively, so all
+# must be in scope here for pytest's resolver.
 from .fixtures import (  # noqa: F401
     aura_url,
     cfn,
+    commercial_site_id,
     commercial_stack,
-    site_id,
     tiger_conn,
     tiger_url,
 )

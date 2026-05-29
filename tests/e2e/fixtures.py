@@ -63,6 +63,15 @@ def site_id() -> str:
 
 
 @pytest.fixture(scope="session")
+def commercial_site_id() -> str:
+    """Stable site_id across all session-scoped commercial tests.
+    Parallel to defense_site_id — both tiers share one stack per session
+    so we don't pay 1 Aurora minute per test (was function-scoped before)."""
+    pid = os.environ.get("CI_PIPELINE_ID", uuid.uuid4().hex[:8])
+    return f"ci_{pid}_{uuid.uuid4().hex[:6]}"
+
+
+@pytest.fixture(scope="session")
 def defense_site_id() -> str:
     """Stable site_id across all session-scoped defense tests."""
     pid = os.environ.get("CI_PIPELINE_ID", uuid.uuid4().hex[:8])
@@ -127,18 +136,26 @@ def defense_stack(
         cfn.delete_stack(StackName=stack_name)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def commercial_stack(
-    cfn: CloudFormationClient, aura_url: str, tiger_url: str, site_id: str
+    cfn: CloudFormationClient,
+    aura_url: str,
+    tiger_url: str,
+    commercial_site_id: str,
 ) -> Iterator[dict[str, str]]:
-    """Deploys a commercial smoke stack, yields {name, site_id}, tears down."""
+    """Deploys a commercial smoke stack, yields {name, site_id}, tears down.
+
+    Session-scoped: one stack shared across all commercial tests in a
+    pytest session. Each test cleans up its measurements by site_id
+    after assertions (DELETE_FOR_SITE_SQL), so DB isolation stays
+    per-row not per-stack. Matches the defense_stack pattern."""
     duid = str(uuid.uuid4())
     stack_name = f"smoke-ci-{duid.split('-')[0]}"
 
     template = CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=duid,
         dtm_url=DTM_URL,
-        site_id=site_id,
+        site_id=commercial_site_id,
         wholesale_market="ercot",
         settlement_point="HB_NORTH",
         deployment_context=DeploymentContext.COMMERCIAL,
@@ -173,7 +190,7 @@ def commercial_stack(
         }
         yield {
             "name": stack_name,
-            "site_id": site_id,
+            "site_id": commercial_site_id,
             "public_ip": outputs["PublicIp"],
         }
     finally:
