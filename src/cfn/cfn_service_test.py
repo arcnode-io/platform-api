@@ -149,8 +149,11 @@ def test_render_template_userdata_signals_cfn_on_success_and_failure() -> None:
     # Assert — aws-cfn-bootstrap installed via dnf (NOT pip — see comment
     # in cfn_resources.build_userdata). Lands at /usr/bin/cfn-signal.
     assert "dnf install -y aws-cfn-bootstrap" in rendered
-    # Trap fires cfn-signal -e 1 on ANY error
-    assert "trap '/usr/bin/cfn-signal -e 1" in rendered
+    # Trap fires _signal_failure on ANY error — captures last 50 lines
+    # of /var/log/cloud-init-output.log and passes via cfn-signal --reason.
+    assert "trap _signal_failure ERR" in rendered
+    assert "/usr/bin/cfn-signal -e 1" in rendered
+    assert "/var/log/cloud-init-output.log" in rendered
     # Success signal at the end
     assert "cfn-signal -e 0" in rendered
     # EmsInstance gates CREATE_COMPLETE on the signal

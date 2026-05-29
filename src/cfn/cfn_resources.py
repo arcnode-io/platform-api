@@ -534,9 +534,23 @@ def build_userdata(
         "#!/bin/bash\n"
         "set -uo pipefail\n"
         "dnf install -y aws-cfn-bootstrap\n"
-        "trap '/usr/bin/cfn-signal -e 1 "
-        "--stack ${AWS::StackName} --resource EmsInstance "
-        "--region ${AWS::Region}' ERR\n"
+        # cfn-signal carries a --reason field (max 1024 chars). Tail
+        # /var/log/cloud-init-output.log and pass it on failure so
+        # stack rollbacks are self-diagnosing — without this we just
+        # see "Received FAILURE signal" with no context after EC2
+        # terminates. Pipeline 2562954562 stack smoke-ci-4fca0a41 was
+        # the case that motivated this.
+        # `${!var}` is Fn::Sub's escape — emits literal `${var}` (bash
+        # expansion) instead of trying to resolve as a CFN intrinsic.
+        "_signal_failure() {\n"
+        "  local reason\n"
+        "  reason=$(tail -50 /var/log/cloud-init-output.log 2>/dev/null "
+        "| tr '\\n' ' ' | head -c 900)\n"
+        "  /usr/bin/cfn-signal -e 1 "
+        "--stack ${AWS::StackName} --resource EmsInstance --region ${AWS::Region} "
+        '--reason "${!reason:-cloud-init log unavailable}"\n'
+        "}\n"
+        "trap _signal_failure ERR\n"
         "set -e\n"
         "mkdir -p /opt/arcnode/observability/prometheus-data "
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
