@@ -59,26 +59,51 @@ publish_compose:
   only:
     - main
 
-e2e:
-  # Real-AWS e2e — pytest suite under tests/e2e/ deploys the commercial
-  # stack with the industrial-fixtures DTM, asserts gateway → MQTT → writer
-  # → Tiger persistence, tears down. Catches CFN/UserData/VPC/IAM bugs the
-  # unit + integration suites can't. ~$0.10/run, ~20min wall clock.
-  #
-  # AURA_CONNECTION_STRING + TIGERDATA_CONNECTION_STRING must be set in
-  # project CI/CD variables (masked + protected). AWS creds come from the
-  # runner's role (same as publish_compose).
+.e2e_base: &e2e_base
   stage: e2e
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'   # nightly cron
-    - if: '$CI_PIPELINE_SOURCE == "web"'         # manual "Run pipeline"
-    - if: '$CI_PIPELINE_SOURCE == "api" && $RUN_DEFENSE_E2E == "1"'  # on-demand defense
-  script:
-    - uv run pytest -m e2e -v --junitxml=junit-e2e.xml
   artifacts:
     when: always
     reports:
       junit: junit-e2e.xml
+
+e2e_commercial:
+  # Real-AWS e2e — deploys the commercial stack (Tiger Cloud + S3) with
+  # the industrial-fixtures DTM, asserts gateway → MQTT → telemetry-writer
+  # → Tiger persistence, tears down. Catches CFN/UserData/VPC/IAM bugs
+  # the unit + integration suites can't. ~$0.10/run, ~20min wall clock.
+  #
+  # AURA_CONNECTION_STRING + TIGERDATA_CONNECTION_STRING must be set in
+  # project CI/CD variables (masked + protected). AWS creds come from the
+  # runner's role (same as publish_compose).
+  <<: *e2e_base
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'   # cron
+    - if: '$CI_PIPELINE_SOURCE == "web"'         # manual "Run pipeline" UI
+    - if: '$CI_PIPELINE_SOURCE == "api"'         # glab ci run
+  script:
+    # pyproject default addopts = "-m 'not e2e'" → must opt-in explicitly.
+    - uv run pytest -m e2e tests/e2e/test_commercial.py -v --junitxml=junit-e2e.xml
+  timeout: 30 minutes
+
+e2e_defense:
+  # Real-AWS e2e — deploys the defense stack (Aurora + Neptune + AOSS)
+  # with the industrial-fixtures DTM. Same gateway → MQTT → writer →
+  # persistence chain, validated against the sovereign cloud topology.
+  # Costlier than commercial (Neptune + AOSS) → manual on API triggers,
+  # auto on schedule + web (human-intent pipelines).
+  <<: *e2e_base
+  variables:
+    # File-level skipif in tests/e2e/test_defense.py looks at this env;
+    # job-level variables set it for the runner shell.
+    RUN_DEFENSE_E2E: "1"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "api"'
+      when: manual
+      allow_failure: true   # api-triggered pipelines succeed without playing defense
+  script:
+    - uv run pytest -m e2e tests/e2e/test_defense.py -v --junitxml=junit-e2e.xml
   timeout: 45 minutes
 
 mirror:
