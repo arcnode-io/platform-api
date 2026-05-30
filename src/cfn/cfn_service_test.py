@@ -113,8 +113,9 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
     assert "EmsSecurityGroup" in rendered
     # SSM resolve syntax — CFN looks up the latest AL2023 AMI in --region
     assert "resolve:ssm:/aws/service/ami-amazon-linux-latest" in rendered
-    # No stale Mappings table
-    assert "Mappings:" not in rendered
+    # No stale top-level Mappings table (anchor to start-of-line so this
+    # doesn't false-positive on BlockDeviceMappings: in the EmsInstance).
+    assert "\nMappings:" not in rendered
 
 
 def test_render_template_userdata_installs_docker_and_starts_compose() -> None:

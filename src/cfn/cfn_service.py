@@ -114,6 +114,24 @@ class CfnService:
                         "IamInstanceProfile": {"Ref": "EmsInstanceProfile"},
                         "SubnetId": {"Ref": "EmsSubnet"},
                         "SecurityGroupIds": [{"Ref": "EmsSecurityGroup"}],
+                        # AL2023 default root volume is 8 GB. Compose pulls
+                        # ~12 EMS + observability images; analyst-server +
+                        # analyst-model carry scipy / ML deps and exhaust
+                        # 8 GB mid-extract ("no space left on device" —
+                        # pipeline 2563132710 stack smoke-ci-07f469e9).
+                        # gp3 50 GB covers all images + grafana/mlflow
+                        # data + room for telemetry growth during the
+                        # test, ~$0.08/month delta to gp3 8 GB.
+                        "BlockDeviceMappings": [
+                            {
+                                "DeviceName": "/dev/xvda",
+                                "Ebs": {
+                                    "VolumeSize": 50,
+                                    "VolumeType": "gp3",
+                                    "DeleteOnTermination": True,
+                                },
+                            }
+                        ],
                         "UserData": {"Fn::Base64": {"Fn::Sub": userdata}},
                         "Tags": [
                             {"Key": "Name", "Value": f"arcnode-{short}"},
