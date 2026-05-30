@@ -404,6 +404,33 @@ def iam_resources(
                             ],
                         },
                     },
+                    {
+                        # Diagnostic upload — UserData ERR trap writes the
+                        # tail of /var/log/cloud-init-output.log here before
+                        # cfn-signaling failure. Without this, EC2 terminates
+                        # on ROLLBACK + the log dies with it, leaving the
+                        # CFN event with just "Received FAILURE signal" (no
+                        # context). With it, we curl s3://arcnode-artifacts/
+                        # diagnostic/${StackName}/cloud-init.log after a
+                        # rollback and see exactly what failed.
+                        "PolicyName": f"arcnode-{short}-diagnostic-write",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "s3:PutObject",
+                                    "Resource": {
+                                        "Fn::Sub": (
+                                            "arn:${AWS::Partition}:s3:::"
+                                            "arcnode-artifacts/diagnostic/"
+                                            "${AWS::StackName}/*"
+                                        ),
+                                    },
+                                }
+                            ],
+                        },
+                    },
                     *neptune_data_policy,
                     *aoss_data_policy,
                 ],
@@ -534,21 +561,21 @@ def build_userdata(
         "#!/bin/bash\n"
         "set -uo pipefail\n"
         "dnf install -y aws-cfn-bootstrap\n"
-        # cfn-signal carries a --reason field (max 1024 chars). Tail
-        # /var/log/cloud-init-output.log and pass it on failure so
-        # stack rollbacks are self-diagnosing — without this we just
-        # see "Received FAILURE signal" with no context after EC2
-        # terminates. Pipeline 2562954562 stack smoke-ci-4fca0a41 was
-        # the case that motivated this.
-        # `${!var}` is Fn::Sub's escape — emits literal `${var}` (bash
-        # expansion) instead of trying to resolve as a CFN intrinsic.
+        # On UserData failure: upload the full cloud-init log to S3
+        # (arcnode-artifacts/diagnostic/<stack>/cloud-init.log) BEFORE
+        # cfn-signal. Without this, EC2 terminates with ROLLBACK and the
+        # log dies — leaving the CFN event as just "Received FAILURE
+        # signal" with zero diagnostic. (cfn-signal --reason was tried
+        # first — the SignalResource API has no Reason param, the flag
+        # is silently ignored.) IAM role `arcnode-{short}-diagnostic-
+        # write` grants the upload. Pipeline 2562999614 stack
+        # smoke-ci-659de46a was the case that motivated this.
         "_signal_failure() {\n"
-        "  local reason\n"
-        "  reason=$(tail -50 /var/log/cloud-init-output.log 2>/dev/null "
-        "| tr '\\n' ' ' | head -c 900)\n"
+        "  aws s3 cp /var/log/cloud-init-output.log "
+        "s3://arcnode-artifacts/diagnostic/${AWS::StackName}/cloud-init.log "
+        "--region ${AWS::Region} || true\n"
         "  /usr/bin/cfn-signal -e 1 "
-        "--stack ${AWS::StackName} --resource EmsInstance --region ${AWS::Region} "
-        '--reason "${!reason:-cloud-init log unavailable}"\n'
+        "--stack ${AWS::StackName} --resource EmsInstance --region ${AWS::Region}\n"
         "}\n"
         "trap _signal_failure ERR\n"
         "set -e\n"
