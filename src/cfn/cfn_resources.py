@@ -627,6 +627,24 @@ def build_userdata(
         "# Start the EMS stack — init containers seed DBs\n"
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
         "cd /opt/arcnode && docker compose up -d\n"
+        # Give services 60s to settle (or fail) before snapshotting state.
+        # Without this, the snapshot catches every container as
+        # "Created/Starting" — useless for diagnosis. With it, crashed
+        # containers have already exited + show their final logs.
+        "sleep 60\n"
+        # ALWAYS upload compose state to S3 (pass or fail). UserData
+        # signaling SUCCESS doesn't mean the e2e tests will pass —
+        # a container that takes 5+ min to crash silently leaves /health
+        # unreachable. Compose-state snapshot makes the crash visible.
+        # Pipeline 2563217577 hit /health-never-200 with no postmortem.
+        "(echo '=== docker compose ps ==='; "
+        "docker compose ps; "
+        "echo '=== docker compose logs (tail 300) ==='; "
+        "docker compose logs --tail 300 --no-color) "
+        "> /tmp/compose-state.log 2>&1 || true\n"
+        "aws s3 cp /tmp/compose-state.log "
+        "s3://arcnode-artifacts/diagnostic/${AWS::StackName}/compose-state.log "
+        "--region ${AWS::Region} || true\n"
         "touch /opt/arcnode/userdata.done\n"
         "# Tell CFN we made it — stack will mark EmsInstance CREATE_COMPLETE.\n"
         "/usr/bin/cfn-signal -e 0 --stack ${AWS::StackName} "
