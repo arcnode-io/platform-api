@@ -389,3 +389,22 @@ def test_userdata_fetches_auth_slots_into_secrets_env() -> None:
         "AUTH_VIEWER_PW",
     ):
         assert env in rendered, f"{env} not fetched into secrets.env"
+
+
+def test_userdata_writes_hmi_runtime_config() -> None:
+    """UserData writes hmi-cfg.customer.yml with same-origin relative URIs +
+    empty mqttUri (SPA derives the broker URL) + the site id. Served by the
+    HMI container's nginx and fetched by the static SPA at boot."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — file + the runtime-config fields the SPA needs
+    assert "/opt/arcnode/hmi-cfg.customer.yml" in rendered
+    # split("YML")[1] = body between the `<<YML` opener and its `YML` close.
+    hmi_block = rendered.split("hmi-cfg.customer.yml")[1].split("YML")[1]
+    assert f"siteId: {SITE_ID}" in hmi_block
+    assert "deviceApiUri: /api" in hmi_block
+    assert "chatApiUri: /analyst" in hmi_block
+    # empty string → SPA derives the broker URL. The "" is YAML-escaped in
+    # the template scalar; cloud-init decodes it back to mqttUri: "" on disk.
+    assert "mqttUri:" in hmi_block

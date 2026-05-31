@@ -664,6 +664,21 @@ def build_userdata(
         "cat > /opt/arcnode/gateway-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
         "YML\n"
+        # HMI runtime-config overlay. Unlike gateway/analyst (env-merged via
+        # CFG_CUSTOMER_PATH), the HMI is a static SPA — its container's nginx
+        # serves this at /cfg.customer.yml and the SPA fetches it at boot.
+        # Relative URIs → nginx proxies same-origin to device-api + analyst;
+        # empty mqttUri → SPA derives ws(s)://${location.host}/mqtt. Only the
+        # deployment-specific keys are set; the rest deep-merge from the baked
+        # default block. camelCase matches the HMI's config.ts schema.
+        "cat > /opt/arcnode/hmi-cfg.customer.yml <<YML\n"
+        f"siteId: {site_id}\n"
+        f"deploymentName: {site_id}\n"
+        "deviceApiUri: /api\n"
+        "chatApiUri: /analyst\n"
+        'mqttUri: ""\n'
+        f"{e2e_line}"
+        "YML\n"
         f"{graph_block}\n"
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
