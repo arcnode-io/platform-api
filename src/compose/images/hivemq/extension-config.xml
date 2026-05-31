@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+  File RBAC policy. PLAIN passwords in v1: the 3 broker creds are random
+  per-deploy machine secrets living in a root-0600 credentials.xml — same
+  trust level as secrets.env (which holds DB URLs in plaintext). HASHED is a
+  v2 hardening. reload-interval lets a deploy-time credentials.xml rewrite
+  take effect without bouncing the broker.
+-->
+<extension-configuration>
+    <credentials-reload-interval>60</credentials-reload-interval>
+    <password-type>PLAIN</password-type>
+</extension-configuration>
