@@ -335,3 +335,57 @@ def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
     # Assert — no ARCNODE_VARIANT export in either variant's UserData
     assert "ARCNODE_VARIANT" not in commercial
     assert "ARCNODE_VARIANT" not in defense
+
+
+def test_auth_secrets_and_params_in_both_variants() -> None:
+    """Broker + human auth secrets are variant-agnostic (File RBAC runs in
+    every deployment), so both commercial and defense render all six secrets
+    plus the two customer-set login-password params."""
+    # Arrange + Act
+    for ctx in (DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD):
+        rendered = _render(ctx)
+
+        # Assert — four generated + two param-sourced secrets
+        for logical in (
+            "MqttGatewayPasswordSecret",
+            "MqttOperatorPasswordSecret",
+            "MqttViewerPasswordSecret",
+            "AuthJwtSecret",
+            "AuthOperatorPwSecret",
+            "AuthViewerPwSecret",
+        ):
+            assert logical in rendered, f"{logical} missing in {ctx}"
+        # NoEcho params the customer pastes
+        assert "AuthOperatorPw" in rendered
+        assert "AuthViewerPw" in rendered
+
+
+def test_userdata_writes_broker_credentials_xml() -> None:
+    """UserData writes /opt/arcnode/credentials.xml (bind-mounted into the
+    File RBAC extension) with the three broker passwords + the three role
+    identities."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — file path + the three File-RBAC usernames in the heredoc
+    assert "/opt/arcnode/credentials.xml" in rendered
+    for user in ("arcnode_gateway", "arcnode_operator", "arcnode_viewer"):
+        assert user in rendered, f"{user} missing from credentials.xml"
+
+
+def test_userdata_fetches_auth_slots_into_secrets_env() -> None:
+    """The six auth env vars land in secrets.env so device-api + gateway can
+    read them (names must match what those services consume)."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    for env in (
+        "MQTT_GATEWAY_PASSWORD",
+        "MQTT_OPERATOR_PASSWORD",
+        "MQTT_VIEWER_PASSWORD",
+        "AUTH_JWT_SECRET",
+        "AUTH_OPERATOR_PW",
+        "AUTH_VIEWER_PW",
+    ):
+        assert env in rendered, f"{env} not fetched into secrets.env"

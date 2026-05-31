@@ -38,6 +38,11 @@ from src.cfn.persistence.vendor_secrets import (
     commercial_url_parameters,
     vendor_url_secrets,
 )
+from src.cfn.persistence.auth_secrets import (
+    auth_human_parameters,
+    auth_human_secrets,
+    auth_machine_secrets,
+)
 from src.orders.configurator_payload import DeploymentContext
 
 DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
@@ -109,6 +114,8 @@ class PersistenceService:
             ),
             **vendor_url_secrets(),
             **agent_api_key_secrets(),
+            **auth_machine_secrets(),
+            **auth_human_secrets(),
         }
         if not e2e:
             resources.update(
@@ -121,6 +128,10 @@ class PersistenceService:
             "TimeseriesUrlSecret",
             "GraphUrlSecret",
             "OpenweathermapApiKeySecret",
+            # Broker + human auth secrets — UserData reads them at boot to
+            # write credentials.xml + secrets.env.
+            *auth_machine_secrets(),
+            *auth_human_secrets(),
         ]
         if not e2e:
             depends_on.append("CustomerUrlPreflightCustomResource")
@@ -129,6 +140,7 @@ class PersistenceService:
             parameters={
                 **commercial_url_parameters(),
                 **agent_api_key_parameters(),
+                **auth_human_parameters(),
             },
             ems_instance_depends_on=depends_on,
         )
@@ -146,10 +158,15 @@ class PersistenceService:
                     slices=DEFENSE_SLICES,
                 ),
                 **agent_api_key_secrets(),
+                **auth_machine_secrets(),
+                **auth_human_secrets(),
                 **neptune_resources(),
                 **aoss_resources(short=short),
             },
-            parameters=agent_api_key_parameters(),
+            parameters={
+                **agent_api_key_parameters(),
+                **auth_human_parameters(),
+            },
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
                 "OpenweathermapApiKeySecret",
@@ -158,5 +175,8 @@ class PersistenceService:
                 "NeptuneHostParam",
                 "NeptuneLoaderRoleArnParam",
                 "AossHostParam",
+                # Broker + human auth secrets (variant-agnostic).
+                *auth_machine_secrets(),
+                *auth_human_secrets(),
             ],
         )

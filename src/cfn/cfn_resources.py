@@ -41,6 +41,17 @@ DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
     ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
     ("aoss-host", "AOSS_HOST"),
 )
+# Broker File RBAC + device-api auth secrets. Variant-agnostic (File RBAC runs
+# in every deployment) → fetched into secrets.env on both. The 3 mqtt-* pws
+# also feed credentials.xml (the broker's auth store). See auth_secrets.py.
+AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
+    ("mqtt-gateway-password", "MQTT_GATEWAY_PASSWORD"),
+    ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
+    ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
+    ("auth-jwt-secret", "AUTH_JWT_SECRET"),
+    ("auth-operator-pw", "AUTH_OPERATOR_PW"),
+    ("auth-viewer-pw", "AUTH_VIEWER_PW"),
+)
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
 # UserData fetches them at boot — never per-order, never carry creds.
@@ -493,6 +504,8 @@ def build_userdata(
     is_commercial = deployment_context == DeploymentContext.COMMERCIAL
     if is_commercial:
         url_slots.extend(COMMERCIAL_ONLY_URL_SLOTS)
+    # Broker + human auth secrets land in secrets.env on every variant.
+    url_slots.extend(AUTH_SLOTS)
 
     # e2e deployments seed the small graph fixture; empty for production.
     e2e_line = "e2e: true\n" if e2e else ""
@@ -504,6 +517,55 @@ def build_userdata(
         f"--secret-id arcnode-ems-${{AWS::StackName}}/{slot} "
         f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
+    )
+    # Broker File RBAC store. The 3 random machine pws (also in secrets.env)
+    # are fetched into shell vars and written into credentials.xml, which the
+    # hivemq image bind-mounts into the File RBAC extension. Topic ACL is
+    # static (system_adr §9 topic shape); only the <password> values vary.
+    # ${{AWS::StackName}} is CFN-substituted; $GW_PW/$OP_PW/$VW_PW are bash
+    # vars (no braces → Fn::Sub leaves them for the unquoted heredoc to expand).
+    credentials_block = (
+        "GW_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-gateway-password "
+        "--query SecretString --output text)\n"
+        "OP_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-operator-password "
+        "--query SecretString --output text)\n"
+        "VW_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-viewer-password "
+        "--query SecretString --output text)\n"
+        "cat > /opt/arcnode/credentials.xml <<XML\n"
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+        "<file-rbac>\n"
+        "  <users>\n"
+        "    <user><name>arcnode_gateway</name><password>$GW_PW</password>"
+        "<roles><id>gateway</id></roles></user>\n"
+        "    <user><name>arcnode_operator</name><password>$OP_PW</password>"
+        "<roles><id>operator</id></roles></user>\n"
+        "    <user><name>arcnode_viewer</name><password>$VW_PW</password>"
+        "<roles><id>viewer</id></roles></user>\n"
+        "  </users>\n"
+        "  <roles>\n"
+        "    <role><id>gateway</id><permissions>"
+        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>PUBLISH</activity></permission>"
+        "<permission><topic>sites/+/devices/+/commands/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "</permissions></role>\n"
+        "    <role><id>operator</id><permissions>"
+        "<permission><topic>sites/+/devices/+/commands/#</topic>"
+        "<activity>PUBLISH</activity></permission>"
+        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "</permissions></role>\n"
+        "    <role><id>viewer</id><permissions>"
+        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "</permissions></role>\n"
+        "  </roles>\n"
+        "</file-rbac>\n"
+        "XML\n"
+        "chmod 600 /opt/arcnode/credentials.xml\n"
     )
     # Defense graph block — fetch SSM params into shell vars, append to
     # the analyst cfg so python-mcp-server's cfg.graph discriminator
@@ -606,6 +668,8 @@ def build_userdata(
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
+        "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
+        f"{credentials_block}"
         "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
