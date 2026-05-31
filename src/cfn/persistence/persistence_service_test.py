@@ -42,6 +42,8 @@ def test_commercial_build_declares_required_parameters() -> None:
         "TimeseriesConnectionUrl",
         "GraphConnectionUrl",
         "OpenweathermapApiKey",
+        "AuthOperatorPw",
+        "AuthViewerPw",
     }
 
 
@@ -62,6 +64,12 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "GraphUrlSecret",
         "OpenweathermapApiKeySecret",
         "CustomerUrlPreflightCustomResource",
+        "MqttGatewayPasswordSecret",
+        "MqttOperatorPasswordSecret",
+        "MqttViewerPasswordSecret",
+        "AuthJwtSecret",
+        "AuthOperatorPwSecret",
+        "AuthViewerPwSecret",
     }
 
 
@@ -99,8 +107,12 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
         deployment_context=DeploymentContext.DEFENSE_FORWARD, short="abcd1234"
     )
 
-    # Assert
-    assert set(build.parameters.keys()) == {"OpenweathermapApiKey"}
+    # Assert — agent key + the two customer-set login passwords
+    assert set(build.parameters.keys()) == {
+        "OpenweathermapApiKey",
+        "AuthOperatorPw",
+        "AuthViewerPw",
+    }
 
 
 def test_defense_build_lists_ems_instance_dependencies() -> None:
@@ -122,6 +134,12 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
         "NeptuneHostParam",
         "NeptuneLoaderRoleArnParam",
         "AossHostParam",
+        "MqttGatewayPasswordSecret",
+        "MqttOperatorPasswordSecret",
+        "MqttViewerPasswordSecret",
+        "AuthJwtSecret",
+        "AuthOperatorPwSecret",
+        "AuthViewerPwSecret",
     }
 
 
