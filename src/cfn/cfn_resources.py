@@ -674,8 +674,11 @@ def build_userdata(
         "cat > /opt/arcnode/hmi-cfg.customer.yml <<YML\n"
         f"siteId: {site_id}\n"
         f"deploymentName: {site_id}\n"
+        # deviceApiUri /api → nginx strips one segment (device-api routes are
+        # bare /auth/*, /topology/*). chatApiUri empty → HMI posts /analyst/chat
+        # which nginx passes through un-stripped (analyst route IS /analyst/chat).
         "deviceApiUri: /api\n"
-        "chatApiUri: /analyst\n"
+        'chatApiUri: ""\n'
         'mqttUri: ""\n'
         f"{e2e_line}"
         "YML\n"

@@ -404,7 +404,8 @@ def test_userdata_writes_hmi_runtime_config() -> None:
     hmi_block = rendered.split("hmi-cfg.customer.yml")[1].split("YML")[1]
     assert f"siteId: {SITE_ID}" in hmi_block
     assert "deviceApiUri: /api" in hmi_block
-    assert "chatApiUri: /analyst" in hmi_block
+    # chatApiUri empty → nginx passes /analyst/chat through un-stripped.
+    assert "chatApiUri:" in hmi_block
     # empty string → SPA derives the broker URL. The "" is YAML-escaped in
     # the template scalar; cloud-init decodes it back to mqttUri: "" on disk.
     assert "mqttUri:" in hmi_block
