@@ -18,12 +18,14 @@ x-env-files: &env-files
 
 services:
   hivemq:
-    image: hivemq/hivemq-ce:latest
+    # Custom CE image: File RBAC baked, Allow-All stripped — rejects anonymous,
+    # enforces per-role topic ACL (gateway/operator/viewer). credentials.xml
+    # (per-deploy machine pws) written by UserData from Secrets Manager.
+    image: public.ecr.aws/y1d2j6a8/ems-hivemq:latest
     restart: unless-stopped
     <<: *env-files
-    # HiveMQ CE ships with the Allow All Extension out of the box, so
-    # anonymous publish/subscribe just works. When real auth lands, drop
-    # the Allow All extension and bring up an auth extension instead.
+    volumes:
+      - /opt/arcnode/credentials.xml:/opt/hivemq/extensions/hivemq-file-rbac-extension/conf/credentials.xml:ro
 
   device-api:
     image: public.ecr.aws/y1d2j6a8/ems-device-api:latest
@@ -106,6 +108,10 @@ services:
     <<: *env-files
     ports:
       - "80:80"
+    volumes:
+      # nginx serves this at /cfg.customer.yml (alias); the SPA fetches it at
+      # boot for siteId + same-origin URIs. Written by UserData.
+      - /opt/arcnode/hmi-cfg.customer.yml:/opt/arcnode/hmi-cfg.customer.yml:ro
     depends_on:
       device-api:
         condition: service_started

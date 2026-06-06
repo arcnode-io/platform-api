@@ -32,13 +32,18 @@ COMMERCIAL_ANALYST = ("analyst-server", "analyst-model")
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
 def test_compose_parses_and_declares_hivemq(variant_path: Path) -> None:
-    """Both variants parse and ship the HiveMQ CE broker."""
+    """Both variants parse and ship the custom File-RBAC HiveMQ image with
+    credentials.xml mounted into the extension's conf/ dir."""
     # Arrange + Act
     spec = yaml.safe_load(variant_path.read_text())
 
-    # Assert
-    assert "hivemq" in spec["services"]
-    assert spec["services"]["hivemq"]["image"].startswith("hivemq/hivemq-ce")
+    # Assert — custom auth image (Allow-All stripped), not vanilla CE
+    hivemq = spec["services"]["hivemq"]
+    assert hivemq["image"] == "public.ecr.aws/y1d2j6a8/ems-hivemq:latest"
+    assert any(
+        "credentials.xml" in v and "hivemq-file-rbac-extension" in v
+        for v in hivemq["volumes"]
+    ), "credentials.xml must be mounted into the File RBAC extension"
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
