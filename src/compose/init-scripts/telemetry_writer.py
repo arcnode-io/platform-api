@@ -19,6 +19,10 @@ import psycopg2
 
 TIMESERIES_URL = os.environ["TIMESERIES_URL"]
 BROKER = os.environ.get("BROKER", "hivemq")
+# Broker runs File RBAC since v1 — authenticate as the arcnode_telemetry_writer
+# identity (sub measurements). Password from env; anonymous is rejected.
+MQTT_USERNAME = os.environ.get("MQTT_USERNAME", "arcnode_telemetry_writer")
+MQTT_PASSWORD = os.environ.get("MQTT_TELEMETRY_WRITER_PASSWORD", "")
 TOPIC = "sites/+/devices/+/measurements/+/+"
 
 INSERT_SQL = (
@@ -108,6 +112,7 @@ print("measurements bootstrap done", flush=True)
 # supported callback shape for new code (extra `properties` arg, etc.).
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 client.on_message = on_message
+client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 client.connect(BROKER, 1883, keepalive=60)
 client.subscribe(TOPIC)
 print(f"subscribed to {TOPIC} on {BROKER}:1883", flush=True)

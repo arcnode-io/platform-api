@@ -49,6 +49,7 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
     ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
     ("mqtt-device-api-password", "MQTT_DEVICE_API_PASSWORD"),
+    ("mqtt-telemetry-writer-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
@@ -538,6 +539,9 @@ def build_userdata(
         "DA_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-device-api-password "
         "--query SecretString --output text)\n"
+        "TW_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-telemetry-writer-password "
+        "--query SecretString --output text)\n"
         "cat > /opt/arcnode/credentials.xml <<XML\n"
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         "<file-rbac>\n"
@@ -550,6 +554,8 @@ def build_userdata(
         "<roles><id>viewer</id></roles></user>\n"
         "    <user><name>arcnode_device_api</name><password>$DA_PW</password>"
         "<roles><id>device_api</id></roles></user>\n"
+        "    <user><name>arcnode_telemetry_writer</name><password>$TW_PW</password>"
+        "<roles><id>telemetry_writer</id></roles></user>\n"
         "  </users>\n"
         "  <roles>\n"
         # gateway: pub telemetry up, sub commands down, sub system control
@@ -566,6 +572,11 @@ def build_userdata(
         "    <role><id>device_api</id><permissions>"
         "<permission><topic>system/#</topic>"
         "<activity>PUBLISH</activity></permission>"
+        "</permissions></role>\n"
+        # telemetry_writer: subscribes all measurements → persists to timeseries.
+        "    <role><id>telemetry_writer</id><permissions>"
+        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
         "</permissions></role>\n"
         "    <role><id>operator</id><permissions>"
         "<permission><topic>sites/+/devices/+/commands/#</topic>"

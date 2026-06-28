@@ -374,6 +374,7 @@ def test_userdata_writes_broker_credentials_xml() -> None:
         "arcnode_operator",
         "arcnode_viewer",
         "arcnode_device_api",
+        "arcnode_telemetry_writer",
     ):
         assert user in rendered, f"{user} missing from credentials.xml"
     # The gateway subscribes system/topology_changed (hot topology reload) and

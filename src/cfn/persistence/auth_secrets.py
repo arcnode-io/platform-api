@@ -57,6 +57,12 @@ def auth_machine_secrets() -> dict[str, dict]:
             "mqtt-device-api-password",
             "Broker File-RBAC password for arcnode_device_api.",
         ),
+        # telemetry-writer subscribes measurements → persists to the timeseries
+        # DB. Dedicated service identity (not the browser-distributed viewer cred).
+        "MqttTelemetryWriterPasswordSecret": _generated_secret(
+            "mqtt-telemetry-writer-password",
+            "Broker File-RBAC password for arcnode_telemetry_writer.",
+        ),
         "AuthJwtSecret": _generated_secret(
             "auth-jwt-secret", "device-api HS256 session-token signing key."
         ),
