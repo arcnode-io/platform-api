@@ -25,6 +25,7 @@ import psycopg2
 import psycopg2.extensions
 import pytest
 from mypy_boto3_cloudformation import CloudFormationClient
+from mypy_boto3_cloudformation.type_defs import ParameterTypeDef
 
 from src.cfn.cfn_service import CfnService
 from src.cfn.persistence.persistence_service import PersistenceService
@@ -38,6 +39,17 @@ DTM_URL: Final[str] = (
 STACK_READY_TIMEOUT_S: Final[int] = 1500
 STACK_DELETE_TIMEOUT_S: Final[int] = 1800
 POLL_INTERVAL_S: Final[int] = 30
+
+# Human login passwords for the v1 auth chain (operator can dispatch, viewer is
+# read-only). Required NoEcho params on every stack since the broker-auth flip.
+# The broker-auth e2e (test_broker_auth.py / test_hmi_browser.py) log in with
+# these — import them, don't hardcode.
+E2E_OPERATOR_PW: Final[str] = "e2e-operator-pw"
+E2E_VIEWER_PW: Final[str] = "e2e-viewer-pw"
+_AUTH_PARAMS: Final[list[ParameterTypeDef]] = [
+    {"ParameterKey": "AuthOperatorPw", "ParameterValue": E2E_OPERATOR_PW},
+    {"ParameterKey": "AuthViewerPw", "ParameterValue": E2E_VIEWER_PW},
+]
 
 
 @pytest.fixture(scope="session")
@@ -110,6 +122,7 @@ def defense_stack(
                 "ParameterKey": "OpenweathermapApiKey",
                 "ParameterValue": "0" * 32,
             },
+            *_AUTH_PARAMS,
         ],
         Tags=[
             {"Key": "arcnode-smoke", "Value": "ci-defense"},
@@ -173,6 +186,7 @@ def commercial_stack(
             },
             {"ParameterKey": "GraphConnectionUrl", "ParameterValue": aura_url},
             {"ParameterKey": "TimeseriesConnectionUrl", "ParameterValue": tiger_url},
+            *_AUTH_PARAMS,
         ],
         Tags=[
             {"Key": "arcnode-smoke", "Value": "ci"},

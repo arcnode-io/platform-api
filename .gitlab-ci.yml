@@ -93,8 +93,17 @@ e2e_commercial:
     - if: '$CI_PIPELINE_SOURCE == "web"'         # manual "Run pipeline" UI
     - if: '$CI_PIPELINE_SOURCE == "api"'         # glab ci run
   script:
-    # pyproject default addopts = "-m 'not e2e'" → must opt-in explicitly.
-    - uv run pytest -m e2e tests/e2e/test_commercial.py -v --junitxml=junit-e2e.xml
+    # Browser e2e (test_hmi_browser.py) drives a real Chromium.
+    - uv run playwright install --with-deps chromium
+    # pyproject default addopts = "-m 'not e2e'" → must opt-in explicitly. All
+    # three share the session-scoped commercial_stack (one deploy): DB-level
+    # persistence + analyst (test_commercial), broker-auth chain
+    # (test_broker_auth), browser login→live-SLD (test_hmi_browser).
+    - uv run pytest -m e2e
+      tests/e2e/test_commercial.py
+      tests/e2e/test_broker_auth.py
+      tests/e2e/test_hmi_browser.py
+      -v --junitxml=junit-e2e.xml
   # commercial_stack is session-scoped (one stack across both tests).
   # Budget: 25 min CFN create + 10 min /health + (2 × ~5 min test work) +
   # ~10 min teardown ≈ 55 min. 90 min for AWS-flake headroom.

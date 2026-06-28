@@ -26,6 +26,8 @@ import urllib3
 # Explicit fixture imports — no conftest. commercial_stack pulls cfn / aura_url
 # / tiger_url / commercial_site_id transitively, so all must be in scope.
 from .fixtures import (  # noqa: F401
+    E2E_OPERATOR_PW,
+    E2E_VIEWER_PW,
     aura_url,
     cfn,
     commercial_site_id,
@@ -155,7 +157,7 @@ def test_login_exchanges_for_role_broker_credential(
     _wait_for_hmi(ip)
 
     # Act
-    token = _login(ip, "operator", "flip-operator-pw")
+    token = _login(ip, "operator", E2E_OPERATOR_PW)
     cred = _mqtt_credentials(ip, token)
 
     # Assert
@@ -190,7 +192,7 @@ def test_authenticated_viewer_receives_live_telemetry(
     ip = commercial_stack["public_ip"]
     site = commercial_stack["site_id"]
     _wait_for_hmi(ip)
-    cred = _mqtt_credentials(ip, _login(ip, "viewer", "flip-viewer-pw"))
+    cred = _mqtt_credentials(ip, _login(ip, "viewer", E2E_VIEWER_PW))
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
     client.ws_set_options(path="/mqtt")

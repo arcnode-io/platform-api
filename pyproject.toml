@@ -38,6 +38,7 @@ dev = [
     "mypy-boto3-cloudformation>=1.35.0",
     "mypy-boto3-lambda>=1.43.0",
     "paho-mqtt>=2.1.0",
+    "playwright>=1.60.0",
 ]
 
 [tool.poe.tasks]
