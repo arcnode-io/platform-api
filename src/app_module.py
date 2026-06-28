@@ -49,6 +49,9 @@ class AppModule:
             manifest=self.manifest_module,
             iso_bake=self.iso_bake_module,
             ems_hmi_apk_url=self.config.ems_hmi_apk_url,
+            ems_industrial_gateway_tarball_url=(
+                self.config.ems_industrial_gateway_tarball_url
+            ),
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self._db_lifespan_enabled = False

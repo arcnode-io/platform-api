@@ -27,6 +27,7 @@ class OrchestratorModule:
         manifest: ManifestModule,
         iso_bake: IsoBakeModule,
         ems_hmi_apk_url: str,
+        ems_industrial_gateway_tarball_url: str,
     ) -> None:
         self.service = OrchestratorService(
             edp_client=edp.service,
@@ -37,4 +38,5 @@ class OrchestratorModule:
             manifest=manifest.service,
             iso_bake=iso_bake.service,
             ems_hmi_apk_url=ems_hmi_apk_url,
+            ems_industrial_gateway_tarball_url=ems_industrial_gateway_tarball_url,
         )

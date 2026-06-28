@@ -45,6 +45,7 @@ EDP_MANIFEST_PATH: Path = (
 POSTGRES_PASSWORD: str = "test"
 S3_BUCKET: str = "platform-api-artifacts-test"
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
+GATEWAY_TARBALL_URL: str = "https://arcnode-public.example/gateway/latest.tar.gz"
 SENDER_EMAIL: str = "noreply@arcnode.test"
 
 VALID_PAYLOAD: dict[str, object] = {
@@ -128,6 +129,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
                 ses_endpoint_url=ls.url,
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
+                ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
                 iso_version="1.0.0-beta",
                 cors_origins=["*"],
             )
@@ -266,6 +268,7 @@ def test_all_profile_combinations_reach_complete() -> None:
                 ses_endpoint_url=ls.url,
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
+                ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
                 iso_version="1.0.0-beta",
                 cors_origins=["*"],
             )

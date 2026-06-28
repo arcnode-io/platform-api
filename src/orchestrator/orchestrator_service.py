@@ -59,6 +59,7 @@ class OrchestratorService:
         manifest: ManifestService,
         iso_bake: IsoBakeService,
         ems_hmi_apk_url: str,
+        ems_industrial_gateway_tarball_url: str,
     ) -> None:
         self._edp = edp_client
         self._s3 = s3
@@ -68,6 +69,7 @@ class OrchestratorService:
         self._manifest = manifest
         self._iso_bake = iso_bake
         self._ems_hmi_apk_url = ems_hmi_apk_url
+        self._ems_industrial_gateway_tarball_url = ems_industrial_gateway_tarball_url
 
     # Public — business intent
 
@@ -279,6 +281,21 @@ class OrchestratorService:
                             url=delivery.template_url,
                         )
                     ],
+                )
+            )
+
+            # Cloud customers also need the on-prem gateway image to run next to
+            # their devices (dials the cloud broker). Per-release tarball, same
+            # for every cloud order. Appliance/ISO orders bake it in instead.
+            gw_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["industrial_gateway"]
+            gw_url = self._ems_industrial_gateway_tarball_url
+            gw_size = await self._s3.head_size(gw_url)
+            artifacts.append(
+                ManifestArtifact(
+                    code="",
+                    name=gw_meta.name,
+                    subtitle=gw_meta.subtitle,
+                    files=[ManifestFile(format="TGZ", size_bytes=gw_size, url=gw_url)],
                 )
             )
 

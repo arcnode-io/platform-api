@@ -12,6 +12,8 @@ local:
   ses_sender_email: 'noreply@arcnode.io'
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
+  # CI overwrites this tarball on each ems-industrial-gateway release.
+  ems_industrial_gateway_tarball_url: 'https://arcnode-public.s3.amazonaws.com/gateway/ems-industrial-gateway-latest.tar.gz'
   cors_origins:
     - '*'  # local dev — any origin
   iso_version: '1.0.0-beta'
@@ -30,6 +32,8 @@ beta:
   ses_sender_email: 'noreply@arcnode.io'
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
+  # CI overwrites this tarball on each ems-industrial-gateway release.
+  ems_industrial_gateway_tarball_url: 'https://arcnode-public.s3.amazonaws.com/gateway/ems-industrial-gateway-latest.tar.gz'
   cors_origins:
     - 'https://arcnode.io'
     - 'https://www.arcnode.io'

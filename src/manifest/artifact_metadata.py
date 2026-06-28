@@ -109,6 +109,14 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
         name="AWS Deployment",
         subtitle="MOCK CloudFormation template (per-order)",
     ),
+    # Cloud customers run the gateway on-prem (next to their devices) and it
+    # dials the cloud broker. Delivered as a docker-save tarball: `docker load`
+    # then run. Per-release artifact (same image for every cloud customer).
+    "industrial_gateway": ArtifactMetadata(
+        section=ManifestSection.SYSTEM_IMAGES,
+        name="Industrial Gateway",
+        subtitle="Docker image · on-prem south-side connector",
+    ),
 }
 
 
