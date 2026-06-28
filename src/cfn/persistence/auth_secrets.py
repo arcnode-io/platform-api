@@ -40,7 +40,7 @@ def _generated_secret(slot: str, description: str) -> dict:
 
 
 def auth_machine_secrets() -> dict[str, dict]:
-    """Four CFN-generated random secrets: 3 broker passwords + JWT signing key."""
+    """Five CFN-generated random secrets: 4 broker passwords + JWT signing key."""
     return {
         "MqttGatewayPasswordSecret": _generated_secret(
             "mqtt-gateway-password", "Broker File-RBAC password for arcnode_gateway."
@@ -50,6 +50,12 @@ def auth_machine_secrets() -> dict[str, dict]:
         ),
         "MqttViewerPasswordSecret": _generated_secret(
             "mqtt-viewer-password", "Broker File-RBAC password for arcnode_viewer."
+        ),
+        # device-api connects to publish system/topology_changed (the gateway
+        # subscribes to it to hot-reload topology). Its own File-RBAC identity.
+        "MqttDeviceApiPasswordSecret": _generated_secret(
+            "mqtt-device-api-password",
+            "Broker File-RBAC password for arcnode_device_api.",
         ),
         "AuthJwtSecret": _generated_secret(
             "auth-jwt-secret", "device-api HS256 session-token signing key."

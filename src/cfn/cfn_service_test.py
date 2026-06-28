@@ -367,10 +367,20 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     # Arrange + Act
     rendered = _render()
 
-    # Assert — file path + the three File-RBAC usernames in the heredoc
+    # Assert — file path + the four File-RBAC usernames in the heredoc
     assert "/opt/arcnode/credentials.xml" in rendered
-    for user in ("arcnode_gateway", "arcnode_operator", "arcnode_viewer"):
+    for user in (
+        "arcnode_gateway",
+        "arcnode_operator",
+        "arcnode_viewer",
+        "arcnode_device_api",
+    ):
         assert user in rendered, f"{user} missing from credentials.xml"
+    # The gateway subscribes system/topology_changed (hot topology reload) and
+    # device-api publishes it — both need the system/# ACL or the gateway
+    # fail-louds on the denied subscribe. Regression guard.
+    assert "<topic>system/#</topic>" in rendered
+    assert "MQTT_DEVICE_API_PASSWORD" in rendered
 
 
 def test_userdata_fetches_auth_slots_into_secrets_env() -> None:

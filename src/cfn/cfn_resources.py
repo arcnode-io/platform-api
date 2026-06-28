@@ -48,6 +48,7 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("mqtt-gateway-password", "MQTT_GATEWAY_PASSWORD"),
     ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
     ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
+    ("mqtt-device-api-password", "MQTT_DEVICE_API_PASSWORD"),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
@@ -534,6 +535,9 @@ def build_userdata(
         "VW_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-viewer-password "
         "--query SecretString --output text)\n"
+        "DA_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-device-api-password "
+        "--query SecretString --output text)\n"
         "cat > /opt/arcnode/credentials.xml <<XML\n"
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         "<file-rbac>\n"
@@ -544,13 +548,24 @@ def build_userdata(
         "<roles><id>operator</id></roles></user>\n"
         "    <user><name>arcnode_viewer</name><password>$VW_PW</password>"
         "<roles><id>viewer</id></roles></user>\n"
+        "    <user><name>arcnode_device_api</name><password>$DA_PW</password>"
+        "<roles><id>device_api</id></roles></user>\n"
         "  </users>\n"
         "  <roles>\n"
+        # gateway: pub telemetry up, sub commands down, sub system control
+        # plane (it subscribes system/topology_changed to hot-reload topology).
         "    <role><id>gateway</id><permissions>"
         "<permission><topic>sites/+/devices/+/measurements/#</topic>"
         "<activity>PUBLISH</activity></permission>"
         "<permission><topic>sites/+/devices/+/commands/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
+        "<permission><topic>system/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "</permissions></role>\n"
+        # device_api: publishes system/topology_changed when topology mutates.
+        "    <role><id>device_api</id><permissions>"
+        "<permission><topic>system/#</topic>"
+        "<activity>PUBLISH</activity></permission>"
         "</permissions></role>\n"
         "    <role><id>operator</id><permissions>"
         "<permission><topic>sites/+/devices/+/commands/#</topic>"
