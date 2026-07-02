@@ -72,4 +72,7 @@ class DeploymentManifest(BaseModel):
     artifact_count: int
     bundle_url: Optional[str] = None  # arcnode.zip — None until bundle phase ships
     bundle_curl_url: Optional[str] = None  # the curl one-liner shown in the header
+    # Cloud delivery (CFN path): SYSTEM_IMAGES renders as "Edge & Connectivity"
+    # (C codes) + the portal shows the gateway install terminal strip.
+    cloud: bool = False
     sections: dict[ManifestSection, list[ManifestArtifact]]

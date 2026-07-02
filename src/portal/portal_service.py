@@ -78,11 +78,16 @@ class PortalService:
 
     def render(self, *, manifest: DeploymentManifest) -> str:
         """Render the portal HTML page (uploaded to S3 as `index.html`)."""
+        # Cloud deliveries have no bootable image — the first column is the
+        # gateway container + CFN template, titled per delivery-portal-cloud.jsx.
+        labels = dict(SECTION_LABEL)
+        if manifest.cloud:
+            labels[ManifestSection.SYSTEM_IMAGES] = "Edge & Connectivity"
         section_specs = [
             {
                 "key": s,
                 "num": _SECTION_NUMBERS[s],
-                "label": SECTION_LABEL[s],
+                "label": labels[s],
             }
             for s in _SECTION_RENDER_ORDER
         ]

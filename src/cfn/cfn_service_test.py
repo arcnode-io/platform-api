@@ -420,3 +420,20 @@ def test_userdata_writes_hmi_runtime_config() -> None:
     # empty string → SPA derives the broker URL. The "" is YAML-escaped in
     # the template scalar; cloud-init decodes it back to mqttUri: "" on disk.
     assert "mqttUri:" in hmi_block
+
+
+def test_stack_exposes_gateway_bootstrap_contract() -> None:
+    """The on-prem gateway container self-configures from the stack: it reads
+    these outputs (+ the gateway secret) with the customer's AWS creds. EIP so
+    the address survives instance stop/start."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — stable address
+    assert "AWS::EC2::EIP" in rendered
+    # Assert — the outputs the bootstrap reads
+    for out in ("SiteId", "BrokerWsUrl", "DeviceApiUrl", "GatewaySecretName"):
+        assert out in rendered, f"missing output {out}"
+    assert "ws://${EmsEip}/mqtt" in rendered
+    assert "http://${EmsEip}/api" in rendered
+    assert f"SiteId:\n    Value: {SITE_ID}" in rendered or SITE_ID in rendered

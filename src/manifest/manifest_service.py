@@ -52,6 +52,7 @@ class ManifestService:
         archived: list[tuple[ArtifactRef, int]],
         system_artifacts: list[ManifestArtifact],
         built_at: datetime | None = None,
+        cloud: bool = False,
     ) -> DeploymentManifest:
         """Compose the manifest. `built_at` defaults to now-UTC.
 
@@ -102,7 +103,7 @@ class ManifestService:
                 )
             )
 
-        self._assign_codes(sections)
+        self._assign_codes(sections, cloud=cloud)
 
         total_size = sum(
             f.size_bytes for arts in sections.values() for a in arts for f in a.files
@@ -124,6 +125,7 @@ class ManifestService:
             artifact_count=artifact_count,
             bundle_url=None,  # Bundle phase (Tier 2.4) emits this
             bundle_curl_url=MOCK_BUNDLE_CURL_TEMPLATE.format(slug=slug),
+            cloud=cloud,
             sections=sections,
         )
 
@@ -142,9 +144,17 @@ class ManifestService:
     @staticmethod
     def _assign_codes(
         sections: dict[ManifestSection, list[ManifestArtifact]],
+        *,
+        cloud: bool = False,
     ) -> None:
-        """Walk each section and stamp A1/A2..., D1/D2..., M1/M2... codes in order."""
+        """Walk each section and stamp A1/A2..., D1/D2..., M1/M2... codes in order.
+
+        Cloud deliveries render SYSTEM_IMAGES as "Edge & Connectivity" → C codes
+        (per delivery-portal-cloud.jsx); the on-prem/ISO portal keeps A codes.
+        """
         for section, arts in sections.items():
             letter = SECTION_LETTER[section]
+            if cloud and section == ManifestSection.SYSTEM_IMAGES:
+                letter = "C"
             for i, art in enumerate(arts, start=1):
                 art.code = f"{letter}{i}"

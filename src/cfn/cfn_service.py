@@ -142,11 +142,54 @@ class CfnService:
                         ],
                     },
                 },
+                # Stable address — the on-prem gateway dials this; an
+                # instance-attached public IP changes on stop/start, an EIP
+                # doesn't. Ref returns the address itself.
+                "EmsEip": {
+                    "Type": "AWS::EC2::EIP",
+                    "Properties": {
+                        "Domain": "vpc",
+                        "InstanceId": {"Ref": "EmsInstance"},
+                    },
+                },
             },
+            # SiteId / BrokerWsUrl / DeviceApiUrl / GatewaySecretName are the
+            # bootstrap contract for the on-prem gateway container: it reads
+            # them (plus the secret) with the customer's AWS creds at startup
+            # and self-configures. Rename any of these in lockstep with
+            # ems-industrial-gateway's bootstrap module.
             "Outputs": {
                 "PublicIp": {
-                    "Value": {"Fn::GetAtt": ["EmsInstance", "PublicIp"]},
+                    "Value": {"Ref": "EmsEip"},
                     "Description": "EMS HMI is reachable on http://<PublicIp>/",
+                },
+                "SiteId": {
+                    "Value": site_id,
+                    "Description": "MQTT topic scope: sites/<SiteId>/...",
+                },
+                "BrokerWsUrl": {
+                    "Value": {"Fn::Sub": "ws://${EmsEip}/mqtt"},
+                    "Description": (
+                        "MQTT-over-WebSocket endpoint (nginx-proxied) the "
+                        "on-prem gateway connects to."
+                    ),
+                },
+                "DeviceApiUrl": {
+                    "Value": {"Fn::Sub": "http://${EmsEip}/api"},
+                    "Description": (
+                        "device-api base URL (nginx-proxied) the on-prem "
+                        "gateway fetches its device spec from."
+                    ),
+                },
+                "GatewaySecretName": {
+                    "Value": {
+                        "Fn::Sub": (
+                            "arcnode-ems-${AWS::StackName}/mqtt-gateway-password"
+                        ),
+                    },
+                    "Description": (
+                        "Secrets Manager name of the gateway's broker password."
+                    ),
                 },
                 "DeploymentUuid": {"Value": deployment_uuid},
                 "DtmUrl": {"Value": dtm_url},

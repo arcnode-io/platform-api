@@ -233,6 +233,9 @@ class OrchestratorService:
             site_display_name=payload.deployment_site_name,
             archived=archived,
             system_artifacts=system_artifacts,
+            # Cloud (CFN) deliveries render the Edge & Connectivity column +
+            # the gateway install strip; ISO deliveries keep System Images.
+            cloud=delivery.template_url is not None,
         )
         html = self._portal.render(manifest=manifest)
         manifest_json = self._portal.render_manifest_json(manifest=manifest)
@@ -287,15 +290,24 @@ class OrchestratorService:
             # Cloud customers also need the on-prem gateway image to run next to
             # their devices (dials the cloud broker). Per-release tarball, same
             # for every cloud order. Appliance/ISO orders bake it in instead.
+            # sha256 sidecar published by gateway CI next to the tarball; chip
+            # renders only when it exists (head_size 0 = absent = omit).
             gw_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["industrial_gateway"]
             gw_url = self._ems_industrial_gateway_tarball_url
             gw_size = await self._s3.head_size(gw_url)
+            gw_files = [ManifestFile(format="TGZ", size_bytes=gw_size, url=gw_url)]
+            sha_url = f"{gw_url}.sha256"
+            sha_size = await self._s3.head_size(sha_url)
+            if sha_size > 0:
+                gw_files.append(
+                    ManifestFile(format="SHA256", size_bytes=sha_size, url=sha_url)
+                )
             artifacts.append(
                 ManifestArtifact(
                     code="",
                     name=gw_meta.name,
                     subtitle=gw_meta.subtitle,
-                    files=[ManifestFile(format="TGZ", size_bytes=gw_size, url=gw_url)],
+                    files=gw_files,
                 )
             )
 

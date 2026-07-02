@@ -559,6 +559,17 @@
     </div>
     {% endif %}
 
+    {# ─── Cloud install strip (per delivery-portal-cloud.jsx) ── #}
+    {% if manifest.cloud %}
+    <div class="curl" style="grid-template-columns: 1fr;">
+      <pre class="curl-cmd" style="margin:0; white-space:pre; overflow-x:auto;"><span style="opacity:.55"># in AWS</span>
+<span class="curl-prompt">$</span> aws cloudformation deploy --template-file <span class="filename">ems-stack.yaml</span> --stack-name arcnode-{{ manifest.site_slug }} --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --parameter-overrides <span style="opacity:.55">&lt;see template parameters&gt;</span>
+<span style="opacity:.55"># on the plant network — the container self-configures from your stack</span>
+<span class="curl-prompt">$</span> docker load -i <span class="filename">ems-industrial-gateway-latest.tar.gz</span>
+<span class="curl-prompt">$</span> docker run -d --restart unless-stopped -e AWS_REGION=<span style="opacity:.55">&lt;region&gt;</span> -e AWS_ACCESS_KEY_ID=<span style="opacity:.55">&lt;key&gt;</span> -e AWS_SECRET_ACCESS_KEY=<span style="opacity:.55">&lt;secret&gt;</span> -e ARCNODE_STACK_NAME=arcnode-{{ manifest.site_slug }} public.ecr.aws/y1d2j6a8/ems-industrial-gateway:latest</pre>
+    </div>
+    {% endif %}
+
     {# ─── Three columns ────────────────────────────────── #}
     <section class="columns">
       {% for spec in section_specs %}

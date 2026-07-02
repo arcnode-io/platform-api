@@ -288,3 +288,54 @@ def test_render_manifest_json_is_pretty_printed() -> None:
 
     # Assert — at least one indented line
     assert '\n  "' in raw
+
+
+def test_cloud_render_shows_edge_column_and_install_strip() -> None:
+    """Cloud deliveries (per delivery-portal-cloud.jsx): the first column is
+    "Edge & Connectivity" and the page carries the gateway install strip —
+    docker load + docker run with AWS env creds + ARCNODE_STACK_NAME."""
+    # Arrange
+    manifest = _manifest()
+    manifest.cloud = True
+
+    # Act
+    html = PortalService().render(manifest=manifest)
+
+    # Assert — column retitle, ISO copy gone from column headers
+    assert "Edge &amp; Connectivity" in html
+    assert "System Images" not in html
+    # Assert — the two-surface install strip with the self-config contract
+    assert "aws cloudformation deploy" in html
+    assert "docker load" in html
+    assert "ARCNODE_STACK_NAME=arcnode-brookside-dc-1" in html
+
+
+def test_iso_render_keeps_system_images_and_no_strip() -> None:
+    """On-prem/ISO deliveries keep the System Images column, no install strip."""
+    # Arrange + Act
+    html = PortalService().render(manifest=_manifest())
+
+    # Assert
+    assert "System Images" in html
+    assert "Edge &amp; Connectivity" not in html
+    assert "ARCNODE_STACK_NAME" not in html
+
+
+def test_cloud_manifest_assigns_c_codes_to_edge_section() -> None:
+    """ManifestService stamps C1/C2... on the first column for cloud builds."""
+    # Arrange
+    from src.manifest.manifest_service import ManifestService
+
+    art = ManifestArtifact(code="", name="Industrial Gateway", subtitle="x", files=[])
+
+    # Act
+    m = ManifestService().build(
+        site_display_name="Brookside DC-1",
+        archived=[],
+        system_artifacts=[art],
+        cloud=True,
+    )
+
+    # Assert
+    assert m.cloud is True
+    assert m.sections[ManifestSection.SYSTEM_IMAGES][0].code == "C1"

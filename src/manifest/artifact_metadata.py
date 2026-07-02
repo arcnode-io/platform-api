@@ -102,20 +102,23 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
         name="EMS Field Client",
         subtitle="MOCK Android · arm64-v8a · minSdk 30",
     ),
-    # MOCK SUBTITLE — replace with a real CFN template version once we version
-    # the rendered yaml.
+    # Copy per delivery-portal-cloud.jsx (C2).
     "aws_deployment": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
-        name="AWS Deployment",
-        subtitle="MOCK CloudFormation template (per-order)",
+        name="CloudFormation Template",
+        subtitle="Deploy in your AWS account · stands up the telemetry ingest stack",
     ),
     # Cloud customers run the gateway on-prem (next to their devices) and it
     # dials the cloud broker. Delivered as a docker-save tarball: `docker load`
-    # then run. Per-release artifact (same image for every cloud customer).
+    # then `docker run` with AWS env creds — the container self-configures
+    # from their stack. Copy per delivery-portal-cloud.jsx (C1).
     "industrial_gateway": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
         name="Industrial Gateway",
-        subtitle="Docker image · on-prem south-side connector",
+        subtitle=(
+            "OCI container · runs on your local network · "
+            "forwards telemetry to the cloud"
+        ),
     ),
 }
 
