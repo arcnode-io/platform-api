@@ -567,6 +567,9 @@ def build_userdata(
         "<activity>SUBSCRIBE</activity></permission>"
         "<permission><topic>system/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
+        # dispatch lifecycle: gateway acks commands on events/dispatch_state.
+        "<permission><topic>sites/+/devices/+/events/#</topic>"
+        "<activity>PUBLISH</activity></permission>"
         "</permissions></role>\n"
         # device_api: publishes system/topology_changed when topology mutates.
         "    <role><id>device_api</id><permissions>"
@@ -583,9 +586,13 @@ def build_userdata(
         "<activity>PUBLISH</activity></permission>"
         "<permission><topic>sites/+/devices/+/measurements/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
+        "<permission><topic>sites/+/devices/+/events/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
         "</permissions></role>\n"
         "    <role><id>viewer</id><permissions>"
         "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "<permission><topic>sites/+/devices/+/events/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
         "</permissions></role>\n"
         "  </roles>\n"

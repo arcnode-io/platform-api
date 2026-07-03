@@ -382,6 +382,9 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     # fail-louds on the denied subscribe. Regression guard.
     assert "<topic>system/#</topic>" in rendered
     assert "MQTT_DEVICE_API_PASSWORD" in rendered
+    # Dispatch lifecycle: gateway publishes events/dispatch_state; HMI roles
+    # subscribe it. Without these grants dispatch acks are silently denied.
+    assert rendered.count("<topic>sites/+/devices/+/events/#</topic>") >= 3
 
 
 def test_userdata_fetches_auth_slots_into_secrets_env() -> None:
