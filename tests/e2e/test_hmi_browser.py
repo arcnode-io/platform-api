@@ -86,3 +86,43 @@ def test_browser_login_then_live_sld(commercial_stack: dict[str, str]) -> None:
             expect(page.get_by_test_id("sld-canvas")).to_be_visible(timeout=20_000)
         finally:
             browser.close()
+
+
+@pytest.mark.e2e
+def test_browser_operator_dispatch_settles(commercial_stack: dict[str, str]) -> None:
+    """The dispatch table-stakes at the pixel level: operator logs in, opens
+    the BESS module, applies the proposed setpoint through the two-step
+    ConfirmationModal, and the gateway's received→done acks drive the status
+    card to `settled` over the real broker."""
+    # Arrange
+    ip = commercial_stack["public_ip"]
+    _wait_for_hmi(ip)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        try:
+            page.goto(f"http://{ip}/", wait_until="domcontentloaded")
+            page.get_by_test_id("login-username").fill(OPERATOR[0])
+            page.get_by_test_id("login-password").fill(OPERATOR[1])
+            page.get_by_test_id("login-submit").click()
+            expect(page.get_by_test_id("login-submit")).to_be_hidden(timeout=15_000)
+
+            # Act — open the dispatchable BESS module (bess_module in the
+            # smoke DTM exists exactly for this test).
+            page.goto(
+                f"http://{ip}/devices/bess_module_01", wait_until="domcontentloaded"
+            )
+            apply_btn = page.get_by_test_id("dispatch-apply")
+            expect(apply_btn).to_be_visible(timeout=20_000)
+            apply_btn.click()
+            # Two-step confirm — Apply never dispatches on first click.
+            page.locator('[data-action="confirm"]').click()
+
+            # Assert — gateway acks drive the card: received→pending,
+            # done→settled. data-phase mirrors the DispatchContext phase.
+            status = page.get_by_test_id("dispatch-status")
+            expect(status).to_be_visible(timeout=15_000)
+            expect(status).to_have_attribute("data-phase", "settled", timeout=20_000)
+        finally:
+            browser.close()

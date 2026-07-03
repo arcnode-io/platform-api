@@ -18,6 +18,7 @@ from __future__ import annotations
 import json as json_lib
 import threading
 import time
+import uuid
 
 import paho.mqtt.client as mqtt
 import pytest
@@ -222,3 +223,86 @@ def test_authenticated_viewer_receives_live_telemetry(
     assert delivered, f"no telemetry on sites/{site}/... within {TELEMETRY_TIMEOUT_S}s"
     assert "measurements" in received["topic"]
     assert "value" in received["payload"]
+
+
+@pytest.mark.e2e
+def test_operator_dispatch_round_trip(commercial_stack: dict[str, str]) -> None:
+    """The dispatch contract end to end on a real stack: operator publishes a
+    command frame → the gateway acks received → done on events/dispatch_state
+    (done = accepted; bess_module_01 is in the smoke DTM). A ghost device gets
+    received → failed with a reason."""
+    # Arrange
+    ip = commercial_stack["public_ip"]
+    site = commercial_stack["site_id"]
+    _wait_for_hmi(ip)
+    cred = _mqtt_credentials(ip, _login(ip, "operator", E2E_OPERATOR_PW))
+
+    # dispatch_state is a RETAINED state topic — subscribing replays stale
+    # events from prior commands, so we correlate by command_id exactly like
+    # the HMI's applyDispatchEvent does. Unique per run: retained state
+    # survives across e2e sessions on a shared stack.
+    run_id = uuid.uuid4().hex[:8]
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
+    client.ws_set_options(path="/mqtt")
+    client.username_pw_set(cred["username"], cred["password"])
+    events: list[dict[str, str]] = []
+    wanted: dict[str, str] = {"command_id": ""}
+    got_two = threading.Event()
+
+    def on_connect(_c, _u, _flags, _rc, _props=None) -> None:
+        client.subscribe(f"sites/{site}/devices/+/events/dispatch_state", qos=1)
+
+    def on_message(_c, _u, msg) -> None:
+        event = json_lib.loads(msg.payload)
+        if event.get("command_id") != wanted["command_id"]:
+            return  # stale retained event from a prior command
+        events.append(event)
+        if len(events) >= 2:
+            got_two.set()
+
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.connect(ip, 80, keepalive=30)
+    client.loop_start()
+    time.sleep(3)  # let the subscribe settle before publishing
+
+    # Act — dispatch 1.62 MW to the DTM's BESS module.
+    wanted["command_id"] = f"e2e-{run_id}-1"
+    frame = {
+        "ts": "2026-07-03T00:00:00Z",
+        "value": 1_620_000,
+        "command_id": wanted["command_id"],
+    }
+    client.publish(
+        f"sites/{site}/devices/bess_module_01/commands/set/active_power/watts",
+        json_lib.dumps(frame),
+        qos=1,
+    )
+    delivered = got_two.wait(30)
+
+    # Assert — received then done, correlated (contract: done = accepted).
+    assert delivered, f"expected 2 acks, got {events}"
+    assert [e["phase"] for e in events[:2]] == ["received", "done"]
+
+    # Act — ghost device is rejected with a reason.
+    events.clear()
+    got_two.clear()
+    wanted["command_id"] = f"e2e-{run_id}-2"
+    frame = {
+        "ts": "2026-07-03T00:00:00Z",
+        "value": 5,
+        "command_id": wanted["command_id"],
+    }
+    client.publish(
+        f"sites/{site}/devices/ghost_99/commands/set/active_power/watts",
+        json_lib.dumps(frame),
+        qos=1,
+    )
+    delivered = got_two.wait(30)
+    client.loop_stop()
+    client.disconnect()
+
+    # Assert
+    assert delivered, f"expected 2 acks for ghost, got {events}"
+    assert [e["phase"] for e in events[:2]] == ["received", "failed"]
+    assert "ghost_99" in events[1].get("reason", "")

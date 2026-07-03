@@ -563,6 +563,10 @@ def build_userdata(
         "    <role><id>gateway</id><permissions>"
         "<permission><topic>sites/+/devices/+/measurements/#</topic>"
         "<activity>PUBLISH</activity></permission>"
+        # synthetic derivations read their inputs off the bus — the gateway
+        # subscribes measurements too (first exercised by bess_module headroom).
+        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
         "<permission><topic>sites/+/devices/+/commands/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
         "<permission><topic>system/#</topic>"
