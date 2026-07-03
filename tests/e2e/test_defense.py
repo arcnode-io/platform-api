@@ -138,3 +138,62 @@ def test_defense_graph_chat_returns_assistant_message(
         c.get("text", "") for c in msg.get("content", []) if c.get("type") == "text"
     ]
     assert any(t.strip() for t in text_parts), f"empty assistant text: {msg!r}"
+
+
+# ─── HMI/broker parity with the commercial leg ──────────────────────────
+# Same containers, same contracts — the checks are shared (hmi_checks.py).
+# Import here (not top) keeps the original defense tests' imports untouched.
+from .hmi_checks import (  # noqa: E402
+    check_anonymous_rejected,
+    check_browser_dispatch_settles,
+    check_browser_login_sld,
+    check_dispatch_round_trip,
+    check_login_cred_exchange,
+    check_spa_and_runtime_config,
+    check_viewer_receives_telemetry,
+)
+
+
+@pytest.mark.e2e
+def test_defense_hmi_serves_spa_and_runtime_config(
+    defense_stack: dict[str, str],
+) -> None:
+    check_spa_and_runtime_config(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_login_exchanges_for_role_broker_credential(
+    defense_stack: dict[str, str],
+) -> None:
+    check_login_cred_exchange(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_anonymous_broker_connection_is_rejected(
+    defense_stack: dict[str, str],
+) -> None:
+    check_anonymous_rejected(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_viewer_receives_live_telemetry(
+    defense_stack: dict[str, str],
+) -> None:
+    check_viewer_receives_telemetry(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_operator_dispatch_round_trip(defense_stack: dict[str, str]) -> None:
+    check_dispatch_round_trip(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_browser_login_then_live_sld(defense_stack: dict[str, str]) -> None:
+    check_browser_login_sld(defense_stack)
+
+
+@pytest.mark.e2e
+def test_defense_browser_operator_dispatch_settles(
+    defense_stack: dict[str, str],
+) -> None:
+    check_browser_dispatch_settles(defense_stack)

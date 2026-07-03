@@ -127,8 +127,11 @@ e2e_defense:
       when: manual
       allow_failure: true   # api-triggered pipelines succeed without playing defense
   script:
+    # Browser parity checks (hmi_checks) drive a real Chromium.
+    - uv run playwright install --with-deps chromium
     - uv run pytest -m e2e tests/e2e/test_defense.py -v --junitxml=junit-e2e.xml
-  timeout: 45 minutes
+  # Defense create ~30 min + health + 10 tests incl. two Chromium runs.
+  timeout: 60 minutes
 
 mirror:
   stage: mirror
