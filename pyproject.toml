@@ -1,7 +1,7 @@
 [project]
 name = "platform-api"
 version = "1.0.0-beta"
-requires-python = "==3.13.2"
+requires-python = ">=3.13,<3.14"
 dependencies = [
     "aioboto3>=13.2.0",
     "asyncpg>=0.30.0",
