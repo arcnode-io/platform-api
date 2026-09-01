@@ -246,11 +246,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/0d/52d98722666d6fc6c3dd4c76df339501d6efd40e0ff95e6186a7b7f0befd/black-26.3.1-py3-none-any.whl", hash = "sha256:2bd5aa94fc267d38bb21a70d7410a89f1a1d318841855f698746f8e7f51acd1b", size = 207542, upload-time = "2026-03-12T03:36:01.668Z" },
 ]
 
-[package.optional-dependencies]
-d = [
-    { name = "aiohttp" },
-]
-
 [[package]]
 name = "boolean-py"
 version = "5.0"
@@ -1069,7 +1064,7 @@ dependencies = [
 dev = [
     { name = "asyncpg-stubs" },
     { name = "bandit" },
-    { name = "black", extra = ["d"] },
+    { name = "black" },
     { name = "boto3-stubs", extra = ["bedrock-runtime", "cloudformation", "lambda"] },
     { name = "cfn-lint" },
     { name = "deptry" },
@@ -1109,7 +1104,7 @@ requires-dist = [
 dev = [
     { name = "asyncpg-stubs", specifier = ">=0.29" },
     { name = "bandit", specifier = ">=1.8.0" },
-    { name = "black", extras = ["d"], specifier = ">=26.3.1" },
+    { name = "black", specifier = ">=26.3.1" },
     { name = "boto3-stubs", extras = ["bedrock-runtime", "cloudformation", "lambda"], specifier = ">=1.35.0" },
     { name = "cfn-lint", specifier = ">=1.49.3" },
     { name = "deptry", specifier = ">=0.23.0" },

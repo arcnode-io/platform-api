@@ -18,7 +18,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "bandit>=1.8.0",
-    "black[d]>=26.3.1",
+    "black>=26.3.1",
     "asyncpg-stubs>=0.29",
     "poethepoet>=0.32.0",
     "ty>=0.0.18",
