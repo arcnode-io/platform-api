@@ -1,8 +1,8 @@
 """Aurora bootstrap Lambda — runs once at stack-create per variant.
 
 Reads ``Slices`` from the CFN custom resource properties (e.g.
-``["document", "vector"]`` for commercial, ``["document", "vector",
-"timeseries"]`` for defense) and:
+``["document", "vector", "dercontrol"]`` for commercial, plus
+``"timeseries"`` for defense) and:
 
   1. Creates one Postgres database per slice (idempotent — checks
      ``pg_database`` first).
@@ -34,6 +34,9 @@ SLICE_SPECS: dict[str, tuple[str, str, str | None]] = {
     "document": ("ems_document", "ems_doc_app", None),
     "vector": ("ems_vector", "ems_vec_app", "vector"),
     "timeseries": ("ems_timeseries", "ems_ts_app", "pg_partman"),
+    # ems-der-control-api's DB. No extension — Hibernate ddl-auto=update builds
+    # the schema on first boot, same as device-api does in the document slice.
+    "dercontrol": ("ems_dercontrol", "ems_dercontrol_app", None),
 }
 
 # measurements — the broker-ingest landing table. Every MQTT publish a

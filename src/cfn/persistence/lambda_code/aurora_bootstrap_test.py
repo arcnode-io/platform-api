@@ -29,13 +29,18 @@ def test_module_loads_and_exposes_handler() -> None:
     assert callable(mod.handler)
 
 
-def test_slice_specs_cover_three_variants() -> None:
+def test_slice_specs_cover_all_slices() -> None:
     """SLICE_SPECS maps each supported slice → (db_name, app_user, extension)."""
     # Arrange + Act
     mod = _load_module()
 
     # Assert
-    assert set(mod.SLICE_SPECS.keys()) == {"document", "vector", "timeseries"}
+    assert set(mod.SLICE_SPECS.keys()) == {
+        "document",
+        "vector",
+        "timeseries",
+        "dercontrol",
+    }
     # document has no extension
     assert mod.SLICE_SPECS["document"] == ("ems_document", "ems_doc_app", None)
     # vector installs pgvector
@@ -45,6 +50,12 @@ def test_slice_specs_cover_three_variants() -> None:
         "ems_timeseries",
         "ems_ts_app",
         "pg_partman",
+    )
+    # dercontrol: plain DB, no extension — Hibernate ddl-auto owns the schema
+    assert mod.SLICE_SPECS["dercontrol"] == (
+        "ems_dercontrol",
+        "ems_dercontrol_app",
+        None,
     )
 
 

@@ -52,6 +52,7 @@ AWS_SHIM = textwrap.dedent("""\
         for arg in "$@"; do
           case "$arg" in
             arcnode-ems-*/document-url)   echo 'postgres://doc-user:doc-pw@aurora/ems_document'; exit 0 ;;
+            arcnode-ems-*/dercontrol-url) echo 'postgres://dc-user:dc-pw@aurora/ems_dercontrol'; exit 0 ;;
             arcnode-ems-*/vector-url)     echo 'postgres://vec-user:vec-pw@aurora/ems_vector'; exit 0 ;;
             arcnode-ems-*/timeseries-url) echo 'postgres://ts-user:ts-pw@tiger.example/ems_timeseries'; exit 0 ;;
             arcnode-ems-*/graph-url)      echo 'neo4j+s://aura-user:aura-pw@aura.example:7687'; exit 0 ;;

@@ -44,6 +44,22 @@ services:
     volumes:
       - /opt/arcnode/dtm.json:/app/dtm.json:ro
 
+  # IEEE 2030.5 / OpenADR DER control intake. Utility/aggregator POSTs
+  # DERControl events → persist to its own Aurora slice (DER_CONTROL_URL,
+  # ddl-auto=update) → republish setpoints as measurement samples on the
+  # der_dispatch singleton device. Broker identity arcnode_der_control_api
+  # (MQTT_DER_CONTROL_API_PASSWORD, both in secrets.env). No published port
+  # yet — the utility-facing HTTPS side needs mutual TLS (own follow-up).
+  der-control-api:
+    image: public.ecr.aws/y1d2j6a8/ems-der-control-api:latest
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      ENV: beta
+    depends_on:
+      hivemq:
+        condition: service_started
+
   # Industrial-fixtures mocks — full set covers every protocol the
   # smoke DTM (industrial-fixtures.json) references. Bindings point
   # at these compose service names; gateway connects on the standard

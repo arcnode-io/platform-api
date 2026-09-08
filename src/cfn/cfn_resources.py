@@ -24,6 +24,10 @@ COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("document-url", "DOCUMENT_URL"),
     ("vector-url", "VECTOR_URL"),
     ("timeseries-url", "TIMESERIES_URL"),
+    # ems-der-control-api's own Aurora slice (both variants). Standard libpq
+    # URL shape like the others — the Spring app splits it into a jdbc: URL +
+    # user/pw on its side.
+    ("dercontrol-url", "DER_CONTROL_URL"),
     # Agent vendor API key — only OpenWeatherMap remains (ADR-024 + ADR-025).
     # Chat + embed go through Bedrock (cloud) or Ollama (airgapped); no
     # OpenAI / Anthropic direct keys anywhere.
@@ -42,14 +46,15 @@ DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
     ("aoss-host", "AOSS_HOST"),
 )
 # Broker File RBAC + device-api auth secrets. Variant-agnostic (File RBAC runs
-# in every deployment) → fetched into secrets.env on both. The 3 mqtt-* pws
-# also feed credentials.xml (the broker's auth store). See auth_secrets.py.
+# in every deployment) → fetched into secrets.env on both. The mqtt-* pws also
+# feed credentials.xml (the broker's auth store). See auth_secrets.py.
 AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("mqtt-gateway-password", "MQTT_GATEWAY_PASSWORD"),
     ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
     ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
     ("mqtt-device-api-password", "MQTT_DEVICE_API_PASSWORD"),
     ("mqtt-telemetry-writer-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
+    ("mqtt-der-control-api-password", "MQTT_DER_CONTROL_API_PASSWORD"),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
@@ -542,6 +547,9 @@ def build_userdata(
         "TW_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-telemetry-writer-password "
         "--query SecretString --output text)\n"
+        "DCA_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-der-control-api-password "
+        "--query SecretString --output text)\n"
         "cat > /opt/arcnode/credentials.xml <<XML\n"
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         "<file-rbac>\n"
@@ -556,6 +564,8 @@ def build_userdata(
         "<roles><id>device_api</id></roles></user>\n"
         "    <user><name>arcnode_telemetry_writer</name><password>$TW_PW</password>"
         "<roles><id>telemetry_writer</id></roles></user>\n"
+        "    <user><name>arcnode_der_control_api</name><password>$DCA_PW</password>"
+        "<roles><id>der_control_api</id></roles></user>\n"
         "  </users>\n"
         "  <roles>\n"
         # gateway: pub telemetry up, sub commands down, sub system control
@@ -584,6 +594,12 @@ def build_userdata(
         "    <role><id>telemetry_writer</id><permissions>"
         "<permission><topic>sites/+/devices/+/measurements/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
+        "</permissions></role>\n"
+        # der_control_api: publishes DERControl setpoints as measurements on the
+        # der_dispatch singleton device only. PUBLISH-only, never subscribes.
+        "    <role><id>der_control_api</id><permissions>"
+        "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
+        "<activity>PUBLISH</activity></permission>"
         "</permissions></role>\n"
         "    <role><id>operator</id><permissions>"
         "<permission><topic>sites/+/devices/+/commands/#</topic>"

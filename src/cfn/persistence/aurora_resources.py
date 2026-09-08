@@ -27,11 +27,18 @@ def _load_lambda_source(filename: str) -> str:
     return (LAMBDA_CODE_DIR / filename).read_text()
 
 
-# Per-variant Aurora slice sets. Commercial keeps only document + vector
+# Per-variant Aurora slice sets. Commercial keeps document + vector
 # (Tiger Cloud owns the timeseries slice). Defense adds timeseries (Aurora
-# pg_partman absorbs telemetry).
-COMMERCIAL_SLICES: Final[tuple[str, ...]] = ("document", "vector")
-DEFENSE_SLICES: Final[tuple[str, ...]] = ("document", "vector", "timeseries")
+# pg_partman absorbs telemetry). Both carry dercontrol — ems-der-control-api's
+# own database in the shared cluster (device-api owns the document schema, so
+# a second Hibernate ddl-auto tenant there would be a schema-ownership hazard).
+COMMERCIAL_SLICES: Final[tuple[str, ...]] = ("document", "vector", "dercontrol")
+DEFENSE_SLICES: Final[tuple[str, ...]] = (
+    "document",
+    "vector",
+    "timeseries",
+    "dercontrol",
+)
 
 
 def aurora_cluster_resources(

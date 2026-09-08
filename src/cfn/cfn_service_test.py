@@ -296,6 +296,7 @@ def test_userdata_keeps_secrets_and_config_in_separate_env_files() -> None:
         assert "DOCUMENT_URL=" in rendered
         assert "VECTOR_URL=" in rendered
         assert "TIMESERIES_URL=" in rendered
+        assert "DER_CONTROL_URL=" in rendered
         # The aws secretsmanager get-secret-value lines all append to secrets.env
         secret_section = rendered.split("/opt/arcnode/secrets.env")[1:]
         secret_block = "\n".join(secret_section)
@@ -350,6 +351,7 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
             "MqttGatewayPasswordSecret",
             "MqttOperatorPasswordSecret",
             "MqttViewerPasswordSecret",
+            "MqttDerControlApiPasswordSecret",
             "AuthJwtSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
@@ -362,12 +364,11 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
 
 def test_userdata_writes_broker_credentials_xml() -> None:
     """UserData writes /opt/arcnode/credentials.xml (bind-mounted into the
-    File RBAC extension) with the three broker passwords + the three role
-    identities."""
+    File RBAC extension) with every broker password + role identity."""
     # Arrange + Act
     rendered = _render()
 
-    # Assert — file path + the four File-RBAC usernames in the heredoc
+    # Assert — file path + every File-RBAC username in the heredoc
     assert "/opt/arcnode/credentials.xml" in rendered
     for user in (
         "arcnode_gateway",
@@ -375,6 +376,7 @@ def test_userdata_writes_broker_credentials_xml() -> None:
         "arcnode_viewer",
         "arcnode_device_api",
         "arcnode_telemetry_writer",
+        "arcnode_der_control_api",
     ):
         assert user in rendered, f"{user} missing from credentials.xml"
     # The gateway subscribes system/topology_changed (hot topology reload) and
@@ -382,6 +384,10 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     # fail-louds on the denied subscribe. Regression guard.
     assert "<topic>system/#</topic>" in rendered
     assert "MQTT_DEVICE_API_PASSWORD" in rendered
+    # der-control-api publishes DERControl setpoints as measurements on the
+    # der_dispatch singleton device — PUBLISH-only, pinned to that device.
+    assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
+    assert "<topic>sites/+/devices/der_dispatch/measurements/#</topic>" in rendered
     # Dispatch lifecycle: gateway publishes events/dispatch_state; HMI roles
     # subscribe it. Without these grants dispatch acks are silently denied.
     assert rendered.count("<topic>sites/+/devices/+/events/#</topic>") >= 3
@@ -398,6 +404,7 @@ def test_userdata_fetches_auth_slots_into_secrets_env() -> None:
         "MQTT_GATEWAY_PASSWORD",
         "MQTT_OPERATOR_PASSWORD",
         "MQTT_VIEWER_PASSWORD",
+        "MQTT_DER_CONTROL_API_PASSWORD",
         "AUTH_JWT_SECRET",
         "AUTH_OPERATOR_PW",
         "AUTH_VIEWER_PW",

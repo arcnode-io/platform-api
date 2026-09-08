@@ -13,15 +13,24 @@ from src.cfn.persistence.aurora_resources import (
 
 
 def test_commercial_slices_omit_timeseries() -> None:
-    """Commercial gets document + vector only — Tiger Cloud owns timeseries."""
+    """Commercial gets document + vector + dercontrol — Tiger Cloud owns timeseries."""
     # Assert
-    assert COMMERCIAL_SLICES == ("document", "vector")
+    assert COMMERCIAL_SLICES == ("document", "vector", "dercontrol")
 
 
 def test_defense_slices_include_timeseries() -> None:
-    """Defense gets document + vector + timeseries (Aurora pg_partman)."""
+    """Defense gets document + vector + timeseries (Aurora pg_partman) + dercontrol."""
     # Assert
-    assert DEFENSE_SLICES == ("document", "vector", "timeseries")
+    assert DEFENSE_SLICES == ("document", "vector", "timeseries", "dercontrol")
+
+
+def test_all_variants_provision_dercontrol_slice() -> None:
+    """ems-der-control-api gets its own Aurora database, not device-api's
+    `document` slice — a second service running Hibernate ddl-auto against
+    that schema would be a schema-ownership hazard."""
+    # Assert
+    assert "dercontrol" in COMMERCIAL_SLICES
+    assert "dercontrol" in DEFENSE_SLICES
 
 
 def test_bootstrap_custom_resource_passes_slices_property() -> None:

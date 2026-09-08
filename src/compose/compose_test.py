@@ -21,6 +21,7 @@ DEFENSE_COMPOSE = COMPOSE_DIR / "defense" / "docker-compose.yaml"
 BROKER_LEG = (
     "hivemq",
     "device-api",
+    "der-control-api",
     "mock-modbus-server",
     "telemetry-writer",
     "industrial-gateway",
@@ -66,6 +67,22 @@ def test_telemetry_writer_uses_baked_image_not_runtime_pip(
     assert svc["image"] == "public.ecr.aws/y1d2j6a8/ems-telemetry-writer:latest"
     assert "command" not in svc, "image has CMD baked in; no override needed"
     assert "volumes" not in svc, "script lives in image; no bind-mount needed"
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_der_control_api_ships_internal_only(variant_path: Path) -> None:
+    """ems-der-control-api ships on both variants: ECR image, ENV=beta, and NO
+    published port — the utility/aggregator-facing HTTPS intake needs mutual
+    TLS (IEEE 2030.5), which is a separate ingress piece. Until then it's
+    reachable only on the compose network.
+    """
+    # Arrange + Act
+    svc = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"]
+
+    # Assert
+    assert svc["image"] == "public.ecr.aws/y1d2j6a8/ems-der-control-api:latest"
+    assert svc["environment"]["ENV"] == "beta"
+    assert "ports" not in svc, "internal-only until mTLS ingress lands"
 
 
 def test_defense_ships_broker_leg_plus_analyst_server() -> None:
