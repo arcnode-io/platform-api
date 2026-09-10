@@ -72,9 +72,7 @@ def test_telemetry_writer_uses_baked_image_not_runtime_pip(
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
 def test_der_control_api_ships_internal_only(variant_path: Path) -> None:
     """ems-der-control-api ships on both variants: ECR image, ENV=beta, and NO
-    published port — the utility/aggregator-facing HTTPS intake needs mutual
-    TLS (IEEE 2030.5), which is a separate ingress piece. Until then it's
-    reachable only on the compose network.
+    published port — der-control-ingress is the only reachable path in.
     """
     # Arrange + Act
     svc = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"]
@@ -82,7 +80,35 @@ def test_der_control_api_ships_internal_only(variant_path: Path) -> None:
     # Assert
     assert svc["image"] == "public.ecr.aws/y1d2j6a8/ems-der-control-api:latest"
     assert svc["environment"]["ENV"] == "beta"
-    assert "ports" not in svc, "internal-only until mTLS ingress lands"
+    assert "ports" not in svc, "internal-only — der-control-ingress fronts it"
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_der_control_ingress_terminates_mtls_in_front_of_der_control_api(
+    variant_path: Path,
+) -> None:
+    """der-control-ingress is the only publicly reachable path to
+    der-control-api: mutual-TLS terminator (IEEE 2030.5 requires client
+    certs), published on 8443, never touching HMI's existing :80 path.
+    """
+    # Arrange + Act
+    services = yaml.safe_load(variant_path.read_text())["services"]
+    svc = services["der-control-ingress"]
+
+    # Assert — vanilla nginx, published mTLS port, depends on the app it fronts
+    assert svc["image"] == "nginx:1.27-alpine"
+    assert svc["ports"] == ["8443:8443"]
+    assert "der-control-api" in svc["depends_on"]
+
+    # Assert — cert/key/truststore/conf all bind-mounted read-only, nothing baked
+    volumes = svc["volumes"]
+    assert any(v.endswith(":/etc/nginx/tls/cert.pem:ro") for v in volumes)
+    assert any(v.endswith(":/etc/nginx/tls/key.pem:ro") for v in volumes)
+    assert any(v.endswith(":/etc/nginx/tls/truststore.pem:ro") for v in volumes)
+    assert any(v.endswith(":/etc/nginx/conf.d/default.conf:ro") for v in volumes)
+
+    # Assert — HMI's own ingress path is untouched by this addition
+    assert services["hmi"]["ports"] == ["80:80"]
 
 
 def test_defense_ships_broker_leg_plus_analyst_server() -> None:

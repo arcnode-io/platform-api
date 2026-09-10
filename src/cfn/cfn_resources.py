@@ -215,6 +215,16 @@ def network_resources() -> dict[str, object]:
                         "ToPort": 8000,
                         "CidrIp": "0.0.0.0/0",
                     },
+                    # der-control-ingress — mTLS terminator for the utility/
+                    # aggregator-facing IEEE 2030.5 DERControl intake. Open to
+                    # the world same as the others: the mTLS handshake itself
+                    # is the gate, not the SG.
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 8443,
+                        "ToPort": 8443,
+                        "CidrIp": "0.0.0.0/0",
+                    },
                 ],
             },
         },
@@ -660,6 +670,27 @@ def build_userdata(
         f"-o /opt/arcnode/observability/{f}"
         for f in observability_files
     )
+    # der-control-ingress TLS assets: self-signed server cert/key (same
+    # openssl shape as the ISO appliance's own TLS role — no ACM/real-CA
+    # story yet, that's a later hardening pass), the ops-populated
+    # truststore secret written straight to a file (it's a PEM bundle, not
+    # a KEY=VALUE line — doesn't belong in secrets.env), and the static
+    # nginx mTLS config (no per-order variability, fetched like
+    # observability/prometheus.yml rather than templated in this heredoc).
+    der_control_ingress_block = (
+        "openssl req -x509 -newkey rsa:2048 -nodes "
+        "-keyout /opt/arcnode/der-control-tls/key.pem "
+        "-out /opt/arcnode/der-control-tls/cert.pem -days 3650 "
+        '-subj "/CN=der-control-${AWS::StackName}"\n'
+        "chmod 600 /opt/arcnode/der-control-tls/key.pem\n"
+        "aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/der-control-truststore-pem "
+        "--query SecretString --output text "
+        "> /opt/arcnode/der-control-truststore.pem\n"
+        "chmod 600 /opt/arcnode/der-control-truststore.pem\n"
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/der-control-ingress/nginx.conf "
+        "-o /opt/arcnode/der-control-ingress.conf\n"
+    )
     # CFN signaling — without cfn-signal the stack reports CREATE_COMPLETE
     # the instant the AMI boots, even if every curl in UserData fails. Both
     # Phase 5 smokes (2026-05-15, 2026-05-16) hit silent UserData failures
@@ -675,7 +706,7 @@ def build_userdata(
     return (
         "#!/bin/bash\n"
         "set -uo pipefail\n"
-        "dnf install -y aws-cfn-bootstrap\n"
+        "dnf install -y aws-cfn-bootstrap openssl\n"
         # On UserData failure: upload the full cloud-init log to S3
         # (arcnode-artifacts/diagnostic/<stack>/cloud-init.log) BEFORE
         # cfn-signal. Without this, EC2 terminates with ROLLBACK and the
@@ -696,7 +727,8 @@ def build_userdata(
         "set -e\n"
         "mkdir -p /opt/arcnode/observability/prometheus-data "
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
-        "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts\n"
+        "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts "
+        "/opt/arcnode/der-control-tls\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         "AWS_REGION=${AWS::Region}\n"
@@ -741,6 +773,8 @@ def build_userdata(
         f"{secret_lines}\n"
         "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
         f"{credentials_block}"
+        "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"
+        f"{der_control_ingress_block}"
         "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"

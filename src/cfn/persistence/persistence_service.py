@@ -42,6 +42,7 @@ from src.cfn.persistence.auth_secrets import (
     auth_human_parameters,
     auth_human_secrets,
     auth_machine_secrets,
+    der_control_truststore_secret,
 )
 from src.orders.configurator_payload import DeploymentContext
 
@@ -116,6 +117,7 @@ class PersistenceService:
             **agent_api_key_secrets(),
             **auth_machine_secrets(),
             **auth_human_secrets(),
+            **der_control_truststore_secret(),
         }
         if not e2e:
             resources.update(
@@ -132,6 +134,7 @@ class PersistenceService:
             # write credentials.xml + secrets.env.
             *auth_machine_secrets(),
             *auth_human_secrets(),
+            *der_control_truststore_secret(),
         ]
         if not e2e:
             depends_on.append("CustomerUrlPreflightCustomResource")
@@ -160,6 +163,7 @@ class PersistenceService:
                 **agent_api_key_secrets(),
                 **auth_machine_secrets(),
                 **auth_human_secrets(),
+                **der_control_truststore_secret(),
                 **neptune_resources(),
                 **aoss_resources(short=short),
             },
@@ -178,5 +182,6 @@ class PersistenceService:
                 # Broker + human auth secrets (variant-agnostic).
                 *auth_machine_secrets(),
                 *auth_human_secrets(),
+                *der_control_truststore_secret(),
             ],
         )

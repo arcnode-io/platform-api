@@ -41,8 +41,8 @@ services:
   # DERControl events → persist to its own Aurora slice (DER_CONTROL_URL,
   # ddl-auto=update) → republish setpoints as measurement samples on the
   # der_dispatch singleton device. Broker identity arcnode_der_control_api
-  # (MQTT_DER_CONTROL_API_PASSWORD, both in secrets.env). No published port
-  # yet — the utility-facing HTTPS side needs mutual TLS (own follow-up).
+  # (MQTT_DER_CONTROL_API_PASSWORD, both in secrets.env). Internal-only,
+  # no published port — der-control-ingress (below) is the only path in.
   der-control-api:
     image: public.ecr.aws/y1d2j6a8/ems-der-control-api:latest
     restart: unless-stopped
@@ -51,6 +51,30 @@ services:
       ENV: beta
     depends_on:
       hivemq:
+        condition: service_started
+
+  # Mutual-TLS terminator for der-control-api — IEEE 2030.5 mandates client
+  # certs (device identity is a hash of the cert, LFDI/SFDI), so this can't
+  # be plain HTTPS. Rejects any client without a cert signed by the mounted
+  # truststore before der-control-api ever sees the request. Doesn't touch
+  # HMI's :80 path — dedicated gateway, one concern. See
+  # src/compose/der_control_ingress/nginx.conf for the mTLS config; cert/key
+  # generated at boot, truststore is an ops-populated Secrets Manager
+  # placeholder (per-DERMS-integration CA bundle — not wired into customer
+  # order intake yet, that's a separate decision).
+  der-control-ingress:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    <<: *env-files
+    ports:
+      - "8443:8443"
+    volumes:
+      - /opt/arcnode/der-control-tls/cert.pem:/etc/nginx/tls/cert.pem:ro
+      - /opt/arcnode/der-control-tls/key.pem:/etc/nginx/tls/key.pem:ro
+      - /opt/arcnode/der-control-truststore.pem:/etc/nginx/tls/truststore.pem:ro
+      - /opt/arcnode/der-control-ingress.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      der-control-api:
         condition: service_started
 
   # MQTT → Tiger Cloud bridge. HiveMQ CE doesn't ship a Postgres connector

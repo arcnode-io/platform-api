@@ -12,6 +12,7 @@ happens when the operator actually runs the stack — out of scope here.
 
 from cfnlint import api as cfnlint_api
 
+from src.cfn.cfn_resources import ARCNODE_PUBLIC_BASE_URL
 from src.cfn.cfn_service import CfnService
 from src.cfn.persistence.persistence_service import PersistenceService
 from src.orders.configurator_payload import DeploymentContext
@@ -430,6 +431,54 @@ def test_userdata_writes_hmi_runtime_config() -> None:
     # empty string → SPA derives the broker URL. The "" is YAML-escaped in
     # the template scalar; cloud-init decodes it back to mqttUri: "" on disk.
     assert "mqttUri:" in hmi_block
+
+
+def test_security_group_opens_der_control_mtls_port() -> None:
+    """8443 is open for der-control-ingress — the mTLS handshake itself is
+    the gate, so opening the port to the world is fine (matches the 8000
+    analyst-server precedent: no auth at the SG layer for either)."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "FromPort: 8443" in rendered
+    assert "ToPort: 8443" in rendered
+
+
+def test_der_control_truststore_secret_provisioned_both_variants() -> None:
+    """A placeholder Secrets Manager slot for der-control-ingress's mTLS
+    truststore — ops overwrites it with the real per-DERMS-integration CA
+    bundle post-deploy (not wired into customer order intake; that's a
+    separate, bigger decision)."""
+    # Arrange + Act
+    for ctx in (DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD):
+        rendered = _render(ctx)
+
+        # Assert
+        assert "DerControlTruststoreSecret" in rendered, f"missing in {ctx}"
+        assert "der-control-truststore-pem" in rendered, f"missing in {ctx}"
+
+
+def test_userdata_writes_der_control_ingress_tls_assets() -> None:
+    """UserData: self-signed server cert/key for der-control-ingress, the
+    ops-populated truststore fetched from Secrets Manager, and the static
+    nginx mTLS config — all the files der-control-ingress bind-mounts."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert — self-signed cert/key generated at boot (mirrors the ISO
+    # appliance's own TLS role — same openssl one-liner shape)
+    assert "/opt/arcnode/der-control-tls/cert.pem" in rendered
+    assert "/opt/arcnode/der-control-tls/key.pem" in rendered
+    assert "openssl req -x509" in rendered
+    # Assert — truststore fetched from the placeholder secret, not secrets.env
+    # (it's a PEM bundle, not a KEY=VALUE line)
+    assert "der-control-truststore-pem" in rendered
+    assert "/opt/arcnode/der-control-truststore.pem" in rendered
+    # Assert — static nginx config fetched from arcnode-public, same pattern
+    # as the observability configs
+    assert f"{ARCNODE_PUBLIC_BASE_URL}/der-control-ingress/nginx.conf" in rendered
+    assert "/opt/arcnode/der-control-ingress.conf" in rendered
 
 
 def test_stack_exposes_gateway_bootstrap_contract() -> None:
