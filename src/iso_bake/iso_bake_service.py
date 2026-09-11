@@ -19,9 +19,18 @@ from datetime import UTC, datetime
 
 import yaml
 
+from src.orders.configurator_grid import GridPath
 from src.orders.configurator_payload import ConfiguratorPayload
 
 _SITE_ID_RX = re.compile(r"[^a-z0-9]+")
+
+# Wizard-facing label per non-off-grid path — off_grid gets its own literal
+# ("Off-grid"), handled separately since it needs no wires_owner/region.
+_PATH_LABELS: dict[GridPath, str] = {
+    GridPath.FLEXIBLE: "Fast grid",
+    GridPath.FIRM: "Firm grid",
+    GridPath.GRID_REVENUE: "Grid + revenue",
+}
 
 
 def _slugify_site_id(name: str) -> str:
@@ -46,20 +55,7 @@ class IsoBakeService:
         self, *, payload: ConfiguratorPayload, order_id: str
     ) -> str:
         """install.json shape matches the wizard's InstallIdentity contract."""
-        # DER and wholesale-market participation are independent — a site can
-        # have both, either, or neither. Designer's middle-dot ("·") separates
-        # market name and hub within a part; " + " joins the two parts if both
-        # are present.
-        market_parts = []
-        if payload.wholesale_market is not None:
-            market_parts.append(
-                f"{payload.wholesale_market.value.upper()} · {payload.settlement_point}"
-            )
-        if payload.der_utility is not None:
-            market_parts.append(f"DER · {payload.der_utility}")
-        market = (
-            " + ".join(market_parts) if market_parts else "No grid program selected"
-        )
+        market = self._market_string(payload)
         body = {
             "customer": payload.operator_org,
             "site": payload.deployment_site_name,
@@ -78,16 +74,39 @@ class IsoBakeService:
     ) -> str:
         """cfg.customer.yml — per-customer overrides loaded over cfg.defaults.yml.
 
-        Grid-program fields are omitted (not null) when unselected — DER and
-        wholesale-market are independent, so either or both may be absent.
+        wires_owner (off-grid has none) and wholesale_market/settlement_point
+        (only when a settlement point is set) are omitted rather than
+        written null.
         """
+        grid = payload.grid
         body: dict[str, object] = {
             "site_id": _slugify_site_id(payload.deployment_site_name),
+            "grid_path": grid.path.value,
         }
-        if payload.wholesale_market is not None:
-            body["wholesale_market"] = payload.wholesale_market.value
-            body["settlement_point"] = payload.settlement_point
-        if payload.der_utility is not None:
-            body["der_utility"] = payload.der_utility
+        if grid.path != GridPath.OFF_GRID:
+            # edp-api's V5a guarantees wires_owner is set for any non-off-grid
+            # path by the time an order reaches us — fail loud, not silent,
+            # if that invariant is somehow broken.
+            assert grid.wires_owner is not None
+            body["wires_owner"] = grid.wires_owner.name
+        if grid.settlement_point is not None:
+            assert grid.market_region is not None
+            body["wholesale_market"] = grid.market_region.value
+            body["settlement_point"] = grid.settlement_point
         body["order_id"] = order_id
         return yaml.safe_dump(body, sort_keys=False)
+
+    @staticmethod
+    def _market_string(payload: ConfiguratorPayload) -> str:
+        """The wizard's Step-1 grid-program display string."""
+        grid = payload.grid
+        if grid.path == GridPath.OFF_GRID:
+            return "Off-grid"
+        # edp-api's V5a guarantees wires_owner + market_region are set for
+        # any non-off-grid path by the time an order reaches us.
+        assert grid.wires_owner is not None
+        market = f"{_PATH_LABELS[grid.path]} · {grid.wires_owner.name}"
+        if grid.settlement_point is not None:
+            assert grid.market_region is not None
+            market += f" · {grid.market_region.value.upper()} · {grid.settlement_point}"
+        return market

@@ -26,14 +26,14 @@ def _render(
     deployment_context: DeploymentContext = DeploymentContext.COMMERCIAL,
     *,
     e2e: bool = False,
-    wholesale_market: str | None = "ercot",
+    market_region: str | None = "ercot",
     settlement_point: str | None = "HB_NORTH",
 ) -> str:
     return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID,
         dtm_url=DTM_URL,
         site_id=SITE_ID,
-        wholesale_market=wholesale_market,
+        market_region=market_region,
         settlement_point=settlement_point,
         deployment_context=deployment_context,
         e2e=e2e,
@@ -58,13 +58,14 @@ def test_e2e_flag_writes_e2e_true_into_analyst_cfg() -> None:
     assert "e2e: true" not in without
 
 
-def test_no_wholesale_market_omits_market_block_from_analyst_cfg() -> None:
-    """DER-only (or off-grid, neither selected) orders pass wholesale_market=
-    None — analyst-server has no LMP market to scope queries to, so the
-    market: block is omitted entirely rather than written with null values.
+def test_no_settlement_point_omits_market_block_from_analyst_cfg() -> None:
+    """Grid paths with no settlement point (off-grid, or a market_region not
+    yet pinned to a settlement point) pass settlement_point=None —
+    analyst-server has no concrete LMP node to query, so the market: block
+    is omitted entirely rather than written with null values.
     """
     # Arrange + Act
-    without_market = _render(wholesale_market=None, settlement_point=None)
+    without_market = _render(market_region=None, settlement_point=None)
     with_market = _render()
 
     # Assert

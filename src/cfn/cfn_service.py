@@ -43,7 +43,7 @@ class CfnService:
         deployment_uuid: str,
         dtm_url: str,
         site_id: str,
-        wholesale_market: str | None,
+        market_region: str | None,
         settlement_point: str | None,
         deployment_context: DeploymentContext,
         e2e: bool = False,
@@ -54,18 +54,19 @@ class CfnService:
         Flows into config.env on EC2 boot and overrides the gateway's baked
         cfg.yml default — every customer publishes to ``sites/{site_id}/...``.
 
-        ``wholesale_market`` + ``settlement_point`` scope analyst-server's
-        LMP queries — flow into config.env so the agent's system prompt
-        can pin queries to the customer's market without LLM-side guessing.
-        Both None when the order has no wholesale-market participation (DER-
-        only or off-grid) — DER and wholesale-market are independent
-        ConfiguratorPayload selections, not either/or.
+        ``market_region`` (ConfiguratorPayload's ``grid.market_region``) +
+        ``settlement_point`` scope analyst-server's LMP queries — written
+        into analyst-cfg.customer.yml's ``market:`` block (key name
+        ``wholesale_market:`` — that's ems-analyst's config contract, not
+        renamed) iff ``settlement_point`` is set. Both None for grid paths
+        with no settlement point (off-grid, flexible, firm, or grid_revenue
+        before a settlement point is picked).
         """
         short = deployment_uuid.split("-", 1)[0]
         userdata = build_userdata(
             dtm_url=dtm_url,
             site_id=site_id,
-            wholesale_market=wholesale_market,
+            market_region=market_region,
             settlement_point=settlement_point,
             deployment_context=deployment_context,
             e2e=e2e,

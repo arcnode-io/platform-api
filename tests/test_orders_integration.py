@@ -48,23 +48,45 @@ APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
 GATEWAY_TARBALL_URL: str = "https://arcnode-public.example/gateway/latest.tar.gz"
 SENDER_EMAIL: str = "noreply@arcnode.test"
 
+# v2 grid model (CONTRACT §1) — "firm" grid path, ERCOT/Oncor site.
 VALID_PAYLOAD: dict[str, object] = {
     "operator_org": "acme",
     "deployment_site_name": "alpha",
     "contact_email": "ops@acme.io",
-    "energy_source": "nuclear",
-    "source_capacity_mw": 10.0,
     "primary_workload": "ai_training",
     "gpu_variant": "h100_sxm",
     "target_gpu_count": 64,
     "bess_coupling": "ac_coupled",
     "bess_capacity_mwh": 10.0,
-    "grid_connection": "grid_tied",
     "climate_zone": "temperate",
     "deployment_context": "commercial",
     "aws_partition": "standard",
-    "wholesale_market": "ercot",
-    "settlement_point": "HB_NORTH",
+    "site": {
+        "location": {"lat": 32.78, "lon": -96.8, "address": None},
+        "country": "US",
+        "state": "TX",
+    },
+    "onsite_generation": {"type": "none", "capacity_mw": None},
+    "grid": {
+        "path": "firm",
+        "interconnection_level": None,
+        "wires_owner": {
+            "id": "oncor",
+            "name": "Oncor Electric Delivery",
+            "type": "tdsp",
+            "eia_id": 14354,
+        },
+        "retail_provider_separate": True,
+        "market_region": "ercot",
+        "service_type": "firm",
+        "flex_obligation": None,
+        "export_mode": "non_export",
+        "export_limit_mw": None,
+        "market_access": "none",
+        "market_program": None,
+        "settlement_point": None,
+        "intentional_islanding": False,
+    },
 }
 
 # 6 min — outer wrapper around EdpClientService's 5 min inner poll, with
@@ -96,6 +118,13 @@ def _extract_portal_url(email_body: str) -> str:
     pytest.fail(f"no Portal: line in email body: {email_body!r}")
 
 
+@pytest.mark.skip(
+    reason="BLOCKED on edp-api landing the ConfiguratorPayload v2 grid model "
+    "(handoff-configurator-grid-CONTRACT-2026-09-11.md) — this test's payload "
+    "is v2-shaped now but the published edp-api image (:latest on the self- "
+    "hosted Harbor registry) still expects v1 and will 422 it. Un-skip once "
+    "📐 system-architect confirms edp-api's step 1 is on main."
+)
 def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
     """POST → poll → assert portal HTML lists artifacts + launch link + APK.
 
@@ -234,6 +263,12 @@ PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
 ]
 
 
+@pytest.mark.skip(
+    reason="BLOCKED on edp-api landing the ConfiguratorPayload v2 grid model "
+    "(handoff-configurator-grid-CONTRACT-2026-09-11.md) — same reason as "
+    "test_order_full_pipeline_publishes_portal_and_emails_link above. "
+    "Un-skip once 📐 system-architect confirms edp-api's step 1 is on main."
+)
 def test_all_profile_combinations_reach_complete() -> None:
     """Smoke-test every supported profile against one shared container stack.
 

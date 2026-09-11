@@ -475,7 +475,7 @@ def build_userdata(
     *,
     dtm_url: str,
     site_id: str,
-    wholesale_market: str | None,
+    market_region: str | None,
     settlement_point: str | None,
     deployment_context: DeploymentContext,
     e2e: bool = False,
@@ -527,15 +527,16 @@ def build_userdata(
     # e2e deployments seed the small graph fixture; empty for production.
     e2e_line = "e2e: true\n" if e2e else ""
 
-    # DER and wholesale-market participation are independent ConfiguratorPayload
-    # selections (not either/or) — wholesale_market is None for DER-only or
-    # off-grid orders. Omit the block entirely rather than write null values;
-    # analyst-server just has no LMP market to scope queries to.
+    # Written iff settlement_point is set (grid.settlement_point in
+    # ConfiguratorPayload v2) — without a settlement point, analyst-server
+    # has no concrete LMP pricing node to query even if market_region is
+    # known. Key stays `wholesale_market:` — ems-analyst's config contract,
+    # not renamed even though the payload field is now `market_region`.
     market_block = (
         "market:\n"
-        f"  wholesale_market: {wholesale_market}\n"
+        f"  wholesale_market: {market_region}\n"
         f"  settlement_point: {settlement_point}\n"
-        if wholesale_market is not None
+        if settlement_point is not None
         else ""
     )
 

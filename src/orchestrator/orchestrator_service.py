@@ -175,14 +175,14 @@ class OrchestratorService:
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
             site_id=_slugify_site_id(payload.deployment_site_name),
-            # DER and wholesale-market participation are independent — None
-            # here means no wholesale-market selection (DER-only or off-grid).
-            wholesale_market=(
-                payload.wholesale_market.value
-                if payload.wholesale_market is not None
+            # None when the grid path has no settlement point (off-grid,
+            # or a market_region not yet pinned to one).
+            market_region=(
+                payload.grid.market_region.value
+                if payload.grid.market_region is not None
                 else None
             ),
-            settlement_point=payload.settlement_point,
+            settlement_point=payload.grid.settlement_point,
             deployment_context=payload.deployment_context,
         )
         template_url = await self._s3.upload_yaml(

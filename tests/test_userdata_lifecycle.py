@@ -82,7 +82,7 @@ def _render_with_test_stack_name(deployment_context: DeploymentContext) -> str:
     raw = build_userdata(
         dtm_url=DTM_URL,
         site_id="test_site",
-        wholesale_market="ercot",
+        market_region="ercot",
         settlement_point="HB_NORTH",
         deployment_context=deployment_context,
     )
