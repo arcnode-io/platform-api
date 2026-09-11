@@ -13,7 +13,7 @@ settlement_point fields — see configurator_grid.py and
 
 from enum import StrEnum
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from src.orders.configurator_grid import Grid, OnsiteGeneration, Site
 
@@ -77,7 +77,13 @@ class ConfiguratorPayload(BaseModel):
     No cross-field validators (policy unchanged from v1) — edp-api owns
     every structural + region-dependent rule on `site`/`onsite_generation`/
     `grid`; platform-api just relays its 422 on an invalid combo.
+
+    extra="forbid": a misspelled/stray key must 422 here, not get silently
+    stripped and forwarded as if it were never sent — matches edp-api's
+    own ConfigDict so both hops reject identically.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     operator_org: str
     deployment_site_name: str

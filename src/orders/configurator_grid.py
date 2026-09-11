@@ -11,11 +11,13 @@ See /tmp/handoffs/handoff-configurator-grid-CONTRACT-2026-09-11.md §1.
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SiteLocation(BaseModel):
     """Lat/lon feeds platform-api's /grid/resolve; address is display-only."""
+
+    model_config = ConfigDict(extra="forbid")
 
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
@@ -24,6 +26,8 @@ class SiteLocation(BaseModel):
 
 class Site(BaseModel):
     """country is ISO 3166-1 alpha-2, uppercase."""
+
+    model_config = ConfigDict(extra="forbid")
 
     location: SiteLocation
     country: str = Field(pattern=r"^[A-Z]{2}$")
@@ -43,6 +47,8 @@ class OnsiteGeneration(BaseModel):
     """capacity_mw > 0 iff type != none, null iff type == none — edp-api's
     V7 enforces this; not duplicated here (forward-verbatim policy)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: OnsiteGenerationType
     capacity_mw: float | None = None
 
@@ -60,6 +66,8 @@ class WiresOwnerType(StrEnum):
 
 class WiresOwner(BaseModel):
     """The distribution utility at the site, resolved from site.location."""
+
+    model_config = ConfigDict(extra="forbid")
 
     id: str
     name: str
@@ -122,6 +130,8 @@ class FlexObligation(BaseModel):
     """Curtailment contract terms. Required whenever service_type ==
     flexible (edp-api's V2/V4a); null otherwise."""
 
+    model_config = ConfigDict(extra="forbid")
+
     level: FlexLevel
     depth_pct: float = Field(gt=0, le=100)
     max_duration_h: float = Field(gt=0)
@@ -157,6 +167,8 @@ class MarketProgram(StrEnum):
 class Grid(BaseModel):
     """The site's grid participation. Cross-field rules (V1-V9, EX in the
     contract) live only in edp-api — platform-api forwards verbatim."""
+
+    model_config = ConfigDict(extra="forbid")
 
     path: GridPath
     interconnection_level: InterconnectionLevel | None = None
