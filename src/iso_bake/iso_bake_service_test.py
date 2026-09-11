@@ -95,6 +95,70 @@ def test_render_customer_cfg_carries_site_and_market() -> None:
     assert data["order_id"] == ORDER_ID
 
 
+def test_render_install_json_der_only_no_wholesale_market() -> None:
+    """DER-only order (no wholesale market) — market string shows the DER
+    utility instead of crashing on a None wholesale_market."""
+    # Arrange
+    payload = _payload(
+        der_utility="Oncor",
+        wholesale_market=None,
+        settlement_point=None,
+    )
+
+    # Act
+    raw = _service().render_install_json(payload=payload, order_id=ORDER_ID)
+    data = json.loads(raw)
+
+    # Assert
+    assert data["market"] == "DER · Oncor"
+
+
+def test_render_install_json_both_der_and_wholesale_market() -> None:
+    """Both selected — market string shows both, not either/or."""
+    # Arrange
+    payload = _payload(der_utility="Oncor")
+
+    # Act
+    raw = _service().render_install_json(payload=payload, order_id=ORDER_ID)
+    data = json.loads(raw)
+
+    # Assert
+    assert data["market"] == "ERCOT · HB_NORTH + DER · Oncor"
+
+
+def test_render_install_json_neither_der_nor_wholesale_market() -> None:
+    """Off-grid site: neither selected — market string says so plainly."""
+    # Arrange
+    payload = _payload(wholesale_market=None, settlement_point=None)
+
+    # Act
+    raw = _service().render_install_json(payload=payload, order_id=ORDER_ID)
+    data = json.loads(raw)
+
+    # Assert
+    assert data["market"] == "No grid program selected"
+
+
+def test_render_customer_cfg_omits_unselected_grid_program_fields() -> None:
+    """DER-only order: cfg.customer.yml carries der_utility, not a null
+    wholesale_market/settlement_point pair."""
+    # Arrange
+    payload = _payload(
+        der_utility="Oncor",
+        wholesale_market=None,
+        settlement_point=None,
+    )
+
+    # Act
+    raw = _service().render_customer_cfg(payload=payload, order_id=ORDER_ID)
+    data = yaml.safe_load(raw)
+
+    # Assert
+    assert data["der_utility"] == "Oncor"
+    assert "wholesale_market" not in data
+    assert "settlement_point" not in data
+
+
 def test_render_install_json_unicode_site_name_survives() -> None:
     """Site names with non-ascii must round-trip through json without mangling."""
     # Arrange

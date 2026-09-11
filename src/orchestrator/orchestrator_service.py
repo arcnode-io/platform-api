@@ -175,7 +175,13 @@ class OrchestratorService:
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
             site_id=_slugify_site_id(payload.deployment_site_name),
-            wholesale_market=payload.wholesale_market.value,
+            # DER and wholesale-market participation are independent — None
+            # here means no wholesale-market selection (DER-only or off-grid).
+            wholesale_market=(
+                payload.wholesale_market.value
+                if payload.wholesale_market is not None
+                else None
+            ),
             settlement_point=payload.settlement_point,
             deployment_context=payload.deployment_context,
         )

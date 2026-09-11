@@ -113,6 +113,19 @@ class ConfiguratorPayload(BaseModel):
     climate_zone: ClimateZone
     deployment_context: DeploymentContext
     aws_partition: AwsPartition
-    wholesale_market: WholesaleMarket
+
+    # DER and wholesale-market participation are independent, not mutually
+    # exclusive — a site can select both, either, or neither (e.g. off-grid).
+    # Mirrors edp-api's ConfiguratorPayload exactly (including which
+    # cross-field rules it does and doesn't duplicate here — see below).
+    der_utility: str | None = None  # non-None => DER selected
+    wholesale_market: WholesaleMarket | None = None  # non-None => wholesale selected
     # Free-form; the edp-api side validates (ISO, hub) compatibility.
-    settlement_point: str
+    settlement_point: str | None = None
+
+    # Reason: no cross-field validator here (e.g. "settlement_point required
+    # iff wholesale_market set") on purpose — every other business rule on
+    # this model (bess_consistency, market_hub_supported, the federal
+    # exclusions) lives only in edp-api too. Platform-api forwards verbatim
+    # and relays edp-api's 422 if the combo is invalid; duplicating the rule
+    # here would just be a second copy to keep in sync.

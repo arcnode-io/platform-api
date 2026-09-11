@@ -475,8 +475,8 @@ def build_userdata(
     *,
     dtm_url: str,
     site_id: str,
-    wholesale_market: str,
-    settlement_point: str,
+    wholesale_market: str | None,
+    settlement_point: str | None,
     deployment_context: DeploymentContext,
     e2e: bool = False,
 ) -> str:
@@ -526,6 +526,18 @@ def build_userdata(
 
     # e2e deployments seed the small graph fixture; empty for production.
     e2e_line = "e2e: true\n" if e2e else ""
+
+    # DER and wholesale-market participation are independent ConfiguratorPayload
+    # selections (not either/or) — wholesale_market is None for DER-only or
+    # off-grid orders. Omit the block entirely rather than write null values;
+    # analyst-server just has no LMP market to scope queries to.
+    market_block = (
+        "market:\n"
+        f"  wholesale_market: {wholesale_market}\n"
+        f"  settlement_point: {settlement_point}\n"
+        if wholesale_market is not None
+        else ""
+    )
 
     # secrets.env — credential-bearing connection URLs from Secrets Manager.
     # Each line writes one ENV_VAR=<URL>.
@@ -740,9 +752,7 @@ def build_userdata(
         # file, so `e2e: true` flows through to the seed-fixture choice.
         "cat > /opt/arcnode/analyst-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
-        f"market:\n"
-        f"  wholesale_market: {wholesale_market}\n"
-        f"  settlement_point: {settlement_point}\n"
+        f"{market_block}"
         f"{e2e_line}"
         "YML\n"
         # gateway's cfg.customer.yml — only site_id today.

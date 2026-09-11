@@ -46,9 +46,19 @@ class IsoBakeService:
         self, *, payload: ConfiguratorPayload, order_id: str
     ) -> str:
         """install.json shape matches the wizard's InstallIdentity contract."""
-        # Designer's middle-dot ("·") separates market name and hub on Step 1.
+        # DER and wholesale-market participation are independent — a site can
+        # have both, either, or neither. Designer's middle-dot ("·") separates
+        # market name and hub within a part; " + " joins the two parts if both
+        # are present.
+        market_parts = []
+        if payload.wholesale_market is not None:
+            market_parts.append(
+                f"{payload.wholesale_market.value.upper()} · {payload.settlement_point}"
+            )
+        if payload.der_utility is not None:
+            market_parts.append(f"DER · {payload.der_utility}")
         market = (
-            f"{payload.wholesale_market.value.upper()} · {payload.settlement_point}"
+            " + ".join(market_parts) if market_parts else "No grid program selected"
         )
         body = {
             "customer": payload.operator_org,
@@ -66,11 +76,18 @@ class IsoBakeService:
     def render_customer_cfg(
         self, *, payload: ConfiguratorPayload, order_id: str
     ) -> str:
-        """cfg.customer.yml — per-customer overrides loaded over cfg.defaults.yml."""
-        body = {
+        """cfg.customer.yml — per-customer overrides loaded over cfg.defaults.yml.
+
+        Grid-program fields are omitted (not null) when unselected — DER and
+        wholesale-market are independent, so either or both may be absent.
+        """
+        body: dict[str, object] = {
             "site_id": _slugify_site_id(payload.deployment_site_name),
-            "wholesale_market": payload.wholesale_market.value,
-            "settlement_point": payload.settlement_point,
-            "order_id": order_id,
         }
+        if payload.wholesale_market is not None:
+            body["wholesale_market"] = payload.wholesale_market.value
+            body["settlement_point"] = payload.settlement_point
+        if payload.der_utility is not None:
+            body["der_utility"] = payload.der_utility
+        body["order_id"] = order_id
         return yaml.safe_dump(body, sort_keys=False)

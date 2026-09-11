@@ -7,6 +7,8 @@ arc-node.html, this test fails and points at the drift.
 Mirror of the JS shape in `website/arc-node.html` — keep them in lockstep.
 """
 
+import typing
+
 from src.orders.configurator_payload import ConfiguratorPayload
 
 # The exact dict shape JS builds via buildPayload() in arc-node.html.
@@ -46,6 +48,7 @@ def test_configurator_js_payload_validates_against_pydantic_schema() -> None:
     assert payload.climate_zone.value == "temperate"
     assert payload.deployment_context.value == "commercial"
     assert payload.aws_partition.value == "standard"
+    assert payload.wholesale_market is not None
     assert payload.wholesale_market.value == "ercot"
     assert payload.settlement_point == "HB_NORTH"
 
@@ -88,11 +91,71 @@ def test_configurator_js_payload_covers_every_select_enum_value() -> None:
         },
     }
 
-    # Each set must equal the Python enum's full value surface
+    # Each set must equal the Python enum's full value surface. wholesale_market
+    # is `WholesaleMarket | None` now (optional) — unwrap the Union to get at
+    # the enum itself; every other field here is still a bare enum annotation,
+    # where get_args() returns () and we fall back to the annotation as-is.
     for field, js_values in js_select_values.items():
-        py_enum = ConfiguratorPayload.model_fields[field].annotation
-        assert py_enum is not None
+        annotation = ConfiguratorPayload.model_fields[field].annotation
+        assert annotation is not None
+        union_args = typing.get_args(annotation)
+        py_enum = next((a for a in union_args if a is not type(None)), annotation)
         py_values = {member.value for member in py_enum}  # type: ignore[union-attr]
         assert (
             js_values == py_values
         ), f"{field}: html has {js_values}, python has {py_values}"
+
+
+def test_der_utility_selected_without_wholesale_market() -> None:
+    """A DER-only order (no wholesale market) validates fine — the two are
+    independent, not mutually exclusive."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(
+        {
+            **JS_PAYLOAD,
+            "der_utility": "Oncor",
+            "wholesale_market": None,
+            "settlement_point": None,
+        }
+    )
+
+    # Assert
+    assert payload.der_utility == "Oncor"
+    assert payload.wholesale_market is None
+    assert payload.settlement_point is None
+
+
+def test_wholesale_market_selected_without_der_utility() -> None:
+    """The pre-DER shape (der_utility omitted) still validates — it defaults
+    to None, same as every order before this field existed."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(JS_PAYLOAD)
+
+    # Assert
+    assert payload.der_utility is None
+    assert payload.wholesale_market is not None
+    assert payload.wholesale_market.value == "ercot"
+
+
+def test_both_der_and_wholesale_market_selected() -> None:
+    """A site can select both — independent, not either/or."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate({**JS_PAYLOAD, "der_utility": "Oncor"})
+
+    # Assert
+    assert payload.der_utility == "Oncor"
+    assert payload.wholesale_market is not None
+    assert payload.wholesale_market.value == "ercot"
+
+
+def test_neither_der_nor_wholesale_market_selected() -> None:
+    """An off-grid site: no DER, no wholesale market. Valid per edp-api."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(
+        {**JS_PAYLOAD, "wholesale_market": None, "settlement_point": None}
+    )
+
+    # Assert
+    assert payload.der_utility is None
+    assert payload.wholesale_market is None
+    assert payload.settlement_point is None

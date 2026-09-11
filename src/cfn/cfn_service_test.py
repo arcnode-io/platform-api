@@ -26,13 +26,15 @@ def _render(
     deployment_context: DeploymentContext = DeploymentContext.COMMERCIAL,
     *,
     e2e: bool = False,
+    wholesale_market: str | None = "ercot",
+    settlement_point: str | None = "HB_NORTH",
 ) -> str:
     return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID,
         dtm_url=DTM_URL,
         site_id=SITE_ID,
-        wholesale_market="ercot",
-        settlement_point="HB_NORTH",
+        wholesale_market=wholesale_market,
+        settlement_point=settlement_point,
         deployment_context=deployment_context,
         e2e=e2e,
     )
@@ -54,6 +56,27 @@ def test_e2e_flag_writes_e2e_true_into_analyst_cfg() -> None:
     heredoc_body = analyst_block.split("YML")[1]
     assert "e2e: true" in heredoc_body
     assert "e2e: true" not in without
+
+
+def test_no_wholesale_market_omits_market_block_from_analyst_cfg() -> None:
+    """DER-only (or off-grid, neither selected) orders pass wholesale_market=
+    None — analyst-server has no LMP market to scope queries to, so the
+    market: block is omitted entirely rather than written with null values.
+    """
+    # Arrange + Act
+    without_market = _render(wholesale_market=None, settlement_point=None)
+    with_market = _render()
+
+    # Assert
+    analyst_block = without_market.split("analyst-cfg.customer.yml")[1]
+    heredoc_body = analyst_block.split("YML")[1]
+    assert "market:" not in heredoc_body
+
+    # Regression guard — the market block is still there when set
+    with_market_block = with_market.split("analyst-cfg.customer.yml")[1].split("YML")[1]
+    assert "market:" in with_market_block
+    assert "wholesale_market: ercot" in with_market_block
+    assert "settlement_point: HB_NORTH" in with_market_block
 
 
 def test_render_template_passes_cfn_lint() -> None:

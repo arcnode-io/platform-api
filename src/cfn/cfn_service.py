@@ -43,8 +43,8 @@ class CfnService:
         deployment_uuid: str,
         dtm_url: str,
         site_id: str,
-        wholesale_market: str,
-        settlement_point: str,
+        wholesale_market: str | None,
+        settlement_point: str | None,
         deployment_context: DeploymentContext,
         e2e: bool = False,
     ) -> str:
@@ -57,6 +57,9 @@ class CfnService:
         ``wholesale_market`` + ``settlement_point`` scope analyst-server's
         LMP queries — flow into config.env so the agent's system prompt
         can pin queries to the customer's market without LLM-side guessing.
+        Both None when the order has no wholesale-market participation (DER-
+        only or off-grid) — DER and wholesale-market are independent
+        ConfiguratorPayload selections, not either/or.
         """
         short = deployment_uuid.split("-", 1)[0]
         userdata = build_userdata(
