@@ -128,16 +128,6 @@ def _extract_portal_url(email_body: str) -> str:
     pytest.fail(f"no Portal: line in email body: {email_body!r}")
 
 
-@pytest.mark.skip(
-    reason="BLOCKED on edp-api's own build — public.ecr.aws/y1d2j6a8/edp-api:latest "
-    "crashes at boot: RuntimeError: grid_regions.yaml missing at "
-    "/app/config/grid_regions.yaml — Dockerfile must COPY it into the image. "
-    "Verified directly (docker run -e ENV=beta ...:latest), not a platform-api "
-    "or registry-choice issue — the config file (or the Dockerfile COPY step "
-    "for it) never landed in edp-api's own build. Un-skip once that's fixed "
-    "and republished; ping 📐 system-architect / ⚡ power-engineer, not mine "
-    "to fix."
-)
 def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
     """POST → poll → assert portal HTML lists artifacts + launch link + APK.
 
@@ -276,11 +266,6 @@ PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
 ]
 
 
-@pytest.mark.skip(
-    reason="BLOCKED on edp-api's own build — same grid_regions.yaml-missing-"
-    "from-image bug as test_order_full_pipeline_publishes_portal_and_emails_link "
-    "above. Not a platform-api issue."
-)
 def test_all_profile_combinations_reach_complete() -> None:
     """Smoke-test every supported profile against one shared container stack.
 
