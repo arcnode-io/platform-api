@@ -231,16 +231,20 @@ def _walk_s3_urls(node: object) -> Generator[str]:
 
 @contextmanager
 def start_edp_api(
-    image: str = "173.211.12.43:8083/library/edp-api:latest",
+    image: str = "public.ecr.aws/y1d2j6a8/edp-api:latest",
     port: int = 8000,
     network: Network | None = None,
     s3_endpoint_url: str | None = None,
 ) -> Generator[Container]:
-    """Run the published edp-api image from the self-hosted Harbor registry.
+    """Run the published edp-api image from ECR Public.
 
-    Default tag is `:latest` — what edp-api's CI publishes on every main merge.
-    For a pinned local build, override with `image="edp-api:test"` after
-    running `docker build -t edp-api:test ../edp-api`.
+    Default tag is `:latest` — what edp-api's CI publishes on every main merge
+    (confirmed with devops: the Harbor mirror some code used to point at is a
+    one-off manual push from 2026-05-11, not CI-synced — no repo's CI in this
+    org pushes to Harbor). For a pinned local build, override with
+    `image="edp-api:test"` after running `docker build -t edp-api:test
+    ../edp-api` from a clean checkout (never the live working tree — someone
+    else may have uncommitted WIP sitting in it).
 
     `s3_endpoint_url` is forwarded to the container as S3_ENDPOINT_URL so
     edp-api's ManifestService.from_client targets LocalStack instead of

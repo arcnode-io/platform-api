@@ -217,3 +217,23 @@ def test_flex_obligation_is_a_nested_model_not_a_dict() -> None:
     assert payload.grid.flex_obligation is not None
     assert isinstance(payload.grid.flex_obligation, FlexObligation)
     assert payload.grid.flex_obligation.level.value == "standard"
+
+
+def test_ride_through_hours_defaults_to_zero() -> None:
+    """[A1] ride_through_hours is optional, sibling of bess_capacity_mwh —
+    omitted payloads (every order before this field existed) still validate."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(JS_PAYLOAD)
+
+    # Assert
+    assert payload.ride_through_hours == 0
+
+
+def test_ride_through_hours_accepts_a_positive_value() -> None:
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(
+        {**JS_PAYLOAD, "ride_through_hours": 2.5}
+    )
+
+    # Assert
+    assert payload.ride_through_hours == 2.5

@@ -4,7 +4,17 @@ Three real Docker containers backing this test (started inline as context
 managers — no pytest fixtures, just `with` blocks):
 - postgres        — Tortoise ORM persistence
 - localstack      — fake AWS S3 + SES (real boto3 API)
-- edp-api:test    — the published edp-api image; same one platform-api hits in prod
+- edp-api:latest  — the published edp-api image from ECR Public
+                    (public.ecr.aws/y1d2j6a8/edp-api:latest), same one
+                    platform-api hits in prod. edp-api's own CI publishes
+                    here on every main merge — confirmed with devops this is
+                    the live path; a self-hosted Harbor mirror some code used
+                    to default to turned out to be a stale one-off manual
+                    push (2026-05-11), not CI-synced. For a pinned local
+                    build instead, override with image="edp-api:test" after
+                    `docker build -t edp-api:test ../edp-api` from a clean
+                    checkout (never the live working tree — someone else may
+                    have uncommitted WIP sitting in it).
 
 Walks the walking-skeleton path:
 1. POST /platform-api/orders → 202 with order_id
@@ -118,13 +128,6 @@ def _extract_portal_url(email_body: str) -> str:
     pytest.fail(f"no Portal: line in email body: {email_body!r}")
 
 
-@pytest.mark.skip(
-    reason="BLOCKED on edp-api landing the ConfiguratorPayload v2 grid model "
-    "(handoff-configurator-grid-CONTRACT-2026-09-11.md) — this test's payload "
-    "is v2-shaped now but the published edp-api image (:latest on the self- "
-    "hosted Harbor registry) still expects v1 and will 422 it. Un-skip once "
-    "📐 system-architect confirms edp-api's step 1 is on main."
-)
 def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
     """POST → poll → assert portal HTML lists artifacts + launch link + APK.
 
@@ -263,12 +266,6 @@ PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
 ]
 
 
-@pytest.mark.skip(
-    reason="BLOCKED on edp-api landing the ConfiguratorPayload v2 grid model "
-    "(handoff-configurator-grid-CONTRACT-2026-09-11.md) — same reason as "
-    "test_order_full_pipeline_publishes_portal_and_emails_link above. "
-    "Un-skip once 📐 system-architect confirms edp-api's step 1 is on main."
-)
 def test_all_profile_combinations_reach_complete() -> None:
     """Smoke-test every supported profile against one shared container stack.
 

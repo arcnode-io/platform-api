@@ -93,6 +93,10 @@ class ConfiguratorPayload(BaseModel):
     target_gpu_count: int = Field(ge=1)
     bess_coupling: BessCoupling
     bess_capacity_mwh: float = Field(ge=0)
+    # [A1] hours of compute the BESS must sustain stand-alone. Sibling of
+    # bess_capacity_mwh, independent of grid.path. Required (>0) iff
+    # grid.intentional_islanding — edp-api's V10, not duplicated here.
+    ride_through_hours: float = Field(ge=0, default=0)
     climate_zone: ClimateZone
     deployment_context: DeploymentContext
     aws_partition: AwsPartition
