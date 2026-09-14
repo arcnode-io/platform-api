@@ -26,10 +26,14 @@ class ArtifactKind(StrEnum):
     GRID_CONTAINER_3D = "grid_container_3d"
     INTERFACE_PLATE = "interface_plate"
     SLD = "sld"
+    SLD_HMI_SVG = "sld_hmi_svg"
     PID_COOLING = "pid_cooling"
     COMMS_DIAGRAM = "comms_diagram"
     CABLE_HOSE_SCHEDULE = "cable_hose_schedule"
-    INSTALLATION_GRAPH = "installation_graph"
+    # Renamed upstream from "installation_graph" — edp-api's actual enum
+    # (confirmed by exec'ing into public.ecr.aws/y1d2j6a8/edp-api:latest)
+    # calls it INSTALL_SEQUENCE now.
+    INSTALL_SEQUENCE = "install_sequence"
     DTM = "dtm"
 
 

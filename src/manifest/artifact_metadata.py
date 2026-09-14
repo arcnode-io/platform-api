@@ -76,7 +76,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         # MOCK SUBTITLE — replace with computed "{n} runs · cu · fiber · glycol · CDA".
         subtitle="MOCK 318 runs · cu · fiber · glycol · CDA",
     ),
-    ArtifactKind.INSTALLATION_GRAPH: ArtifactMetadata(
+    ArtifactKind.INSTALL_SEQUENCE: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
         name="Installation Graph",
         subtitle="Install order · torque specs",
