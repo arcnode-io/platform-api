@@ -83,6 +83,7 @@
      "unit": "watt_hours",
      "type": "float",
      "poll_rate_hz": 0.1,
+     "display_name_default": "Energy Delivered",
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -91,6 +92,71 @@
       "word_order": "high_low",
       "scale": 1.0,
       "offset": 0.0
+     }
+    },
+    "kwh_received": {
+     "unit": "watt_hours",
+     "type": "float",
+     "poll_rate_hz": 0.1,
+     "display_name_default": "Energy Received",
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4002,
+      "data_type": "int32",
+      "word_order": "high_low"
+     }
+    },
+    "power_factor": {
+     "unit": "none",
+     "type": "float",
+     "poll_rate_hz": 1,
+     "display_name_default": "Power Factor",
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4010,
+      "data_type": "int16",
+      "scale": 0.001
+     }
+    },
+    "thd_voltage_a": {
+     "unit": "percent",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "THD Voltage Phase A",
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4020,
+      "data_type": "int16",
+      "scale": 0.01
+     }
+    },
+    "thd_voltage_b": {
+     "unit": "percent",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "THD Voltage Phase B",
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4021,
+      "data_type": "int16",
+      "scale": 0.01
+     }
+    },
+    "thd_voltage_c": {
+     "unit": "percent",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "THD Voltage Phase C",
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4022,
+      "data_type": "int16",
+      "scale": 0.01
      }
     }
    }
