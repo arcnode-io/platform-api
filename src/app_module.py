@@ -23,6 +23,7 @@ from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
 from src.orders.orders_module import OrdersModule
 from src.portal.portal_module import PortalModule
+from src.sizing.sizing_module import SizingModule
 
 
 class AppModule:
@@ -54,6 +55,7 @@ class AppModule:
             ),
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
+        self.sizing_module = SizingModule(edp_api_url=self.config.edp_api_url)
         self._db_lifespan_enabled = False
 
     def import_module(self, app: FastAPI) -> None:
@@ -61,6 +63,7 @@ class AppModule:
         app_controller = AppController()
         app.include_router(app_controller.router)
         app.include_router(self.orders_module.router)
+        app.include_router(self.sizing_module.router)
 
     def register_database(self) -> None:
         """Enable Tortoise ORM init in the FastAPI lifespan. Call before `create_app`.
