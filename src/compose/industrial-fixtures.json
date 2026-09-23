@@ -192,21 +192,36 @@
      "type": "float",
      "poll_rate_hz": 1,
      "display_name_default": "Module State of Charge",
-     "publisher": "line_controller"
+     "publisher": "gateway",
+     "binding": {
+      "protocol": "synthetic",
+      "operation": "weighted_mean",
+      "source_measurement": "state_of_charge"
+     }
     },
     "active_power": {
      "unit": "watts",
      "type": "float",
      "poll_rate_hz": 1,
      "display_name_default": "Module Active Power",
-     "publisher": "line_controller"
+     "publisher": "gateway",
+     "binding": {
+      "protocol": "synthetic",
+      "operation": "sum",
+      "source_measurement": "active_power"
+     }
     },
     "reactive_power": {
      "unit": "vars",
      "type": "float",
      "poll_rate_hz": 1,
      "display_name_default": "Module Reactive Power",
-     "publisher": "line_controller"
+     "publisher": "gateway",
+     "binding": {
+      "protocol": "synthetic",
+      "operation": "sum",
+      "source_measurement": "reactive_power"
+     }
     },
     "import_headroom": {
      "unit": "watts",
@@ -216,7 +231,7 @@
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "formula": "subtract",
+      "operation": "subtract",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/import_limit/watts",
        "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
@@ -231,7 +246,7 @@
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "formula": "subtract",
+      "operation": "subtract",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/export_limit/watts",
        "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
@@ -246,14 +261,20 @@
      "unit": "watts",
      "payload": "float",
      "display_name_default": "Set Active Power",
-     "fanout": "line_controller"
+     "binding": {
+      "protocol": "distribute",
+      "allocation_policy": "soc_weighted",
+      "ramp_rate_per_sec": 0.10,
+      "hysteresis_margin": 0.05,
+      "hysteresis_dwell_secs": 30.0
+     }
     },
     "set_reactive_power": {
      "verb": "set",
      "target": "reactive_power",
      "unit": "vars",
      "payload": "float",
-     "fanout": "line_controller"
+     "fanout": "local_process"
     }
    },
    "install_tasks": [
