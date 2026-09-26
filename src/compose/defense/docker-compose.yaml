@@ -108,6 +108,25 @@ services:
     image: public.ecr.aws/y1d2j6a8/mock-bacnet-device:latest
     restart: unless-stopped
 
+  # Simulated BESS racks (bess_rack_01/02 in industrial-fixtures.json) —
+  # different starting SoC makes the gateway's soc_weighted allocation
+  # visible in the demo. See ems-industrial-fixtures MODBUS_PROFILE=bess_rack.
+  mock-bess-rack-1:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+    environment:
+      MODBUS_PROFILE: bess_rack
+      BATTERY_TIME_SCALE: "60"
+      BATTERY_INITIAL_SOC_PERCENT: "70"
+
+  mock-bess-rack-2:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+    environment:
+      MODBUS_PROFILE: bess_rack
+      BATTERY_TIME_SCALE: "60"
+      BATTERY_INITIAL_SOC_PERCENT: "50"
+
   # MQTT → Aurora bridge. HiveMQ CE doesn't ship a Postgres connector
   # (Enterprise-only, sales-gated); we own the bridge as a tiny
   # subscriber. INSERTs into the partman-managed measurements table.
@@ -161,6 +180,10 @@ services:
       mock-dnp3-outstation:
         condition: service_started
       mock-bacnet-device:
+        condition: service_started
+      mock-bess-rack-1:
+        condition: service_started
+      mock-bess-rack-2:
         condition: service_started
 
   # Phase 1 defense smoke: analyst-server hosts the agent which spawns
