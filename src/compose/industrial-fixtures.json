@@ -89,6 +89,17 @@
     "unit_id": "1"
    },
    "blocking": []
+  },
+  "operating_envelope": {
+   "device_id": "operating_envelope",
+   "template": "operating_envelope",
+   "parent": null,
+   "connection": {
+    "host": "127.0.0.1",
+    "port": 20000,
+    "unit_id": null
+   },
+   "blocking": []
   }
  },
  "buses": [],
@@ -550,6 +561,87 @@
     {
      "name": "canopen_commission",
      "depends_on": ["wire_dc_bus"],
+     "est_minutes": 30,
+     "crew_role": "it",
+     "cx_level": "L3"
+    }
+   ]
+  },
+  "operating_envelope": {
+   "template": "operating_envelope",
+   "kind": "leaf",
+   "equipment_id": "GRD-OE-001",
+   "vendor": "ARCNODE",
+   "model": "Operating Envelope Producer (Pi RTU)",
+   "description": "Utility-published DOE per IEEE 2030.5 / CSIP-AUS (DERControlBase). Singleton per site for MVP.",
+   "measurements": {
+    "import_limit": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 0.0033,
+     "display_name_default": "Import Limit",
+     "iec_61850_ref": "CSIP.opModImpLimW",
+     "bounds": { "min": 0, "max": 10000000, "nominal": 5000000 },
+     "thresholds": { "warn_min": 100000, "warn_max": 9500000, "alarm_min": 0, "alarm_max": 10000000 },
+     "binding": {
+      "protocol": "dnp3_tcp",
+      "point_type": "analog_input",
+      "point_index": 0,
+      "variation": 5
+     }
+    },
+    "export_limit": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 0.0033,
+     "display_name_default": "Export Limit",
+     "iec_61850_ref": "CSIP.opModExpLimW",
+     "bounds": { "min": 0, "max": 10000000, "nominal": 0 },
+     "thresholds": { "warn_min": 0, "warn_max": 9500000, "alarm_min": 0, "alarm_max": 10000000 },
+     "binding": {
+      "protocol": "dnp3_tcp",
+      "point_type": "analog_input",
+      "point_index": 1,
+      "variation": 5
+     }
+    },
+    "status": {
+     "unit": "none",
+     "type": "enum",
+     "poll_rate_hz": 1,
+     "display_name_default": "Status",
+     "iec_61850_ref": "ZGEN.Mod.stVal",
+     "values": {
+      "0": "OK",
+      "1": "STALE",
+      "2": "INVALID",
+      "3": "COMM_FAIL"
+     },
+     "binding": {
+      "protocol": "dnp3_tcp",
+      "point_type": "analog_input",
+      "point_index": 100,
+      "variation": 2
+     }
+    }
+   },
+   "install_tasks": [
+    {
+     "name": "pi_mount",
+     "est_minutes": 20,
+     "crew_role": "it",
+     "cx_level": "L1"
+    },
+    {
+     "name": "sensor_wire",
+     "depends_on": ["pi_mount"],
+     "est_minutes": 45,
+     "crew_role": "electrician",
+     "cx_level": "L2"
+    },
+    {
+     "name": "dnp3_commission",
+     "depends_on": ["sensor_wire"],
      "est_minutes": 30,
      "crew_role": "it",
      "cx_level": "L3"

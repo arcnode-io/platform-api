@@ -82,6 +82,14 @@ def auth_machine_secrets() -> dict[str, dict]:
             "mqtt-der-control-api-password",
             "Broker File-RBAC password for arcnode_der_control_api.",
         ),
+        # mock-derms-dispatch-api (demo/smoke DERMS simulator) subscribes the
+        # DLR rating + line-loading topics it evaluates against. SUBSCRIBE-only
+        # — it delivers envelope/curtailment events to der-control-api over
+        # HTTP, not MQTT.
+        "MqttMockDermsDispatchApiPasswordSecret": _generated_secret(
+            "mqtt-mock-derms-dispatch-api-password",
+            "Broker File-RBAC password for arcnode_mock_derms_dispatch_api.",
+        ),
         "AuthJwtSecret": _generated_secret(
             "auth-jwt-secret", "device-api HS256 session-token signing key."
         ),

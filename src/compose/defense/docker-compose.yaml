@@ -84,6 +84,28 @@ services:
       der-control-api:
         condition: service_started
 
+  # Demo/smoke DERMS simulator — stands in for the real utility-side DERMS
+  # until a real integration is onboarded. Evaluates the DLR rating against
+  # line loading, publishes the standing operating envelope (and, on
+  # curtailment, a DERControl event) to der-control-api over HTTP; der-control-api
+  # relays both onto MQTT. Its own beta cfg.yml block already carries the
+  # in-stack hostnames (hivemq, der-control-api) and siteId (arcnode_beta,
+  # matching der-control-api's), so no per-deploy overrides are needed here.
+  # ERCOT_PRIMARY_KEY/ERCOT_PASSWORD are intentionally omitted — absent just
+  # means the ERCOT zone-stress signal is unavailable, the tracker reports
+  # zone_feed_stale, and the trigger runs on its local margin.
+  mock-derms-dispatch-api:
+    image: public.ecr.aws/y1d2j6a8/mock-derms-dispatch-api:latest
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      ENV: beta
+    depends_on:
+      hivemq:
+        condition: service_started
+      der-control-api:
+        condition: service_started
+
   # Industrial-fixtures mocks — full set covers every protocol the
   # smoke DTM (industrial-fixtures.json) references. Bindings point
   # at these compose service names; gateway connects on the standard

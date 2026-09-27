@@ -377,6 +377,7 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
             "MqttOperatorPasswordSecret",
             "MqttViewerPasswordSecret",
             "MqttDerControlApiPasswordSecret",
+            "MqttMockDermsDispatchApiPasswordSecret",
             "AuthJwtSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
@@ -402,6 +403,7 @@ def test_userdata_writes_broker_credentials_xml() -> None:
         "arcnode_device_api",
         "arcnode_telemetry_writer",
         "arcnode_der_control_api",
+        "arcnode_mock_derms_dispatch_api",
     ):
         assert user in rendered, f"{user} missing from credentials.xml"
     # The gateway subscribes system/topology_changed (hot topology reload) and
@@ -410,9 +412,18 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     assert "<topic>system/#</topic>" in rendered
     assert "MQTT_DEVICE_API_PASSWORD" in rendered
     # der-control-api publishes DERControl setpoints as measurements on the
-    # der_dispatch singleton device — PUBLISH-only, pinned to that device.
+    # der_dispatch singleton device, and envelope-mode limits on the
+    # operating_envelope singleton — both PUBLISH-only.
     assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
     assert "<topic>sites/+/devices/der_dispatch/measurements/#</topic>" in rendered
+    assert (
+        "<topic>sites/+/devices/operating_envelope/measurements/#</topic>" in rendered
+    )
+    # mock-derms-dispatch-api: SUBSCRIBE-only on the DLR rating + line-loading
+    # topics it evaluates — never publishes (delivers events over HTTP).
+    assert "MQTT_MOCK_DERMS_DISPATCH_API_PASSWORD" in rendered
+    assert "<topic>sites/+/devices/dlr_rtu_demo/measurements/#</topic>" in rendered
+    assert "<topic>test/line_loading/A</topic>" in rendered
     # Dispatch lifecycle: gateway publishes events/dispatch_state; HMI roles
     # subscribe it. Without these grants dispatch acks are silently denied.
     assert rendered.count("<topic>sites/+/devices/+/events/#</topic>") >= 3
