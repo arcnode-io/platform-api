@@ -84,15 +84,22 @@ services:
   # relays both onto MQTT. Its own beta cfg.yml block already carries the
   # in-stack hostnames (hivemq, der-control-api) and siteId (arcnode_beta,
   # matching der-control-api's), so no per-deploy overrides are needed here.
-  # ERCOT_PRIMARY_KEY/ERCOT_PASSWORD are intentionally omitted — absent just
-  # means the ERCOT zone-stress signal is unavailable, the tracker reports
-  # zone_feed_stale, and the trigger runs on its local margin.
+  #
+  # ERCOT_PRIMARY_KEY/ERCOT_PASSWORD: Joe's own creds, passed through from
+  # the shell environment (not committed, not CFN-provisioned — mock-derms
+  # isn't a real per-customer service). Functionally optional (absent just
+  # means zone_feed_stale, trigger runs on local margin), but Joe wants to
+  # show a live ERCOT call in the demo narration, so these should be set
+  # when he runs it. Names match mock-derms-dispatch-api's own
+  # template-secrets.env.
   mock-derms-dispatch-api:
     image: public.ecr.aws/y1d2j6a8/mock-derms-dispatch-api:latest
     restart: unless-stopped
     <<: *env-files
     environment:
       ENV: beta
+      ERCOT_PRIMARY_KEY: ${ERCOT_PRIMARY_KEY}
+      ERCOT_PASSWORD: ${ERCOT_PASSWORD}
     depends_on:
       hivemq:
         condition: service_started
