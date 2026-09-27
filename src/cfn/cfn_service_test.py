@@ -413,9 +413,17 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     assert "MQTT_DEVICE_API_PASSWORD" in rendered
     # der-control-api publishes DERControl setpoints as measurements on the
     # der_dispatch singleton device, and envelope-mode limits on the
-    # operating_envelope singleton — both PUBLISH-only.
+    # operating_envelope singleton. It also subscribes der_dispatch's own
+    # measurements (reads back its own target_active_power/event_active
+    # publishes, plus actual_active_power) and der_dispatch commands
+    # (operator approve/reject) — a denied SUBSCRIBE fails silently, unlike
+    # a denied PUBLISH, so this is a regression guard for exactly that.
     assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
-    assert "<topic>sites/+/devices/der_dispatch/measurements/#</topic>" in rendered
+    assert (
+        rendered.count("<topic>sites/+/devices/der_dispatch/measurements/#</topic>")
+        >= 2
+    ), "expected both a PUBLISH and a SUBSCRIBE grant on der_dispatch measurements"
+    assert "<topic>sites/+/devices/der_dispatch/commands/#</topic>" in rendered
     assert (
         "<topic>sites/+/devices/operating_envelope/measurements/#</topic>" in rendered
     )

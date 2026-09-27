@@ -630,12 +630,22 @@ def build_userdata(
         # der_control_api: publishes DERControl setpoints as measurements on the
         # der_dispatch singleton device, plus envelope-mode limits on the
         # operating_envelope singleton (DispatchPublisher.java) when a
-        # DERControlBase payload carries them. PUBLISH-only, never subscribes.
+        # DERControlBase payload carries them. Also subscribes der_dispatch's
+        # own measurements (DeliveryShortfallMonitor, ActualActivePowerSubscriber
+        # — includes reading back its own target_active_power/event_active
+        # publishes) and der_dispatch commands (DispatchCommandSubscriber,
+        # operator approve/reject). A denied SUBSCRIBE fails silently (SUBACK
+        # reason codes discarded) rather than throwing like a denied PUBLISH
+        # does — so this grant matters even though it's easy to miss.
         "    <role><id>der_control_api</id><permissions>"
         "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
         "<activity>PUBLISH</activity></permission>"
         "<permission><topic>sites/+/devices/operating_envelope/measurements/#</topic>"
         "<activity>PUBLISH</activity></permission>"
+        "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
+        "<permission><topic>sites/+/devices/der_dispatch/commands/#</topic>"
+        "<activity>SUBSCRIBE</activity></permission>"
         "</permissions></role>\n"
         # mock_derms_dispatch_api: demo/smoke DERMS simulator. Reads the DLR
         # rating + line-loading topics it evaluates; delivers envelope/
