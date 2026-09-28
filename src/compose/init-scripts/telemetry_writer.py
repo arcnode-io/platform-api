@@ -62,6 +62,31 @@ SCHEMA_SQL: tuple[str, ...] = (
 )
 
 
+def on_connect(
+    client: mqtt.Client,
+    _userdata: object,
+    _flags: object,
+    reason_code: object,
+    _properties: object = None,
+) -> None:
+    """(Re-)subscribe on every successful connect, including reconnects.
+
+    Reason: an MQTT subscription is broker-side session state, not
+    client-side — a broker restart wipes it, and paho-python has no
+    auto-resubscribe (unlike mqtt.js's `resubscribe: true`). paho calls
+    on_connect on every successful connection including reconnects, so
+    subscribing here (not once at module level) is what keeps this alive
+    across a broker blip. Without it: publishing still works, so nothing
+    looks wrong, but this bridge silently stops persisting all telemetry
+    forever with no error.
+    """
+    client.subscribe(TOPIC)
+    print(
+        f"subscribed to {TOPIC} on {BROKER}:1883 (reason_code={reason_code})",
+        flush=True,
+    )
+
+
 def on_message(
     _client: mqtt.Client,
     _userdata: object,
@@ -111,9 +136,8 @@ print("measurements bootstrap done", flush=True)
 # paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
 # supported callback shape for new code (extra `properties` arg, etc.).
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+client.on_connect = on_connect
 client.on_message = on_message
 client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 client.connect(BROKER, 1883, keepalive=60)
-client.subscribe(TOPIC)
-print(f"subscribed to {TOPIC} on {BROKER}:1883", flush=True)
 client.loop_forever()
