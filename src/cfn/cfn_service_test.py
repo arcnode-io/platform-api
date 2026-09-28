@@ -377,7 +377,6 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
             "MqttOperatorPasswordSecret",
             "MqttViewerPasswordSecret",
             "MqttDerControlApiPasswordSecret",
-            "MqttMockDermsDispatchApiPasswordSecret",
             "AuthJwtSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
@@ -403,7 +402,6 @@ def test_userdata_writes_broker_credentials_xml() -> None:
         "arcnode_device_api",
         "arcnode_telemetry_writer",
         "arcnode_der_control_api",
-        "arcnode_mock_derms_dispatch_api",
     ):
         assert user in rendered, f"{user} missing from credentials.xml"
     # The gateway subscribes system/topology_changed (hot topology reload) and
@@ -427,11 +425,10 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     assert (
         "<topic>sites/+/devices/operating_envelope/measurements/#</topic>" in rendered
     )
-    # mock-derms-dispatch-api: SUBSCRIBE-only on the DLR rating + line-loading
-    # topics it evaluates — never publishes (delivers events over HTTP).
-    assert "MQTT_MOCK_DERMS_DISPATCH_API_PASSWORD" in rendered
-    assert "<topic>sites/+/devices/dlr_rtu_demo/measurements/#</topic>" in rendered
-    assert "<topic>test/line_loading/A</topic>" in rendered
+    # mock_derms is a separate trust domain (ems/readme.md's deployment
+    # diagram) — it gets no broker identity in the product's own ACL.
+    assert "mock_derms_dispatch_api" not in rendered
+    assert "arcnode_mock_derms_dispatch_api" not in rendered
     # Dispatch lifecycle: gateway publishes events/dispatch_state; HMI roles
     # subscribe it. Without these grants dispatch acks are silently denied.
     assert rendered.count("<topic>sites/+/devices/+/events/#</topic>") >= 3

@@ -55,10 +55,6 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("mqtt-device-api-password", "MQTT_DEVICE_API_PASSWORD"),
     ("mqtt-telemetry-writer-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
     ("mqtt-der-control-api-password", "MQTT_DER_CONTROL_API_PASSWORD"),
-    (
-        "mqtt-mock-derms-dispatch-api-password",
-        "MQTT_MOCK_DERMS_DISPATCH_API_PASSWORD",
-    ),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
@@ -577,9 +573,6 @@ def build_userdata(
         "DCA_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-der-control-api-password "
         "--query SecretString --output text)\n"
-        "MMD_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-mock-derms-dispatch-api-password "
-        "--query SecretString --output text)\n"
         "cat > /opt/arcnode/credentials.xml <<XML\n"
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
         "<file-rbac>\n"
@@ -596,8 +589,6 @@ def build_userdata(
         "<roles><id>telemetry_writer</id></roles></user>\n"
         "    <user><name>arcnode_der_control_api</name><password>$DCA_PW</password>"
         "<roles><id>der_control_api</id></roles></user>\n"
-        "    <user><name>arcnode_mock_derms_dispatch_api</name><password>$MMD_PW</password>"
-        "<roles><id>mock_derms_dispatch_api</id></roles></user>\n"
         "  </users>\n"
         "  <roles>\n"
         # gateway: pub telemetry up, sub commands down, sub system control
@@ -645,16 +636,6 @@ def build_userdata(
         "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
         "<permission><topic>sites/+/devices/der_dispatch/commands/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "</permissions></role>\n"
-        # mock_derms_dispatch_api: demo/smoke DERMS simulator. Reads the DLR
-        # rating + line-loading topics it evaluates; delivers envelope/
-        # curtailment events to der-control-api over HTTP, not MQTT —
-        # SUBSCRIBE-only, never publishes.
-        "    <role><id>mock_derms_dispatch_api</id><permissions>"
-        "<permission><topic>sites/+/devices/dlr_rtu_demo/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>test/line_loading/A</topic>"
         "<activity>SUBSCRIBE</activity></permission>"
         "</permissions></role>\n"
         "    <role><id>operator</id><permissions>"
