@@ -1,11 +1,9 @@
 {
  "deployment_uuid": "11111111-1111-4111-8111-111111111111",
  "sizing_params": {
-  "P_compute_total_kW": 1120,
+  "P_compute_total_kW": 100,
   "E_BESS_total_kWh": 8000,
-  "T_coolant_setpoint_C": 30,
-  "ride_through_hours": 2.0,
-  "bess_reserve_floor_mwh": 2.3579
+  "T_coolant_setpoint_C": 18
  },
  "devices": {
   "meter_01": {
