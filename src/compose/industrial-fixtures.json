@@ -208,7 +208,29 @@
       "scale": 0.01
      }
     }
-   }
+   },
+   "install_tasks": [
+    {
+     "name": "mount_in_panel",
+     "est_minutes": 30,
+     "crew_role": "electrician",
+     "cx_level": "L1"
+    },
+    {
+     "name": "wire_ct_pt_inputs",
+     "depends_on": ["mount_in_panel"],
+     "est_minutes": 60,
+     "crew_role": "electrician",
+     "cx_level": "L2"
+    },
+    {
+     "name": "modbus_commission",
+     "depends_on": ["wire_ct_pt_inputs"],
+     "est_minutes": 15,
+     "crew_role": "it",
+     "cx_level": "L3"
+    }
+   ]
   },
   "pdu": {
    "template": "pdu",
@@ -342,14 +364,14 @@
      "unit": "watts",
      "type": "float",
      "poll_rate_hz": 1,
-     "display_name_default": "Module Import Headroom",
+     "display_name_default": "POI Import Headroom",
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "operation": "sum",
+      "operation": "subtract",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/import_limit/watts",
-       "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
+       "sites/{site_id}/devices/{poi_meter_device_id}/measurements/active_power/watts"
       ]
      }
     },
@@ -357,14 +379,14 @@
      "unit": "watts",
      "type": "float",
      "poll_rate_hz": 1,
-     "display_name_default": "Module Export Headroom",
+     "display_name_default": "POI Export Headroom",
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "operation": "subtract",
+      "operation": "sum",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/export_limit/watts",
-       "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
+       "sites/{site_id}/devices/{poi_meter_device_id}/measurements/active_power/watts"
       ]
      }
     }
