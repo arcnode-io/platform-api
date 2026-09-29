@@ -102,6 +102,1084 @@
     "unit_id": null
    },
    "blocking": []
+  },
+  "gpu_node_01": {
+   "device_id": "gpu_node_01",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_02": {
+   "device_id": "gpu_node_02",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_03": {
+   "device_id": "gpu_node_03",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_04": {
+   "device_id": "gpu_node_04",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_05": {
+   "device_id": "gpu_node_05",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_06": {
+   "device_id": "gpu_node_06",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_07": {
+   "device_id": "gpu_node_07",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_08": {
+   "device_id": "gpu_node_08",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_09": {
+   "device_id": "gpu_node_09",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_10": {
+   "device_id": "gpu_node_10",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_11": {
+   "device_id": "gpu_node_11",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_12": {
+   "device_id": "gpu_node_12",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_13": {
+   "device_id": "gpu_node_13",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_14": {
+   "device_id": "gpu_node_14",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_15": {
+   "device_id": "gpu_node_15",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_16": {
+   "device_id": "gpu_node_16",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_17": {
+   "device_id": "gpu_node_17",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_18": {
+   "device_id": "gpu_node_18",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_19": {
+   "device_id": "gpu_node_19",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_20": {
+   "device_id": "gpu_node_20",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_21": {
+   "device_id": "gpu_node_21",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_22": {
+   "device_id": "gpu_node_22",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_23": {
+   "device_id": "gpu_node_23",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_24": {
+   "device_id": "gpu_node_24",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_25": {
+   "device_id": "gpu_node_25",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_26": {
+   "device_id": "gpu_node_26",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_27": {
+   "device_id": "gpu_node_27",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_28": {
+   "device_id": "gpu_node_28",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_29": {
+   "device_id": "gpu_node_29",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_30": {
+   "device_id": "gpu_node_30",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_31": {
+   "device_id": "gpu_node_31",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_32": {
+   "device_id": "gpu_node_32",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_33": {
+   "device_id": "gpu_node_33",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_34": {
+   "device_id": "gpu_node_34",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_35": {
+   "device_id": "gpu_node_35",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_36": {
+   "device_id": "gpu_node_36",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_37": {
+   "device_id": "gpu_node_37",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_38": {
+   "device_id": "gpu_node_38",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_39": {
+   "device_id": "gpu_node_39",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_40": {
+   "device_id": "gpu_node_40",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_41": {
+   "device_id": "gpu_node_41",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_42": {
+   "device_id": "gpu_node_42",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_43": {
+   "device_id": "gpu_node_43",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_44": {
+   "device_id": "gpu_node_44",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_45": {
+   "device_id": "gpu_node_45",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_46": {
+   "device_id": "gpu_node_46",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_47": {
+   "device_id": "gpu_node_47",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_48": {
+   "device_id": "gpu_node_48",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_49": {
+   "device_id": "gpu_node_49",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_50": {
+   "device_id": "gpu_node_50",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_51": {
+   "device_id": "gpu_node_51",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_52": {
+   "device_id": "gpu_node_52",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_53": {
+   "device_id": "gpu_node_53",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_54": {
+   "device_id": "gpu_node_54",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_55": {
+   "device_id": "gpu_node_55",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_56": {
+   "device_id": "gpu_node_56",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_57": {
+   "device_id": "gpu_node_57",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_58": {
+   "device_id": "gpu_node_58",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_59": {
+   "device_id": "gpu_node_59",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_60": {
+   "device_id": "gpu_node_60",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_61": {
+   "device_id": "gpu_node_61",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_62": {
+   "device_id": "gpu_node_62",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_63": {
+   "device_id": "gpu_node_63",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_64": {
+   "device_id": "gpu_node_64",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_65": {
+   "device_id": "gpu_node_65",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_66": {
+   "device_id": "gpu_node_66",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_67": {
+   "device_id": "gpu_node_67",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_68": {
+   "device_id": "gpu_node_68",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_69": {
+   "device_id": "gpu_node_69",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_70": {
+   "device_id": "gpu_node_70",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_71": {
+   "device_id": "gpu_node_71",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_72": {
+   "device_id": "gpu_node_72",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_73": {
+   "device_id": "gpu_node_73",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_74": {
+   "device_id": "gpu_node_74",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_75": {
+   "device_id": "gpu_node_75",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_76": {
+   "device_id": "gpu_node_76",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_77": {
+   "device_id": "gpu_node_77",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_78": {
+   "device_id": "gpu_node_78",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_79": {
+   "device_id": "gpu_node_79",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_80": {
+   "device_id": "gpu_node_80",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_81": {
+   "device_id": "gpu_node_81",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_82": {
+   "device_id": "gpu_node_82",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_83": {
+   "device_id": "gpu_node_83",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_84": {
+   "device_id": "gpu_node_84",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_85": {
+   "device_id": "gpu_node_85",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_86": {
+   "device_id": "gpu_node_86",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_87": {
+   "device_id": "gpu_node_87",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_88": {
+   "device_id": "gpu_node_88",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_89": {
+   "device_id": "gpu_node_89",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_90": {
+   "device_id": "gpu_node_90",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_91": {
+   "device_id": "gpu_node_91",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_92": {
+   "device_id": "gpu_node_92",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_93": {
+   "device_id": "gpu_node_93",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_94": {
+   "device_id": "gpu_node_94",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_95": {
+   "device_id": "gpu_node_95",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_96": {
+   "device_id": "gpu_node_96",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_97": {
+   "device_id": "gpu_node_97",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
+  },
+  "gpu_node_98": {
+   "device_id": "gpu_node_98",
+   "template": "gpu_node",
+   "parent": null,
+   "connection": {
+    "host": "mock-redfish-service",
+    "port": 8443,
+    "unit_id": null
+   },
+   "blocking": []
   }
  },
  "buses": [],
@@ -210,7 +1288,29 @@
       "scale": 0.01
      }
     }
-   }
+   },
+   "install_tasks": [
+    {
+     "name": "mount_in_panel",
+     "est_minutes": 30,
+     "crew_role": "electrician",
+     "cx_level": "L1"
+    },
+    {
+     "name": "wire_ct_pt_inputs",
+     "depends_on": ["mount_in_panel"],
+     "est_minutes": 60,
+     "crew_role": "electrician",
+     "cx_level": "L2"
+    },
+    {
+     "name": "modbus_commission",
+     "depends_on": ["wire_ct_pt_inputs"],
+     "est_minutes": 15,
+     "crew_role": "it",
+     "cx_level": "L3"
+    }
+   ]
   },
   "pdu": {
    "template": "pdu",
@@ -344,14 +1444,14 @@
      "unit": "watts",
      "type": "float",
      "poll_rate_hz": 1,
-     "display_name_default": "Module Import Headroom",
+     "display_name_default": "POI Import Headroom",
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "operation": "sum",
+      "operation": "subtract",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/import_limit/watts",
-       "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
+       "sites/{site_id}/devices/{poi_meter_device_id}/measurements/active_power/watts"
       ]
      }
     },
@@ -359,14 +1459,14 @@
      "unit": "watts",
      "type": "float",
      "poll_rate_hz": 1,
-     "display_name_default": "Module Export Headroom",
+     "display_name_default": "POI Export Headroom",
      "publisher": "gateway",
      "binding": {
       "protocol": "synthetic",
-      "operation": "subtract",
+      "operation": "sum",
       "inputs": [
        "sites/{site_id}/devices/operating_envelope/measurements/export_limit/watts",
-       "sites/{site_id}/devices/{device_id}/measurements/active_power/watts"
+       "sites/{site_id}/devices/{poi_meter_device_id}/measurements/active_power/watts"
       ]
      }
     }
@@ -661,6 +1761,104 @@
      "name": "dnp3_commission",
      "depends_on": ["sensor_wire"],
      "est_minutes": 30,
+     "crew_role": "it",
+     "cx_level": "L3"
+    }
+   ]
+  },
+  "gpu_node": {
+   "template": "gpu_node",
+   "kind": "leaf",
+   "equipment_id": "CMP-NODE-001",
+   "vendor": "Supermicro (Super Micro Computer Inc.)",
+   "model": "SYS-421GE-NBRT-LCC",
+   "description": "4U liquid-cooled HGX B200 GPU server (8× NVIDIA B200 SXM) with Redfish BMC",
+   "measurements": {
+    "power_consumed": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 1,
+     "display_name_default": "Power Consumed",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Power",
+      "json_pointer": "/PowerControl/0/PowerConsumedWatts"
+     }
+    },
+    "power_limit": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 0.1,
+     "display_name_default": "Power Limit",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Power",
+      "json_pointer": "/PowerControl/0/PowerLimit/LimitInWatts"
+     }
+    },
+    "inlet_temp": {
+     "unit": "celsius",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "Inlet Temperature",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Thermal",
+      "json_pointer": "/Temperatures/0/ReadingCelsius"
+     }
+    },
+    "exhaust_temp": {
+     "unit": "celsius",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "Exhaust Temperature",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Thermal",
+      "json_pointer": "/Temperatures/1/ReadingCelsius"
+     }
+    },
+    "fan_speed": {
+     "unit": "percent",
+     "type": "float",
+     "poll_rate_hz": 0.5,
+     "display_name_default": "Fan Speed",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Thermal",
+      "json_pointer": "/Fans/0/Reading"
+     }
+    },
+    "gpu_power_watts": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 1,
+     "display_name_default": "GPU Total Power",
+     "binding": {
+      "protocol": "redfish",
+      "uri": "/Chassis/1/Processors",
+      "json_pointer": "/Members/0/Oem/Nvidia/TotalPowerWatts"
+     }
+    }
+   },
+   "install_tasks": [
+    {
+     "name": "rack_install",
+     "est_minutes": 30,
+     "crew_role": "it",
+     "cx_level": "L1"
+    },
+    {
+     "name": "network_connect",
+     "depends_on": ["rack_install"],
+     "est_minutes": 15,
+     "crew_role": "it",
+     "cx_level": "L2"
+    },
+    {
+     "name": "power_on_and_pxe",
+     "depends_on": ["network_connect"],
+     "est_minutes": 60,
      "crew_role": "it",
      "cx_level": "L3"
     }

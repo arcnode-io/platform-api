@@ -88,9 +88,23 @@ services:
   # smoke DTM (industrial-fixtures.json) references. Bindings point
   # at these compose service names; gateway connects on the standard
   # protocol ports. See ems-industrial-fixtures repo for the impls.
+  # SITE_LOAD_W/POI_BESS_RACKS: the POI meter's active_power (4030) now
+  # serves site load minus the racks' live discharge — it reads each rack
+  # over Modbus, so both env vars are required for that reading to be
+  # meaningful (ems-industrial-fixtures 79213b4). 1,120,000 W matches
+  # sizing_params.P_compute_total_kW (1120 kW, the 14-container ~1 MW
+  # demo site). Depends on the racks so it can dial in on boot.
   mock-modbus-server:
     image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
     restart: unless-stopped
+    environment:
+      SITE_LOAD_W: "1120000"
+      POI_BESS_RACKS: "mock-bess-rack-1:502,mock-bess-rack-2:502"
+    depends_on:
+      mock-bess-rack-1:
+        condition: service_started
+      mock-bess-rack-2:
+        condition: service_started
 
   mock-snmp-agent:
     image: public.ecr.aws/y1d2j6a8/mock-snmp-agent:latest
@@ -111,21 +125,25 @@ services:
   # Simulated BESS racks (bess_rack_01/02 in industrial-fixtures.json) —
   # different starting SoC makes the gateway's soc_weighted allocation
   # visible in the demo. See ems-industrial-fixtures MODBUS_PROFILE=bess_rack.
+  # BATTERY_INITIAL_SOC_PERCENT must start above the 29.47% reserve floor
+  # (sizing_params.bess_reserve_floor_mwh 2.3579 MWh / 8000 kWh total); these
+  # two land the floor ~2 min into an 836.6 kW curtailment event at 30x time
+  # scale — verified live on the gateway (ics-engineer).
   mock-bess-rack-1:
     image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
     restart: unless-stopped
     environment:
       MODBUS_PROFILE: bess_rack
-      BATTERY_TIME_SCALE: "60"
-      BATTERY_INITIAL_SOC_PERCENT: "70"
+      BATTERY_TIME_SCALE: "30"
+      BATTERY_INITIAL_SOC_PERCENT: "41"
 
   mock-bess-rack-2:
     image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
     restart: unless-stopped
     environment:
       MODBUS_PROFILE: bess_rack
-      BATTERY_TIME_SCALE: "60"
-      BATTERY_INITIAL_SOC_PERCENT: "50"
+      BATTERY_TIME_SCALE: "30"
+      BATTERY_INITIAL_SOC_PERCENT: "40"
 
   # MQTT → Aurora bridge. HiveMQ CE doesn't ship a Postgres connector
   # (Enterprise-only, sales-gated); we own the bridge as a tiny
