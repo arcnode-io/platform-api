@@ -527,6 +527,24 @@ def build_userdata(
     # e2e deployments seed the small graph fixture; empty for production.
     e2e_line = "e2e: true\n" if e2e else ""
 
+    # Industrial fixtures (protocol simulators standing in for real on-site
+    # devices) are e2e/test-stack-only per system_adr §25 — a real customer
+    # deployment ships every device unprovisioned, no fixtures running.
+    # `-f` merges the overlay's services + its industrial-gateway depends_on
+    # additions into the base compose config; omitted entirely otherwise.
+    fixtures_fetch_line = (
+        "curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused "
+        f"{ARCNODE_PUBLIC_BASE_URL}/compose/industrial-fixtures/docker-compose.yaml "
+        "-o /opt/arcnode/docker-compose.fixtures.yaml\n"
+        if e2e
+        else ""
+    )
+    compose_files_flag = (
+        "-f docker-compose.yaml -f docker-compose.fixtures.yaml"
+        if e2e
+        else "-f docker-compose.yaml"
+    )
+
     # Written iff settlement_point is set (grid.settlement_point in
     # ConfiguratorPayload v2) — without a settlement point, analyst-server
     # has no concrete LMP pricing node to query even if market_region is
@@ -803,6 +821,7 @@ def build_userdata(
         "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
+        f"{fixtures_fetch_line}"
         f"{observability_lines}\n"
         "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
@@ -820,7 +839,7 @@ def build_userdata(
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"
         "# Start the EMS stack — init containers seed DBs\n"
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
-        "cd /opt/arcnode && docker compose up -d\n"
+        f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
         # Give services 60s to settle (or fail) before snapshotting state.
         # Without this, the snapshot catches every container as
         # "Created/Starting" — useless for diagnosis. With it, crashed

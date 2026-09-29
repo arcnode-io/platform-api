@@ -67,6 +67,9 @@ publish_compose:
     - aws s3 sync src/compose/init-scripts/  s3://arcnode-public/init-scripts/          --delete --exclude "__pycache__/*" --exclude "*.pyc" --exclude "*_test.py"
     - aws s3 sync src/compose/observability/ s3://arcnode-public/observability/         --delete
     - aws s3 sync src/compose/der_control_ingress/ s3://arcnode-public/der-control-ingress/ --delete
+    # e2e/test-stack-only overlay (system_adr §25) — UserData fetches this
+    # only when e2e=True, merged in via a second `docker compose -f`.
+    - aws s3 sync src/compose/industrial-fixtures/ s3://arcnode-public/compose/industrial-fixtures/ --delete
     - aws s3 cp src/compose/industrial-fixtures.json s3://arcnode-public/seed/industrial-fixtures.json
     - aws s3 rm s3://arcnode-public/seed/dtm-smoke.json || true
   only:

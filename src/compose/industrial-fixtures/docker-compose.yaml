@@ -1,0 +1,70 @@
+# Industrial fixtures overlay — e2e/test-demo stacks only.
+#
+# Per system_adr §25: a real customer deployment ships every device
+# unprovisioned and runs no fixtures. This file exists so the smoke/e2e
+# path (industrial-fixtures.json DTM) has protocol simulators to poll,
+# without those containers running on every real customer's EC2 or
+# appliance. UserData fetches this and merges it in via a second `docker
+# compose -f` only when e2e=True (cfn_resources.py build_userdata);
+# omitted entirely for a real deploy.
+#
+# `docker compose -f <base> -f <this>` deep-merges: the fixture services
+# below are added, and industrial-gateway's depends_on gains the fixture
+# entries alongside whatever the base file already declared (hivemq,
+# device-api for defense).
+services:
+  mock-modbus-server:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+
+  mock-snmp-agent:
+    image: public.ecr.aws/y1d2j6a8/mock-snmp-agent:latest
+    restart: unless-stopped
+
+  mock-redfish-service:
+    image: public.ecr.aws/y1d2j6a8/mock-redfish-service:latest
+    restart: unless-stopped
+
+  mock-dnp3-outstation:
+    image: public.ecr.aws/y1d2j6a8/mock-dnp3-outstation:latest
+    restart: unless-stopped
+
+  mock-bacnet-device:
+    image: public.ecr.aws/y1d2j6a8/mock-bacnet-device:latest
+    restart: unless-stopped
+
+  # Simulated BESS racks (bess_rack_01/02 in industrial-fixtures.json) —
+  # different starting SoC makes the gateway's soc_weighted allocation
+  # visible. See ems-industrial-fixtures MODBUS_PROFILE=bess_rack.
+  mock-bess-rack-1:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+    environment:
+      MODBUS_PROFILE: bess_rack
+      BATTERY_TIME_SCALE: "60"
+      BATTERY_INITIAL_SOC_PERCENT: "70"
+
+  mock-bess-rack-2:
+    image: public.ecr.aws/y1d2j6a8/mock-modbus-server:latest
+    restart: unless-stopped
+    environment:
+      MODBUS_PROFILE: bess_rack
+      BATTERY_TIME_SCALE: "60"
+      BATTERY_INITIAL_SOC_PERCENT: "50"
+
+  industrial-gateway:
+    depends_on:
+      mock-modbus-server:
+        condition: service_started
+      mock-snmp-agent:
+        condition: service_started
+      mock-redfish-service:
+        condition: service_started
+      mock-dnp3-outstation:
+        condition: service_started
+      mock-bacnet-device:
+        condition: service_started
+      mock-bess-rack-1:
+        condition: service_started
+      mock-bess-rack-2:
+        condition: service_started

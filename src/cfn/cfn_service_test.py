@@ -157,9 +157,38 @@ def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
     # Assert — docker install + compose up wire the EMS stack onto the EC2
     assert "dnf install -y docker" in rendered
     assert "systemctl enable --now docker" in rendered
-    assert "docker compose up -d" in rendered
+    assert "docker compose -f docker-compose.yaml up -d" in rendered
     # No reference to the old private registry — images come from ECR Public
     assert "registry.gitlab.com" not in rendered
+
+
+def test_real_deploy_ships_no_industrial_fixtures() -> None:
+    """e2e=False (a real customer deploy): no fixtures overlay fetched or merged.
+
+    system_adr §25 — a real deployment ships every device unprovisioned and
+    runs no fixtures. Regression guard for exactly that.
+    """
+    # Arrange + Act
+    rendered = _render(e2e=False)
+
+    # Assert
+    assert "docker-compose.fixtures.yaml" not in rendered
+    assert "-f docker-compose.yaml up -d" in rendered
+
+
+def test_e2e_deploy_fetches_and_merges_industrial_fixtures() -> None:
+    """e2e=True: fetches the fixtures overlay and merges it in via a second -f."""
+    # Arrange + Act
+    rendered = _render(e2e=True)
+
+    # Assert
+    assert (
+        "compose/industrial-fixtures/docker-compose.yaml" in rendered
+    ), "fixtures overlay not fetched"
+    assert "-o /opt/arcnode/docker-compose.fixtures.yaml" in rendered
+    assert (
+        "-f docker-compose.yaml -f docker-compose.fixtures.yaml up -d" in rendered
+    ), "fixtures overlay not merged into docker compose up"
 
 
 def test_render_template_userdata_signals_cfn_on_success_and_failure() -> None:

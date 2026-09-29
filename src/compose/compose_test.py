@@ -17,15 +17,24 @@ import yaml
 COMPOSE_DIR = Path(__file__).parent
 COMMERCIAL_COMPOSE = COMPOSE_DIR / "commercial" / "docker-compose.yaml"
 DEFENSE_COMPOSE = COMPOSE_DIR / "defense" / "docker-compose.yaml"
+FIXTURES_COMPOSE = COMPOSE_DIR / "industrial-fixtures" / "docker-compose.yaml"
 
 BROKER_LEG = (
     "hivemq",
     "device-api",
     "der-control-api",
-    "mock-modbus-server",
     "telemetry-writer",
     "industrial-gateway",
     "hmi",
+)
+FIXTURE_SERVICES = (
+    "mock-modbus-server",
+    "mock-snmp-agent",
+    "mock-redfish-service",
+    "mock-dnp3-outstation",
+    "mock-bacnet-device",
+    "mock-bess-rack-1",
+    "mock-bess-rack-2",
 )
 COMMERCIAL_INITS: tuple[str, ...] = ()
 COMMERCIAL_ANALYST = ("analyst-server", "analyst-model")
@@ -127,14 +136,41 @@ def test_defense_ships_broker_leg_plus_analyst_server() -> None:
 
 def test_commercial_has_broker_plus_analyst_stack() -> None:
     """Commercial ships broker leg + analyst stack + matching seed inits."""
-    # Arrange + Act (mock-modbus-server is defense-only — strip from check)
+    # Arrange + Act
     services = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]
 
     # Assert
     for svc in (*BROKER_LEG, *COMMERCIAL_INITS, *COMMERCIAL_ANALYST):
-        if svc == "mock-modbus-server":
-            continue
         assert svc in services, f"commercial missing {svc}"
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_no_variant_declares_industrial_fixtures(variant_path: Path) -> None:
+    """Neither variant declares fixture services directly — system_adr §25:
+    a real customer deployment ships every device unprovisioned and runs no
+    fixtures. They only exist in the e2e-only overlay (FIXTURES_COMPOSE),
+    merged in by UserData via a second `docker compose -f` when e2e=True.
+    """
+    # Arrange + Act
+    services = yaml.safe_load(variant_path.read_text())["services"]
+
+    # Assert
+    for fixture in FIXTURE_SERVICES:
+        assert fixture not in services, f"{variant_path.name} ships {fixture}"
+
+
+def test_fixtures_overlay_declares_every_fixture_and_gateway_dependency() -> None:
+    """The overlay declares all 7 fixtures and adds them to industrial-gateway's
+    depends_on — the two things a real deploy's compose files no longer have."""
+    # Arrange + Act
+    services = yaml.safe_load(FIXTURES_COMPOSE.read_text())["services"]
+
+    # Assert — every fixture present
+    for fixture in FIXTURE_SERVICES:
+        assert fixture in services, f"fixtures overlay missing {fixture}"
+    # Assert — industrial-gateway's partial def adds exactly the fixture deps
+    gateway_deps = set(services["industrial-gateway"]["depends_on"].keys())
+    assert gateway_deps == set(FIXTURE_SERVICES)
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
@@ -145,9 +181,6 @@ def test_long_runners_have_unless_stopped(variant_path: Path) -> None:
 
     # Assert
     for svc in BROKER_LEG:
-        if svc not in services:
-            # mock-modbus-server is defense-only, not in commercial
-            continue
         assert (
             services[svc]["restart"] == "unless-stopped"
         ), f"{variant_path.name}: {svc} should be unless-stopped"

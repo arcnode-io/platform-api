@@ -96,7 +96,7 @@ def _strip_docker_steps(rendered: str) -> str:
     everything up to (but not including) the docker boot.
     """
     return re.sub(
-        r"# Install docker.*?docker compose up -d\n",
+        r"# Install docker.*?docker compose .*?up -d\n",
         "# (docker install + compose up stripped for in-container test)\n",
         rendered,
         flags=re.DOTALL,
