@@ -140,6 +140,22 @@
       "word_order": "high_low"
      }
     },
+    "active_power": {
+     "unit": "watts",
+     "type": "float",
+     "poll_rate_hz": 1,
+     "display_name_default": "POI Active Power (+ import, - export)",
+     "iec_61850_ref": "MMXU.W",
+     "bounds": { "min": -10000000, "max": 10000000, "nominal": 0 },
+     "binding": {
+      "protocol": "modbus_tcp",
+      "function_code": 3,
+      "address": 4030,
+      "data_type": "int32",
+      "word_order": "high_low",
+      "scale": 1.0
+     }
+    },
     "power_factor": {
      "unit": "none",
      "type": "float",
