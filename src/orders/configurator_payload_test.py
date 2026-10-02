@@ -237,3 +237,23 @@ def test_ride_through_hours_accepts_a_positive_value() -> None:
 
     # Assert
     assert payload.ride_through_hours == 2.5
+
+
+def test_compute_shed_enabled_defaults_to_false() -> None:
+    """Per-site order-time choice, sibling of ride_through_hours — omitted
+    payloads (every order before this field existed) still validate."""
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(JS_PAYLOAD)
+
+    # Assert
+    assert payload.compute_shed_enabled is False
+
+
+def test_compute_shed_enabled_accepts_true() -> None:
+    # Arrange + Act
+    payload = ConfiguratorPayload.model_validate(
+        {**JS_PAYLOAD, "compute_shed_enabled": True}
+    )
+
+    # Assert
+    assert payload.compute_shed_enabled is True
