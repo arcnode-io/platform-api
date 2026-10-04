@@ -16,7 +16,6 @@ local:
   ems_industrial_gateway_tarball_url: 'https://arcnode-public.s3.amazonaws.com/gateway/ems-industrial-gateway-latest.tar.gz'
   cors_origins:
     - '*'  # local dev — any origin
-  iso_version: '1.0.0-beta'
 
 beta:
   log_level: INFO
@@ -37,4 +36,3 @@ beta:
   cors_origins:
     - 'https://arcnode.io'
     - 'https://www.arcnode.io'
-  iso_version: '1.0.0-beta'

@@ -38,7 +38,6 @@ class Config(BaseModel):  # noqa: D101
     # S3 URL of the on-prem industrial-gateway docker-save tarball (cloud orders)
     ems_industrial_gateway_tarball_url: str
     cors_origins: list[str]  # Allowed origins for browser fetches (e.g. arcnode.io)
-    iso_version: str  # platform-ems-iso semver — baked into install.json per order
 
 
 class _ConfigMap(BaseModel):

@@ -42,10 +42,10 @@ class OrderEmsDelivery(BaseModel):
 
     path: DeliveryPath
     template_url: Optional[str] = None
-    # ISO path only: presigned S3 URL of the per-customer overlay dir
-    # (install.json + cfg.customer.yml + dtm.json). Future bake worker
-    # picks this up to produce a personalized ISO; until then the customer
-    # downloads the reference ISO and the wizard reads cfg.customer.yml.
+    # ISO path only: no per-order build pipeline exists yet (the prior
+    # live-build-based design was abandoned — see platform-ems-iso, which
+    # is being rebuilt from scratch on a different mechanism). Field stays
+    # for when per-order ISO delivery is designed against that new build.
     iso_overlay_url: Optional[str] = None
 
 

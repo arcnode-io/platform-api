@@ -162,7 +162,6 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
-                iso_version="1.0.0-beta",
                 cors_origins=["*"],
             )
             module = AppModule(config=cfg)
@@ -301,7 +300,6 @@ def test_all_profile_combinations_reach_complete() -> None:
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
-                iso_version="1.0.0-beta",
                 cors_origins=["*"],
             )
             module = AppModule(config=cfg)
