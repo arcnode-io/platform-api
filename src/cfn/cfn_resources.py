@@ -28,10 +28,12 @@ COMMON_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     # URL shape like the others — the Spring app splits it into a jdbc: URL +
     # user/pw on its side.
     ("dercontrol-url", "DER_CONTROL_URL"),
-    # Agent vendor API key — only OpenWeatherMap remains (ADR-024 + ADR-025).
-    # Chat + embed go through Bedrock (cloud) or Ollama (airgapped); no
-    # OpenAI / Anthropic direct keys anywhere.
+    # Agent vendor API keys (ADR-024 + ADR-025). Chat + embed go through
+    # Bedrock (cloud) or Ollama (airgapped); no OpenAI / Anthropic direct
+    # keys anywhere. GridStatus degrades to labelled synthetic data when
+    # missing (see markets.py) — not fatal to omit, unlike the others.
     ("openweathermap-api-key", "OPENWEATHERMAP_API_KEY"),
+    ("gridstatus-api-key", "GRIDSTATUS_API_KEY"),
 )
 COMMERCIAL_ONLY_URL_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("graph-url", "GRAPH_URL"),

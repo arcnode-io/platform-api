@@ -42,6 +42,7 @@ def test_commercial_build_declares_required_parameters() -> None:
         "TimeseriesConnectionUrl",
         "GraphConnectionUrl",
         "OpenweathermapApiKey",
+        "GridstatusApiKey",
         "AuthOperatorPw",
         "AuthViewerPw",
     }
@@ -63,6 +64,7 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "TimeseriesUrlSecret",
         "GraphUrlSecret",
         "OpenweathermapApiKeySecret",
+        "GridstatusApiKeySecret",
         "CustomerUrlPreflightCustomResource",
         "MqttGatewayPasswordSecret",
         "MqttOperatorPasswordSecret",
@@ -97,11 +99,12 @@ def test_defense_build_returns_aurora_plus_neptune_plus_aoss() -> None:
 
 
 def test_defense_build_declares_agent_api_key_parameters() -> None:
-    """Defense Parameters: only OpenWeatherMap remains.
+    """Defense Parameters: the two third-party agent API keys.
 
-    Per ADR-024 chat + embed go through Bedrock; the only third-party
-    API key the agent still needs is OpenWeatherMap (per ADR-025).
-    All other persistence URLs are CFN-internal.
+    Per ADR-024 chat + embed go through Bedrock; OpenWeatherMap (weather
+    tool) and GridStatus (ISO market-data tool, per ADR-025) are the only
+    third-party keys the agent still needs. All other persistence URLs
+    are CFN-internal.
     """
     # Arrange
     service = PersistenceService()
@@ -111,9 +114,10 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
         deployment_context=DeploymentContext.DEFENSE_FORWARD, short="abcd1234"
     )
 
-    # Assert — agent key + the two customer-set login passwords
+    # Assert — agent keys + the two customer-set login passwords
     assert set(build.parameters.keys()) == {
         "OpenweathermapApiKey",
+        "GridstatusApiKey",
         "AuthOperatorPw",
         "AuthViewerPw",
     }
@@ -133,6 +137,7 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
     assert set(build.ems_instance_depends_on) == {
         "AuroraBootstrapCustomResource",
         "OpenweathermapApiKeySecret",
+        "GridstatusApiKeySecret",
         "NeptuneInstance",
         "AossCollection",
         "NeptuneHostParam",

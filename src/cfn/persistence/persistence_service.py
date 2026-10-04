@@ -130,6 +130,7 @@ class PersistenceService:
             "TimeseriesUrlSecret",
             "GraphUrlSecret",
             "OpenweathermapApiKeySecret",
+            "GridstatusApiKeySecret",
             # Broker + human auth secrets — UserData reads them at boot to
             # write credentials.xml + secrets.env.
             *auth_machine_secrets(),
@@ -174,6 +175,7 @@ class PersistenceService:
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
                 "OpenweathermapApiKeySecret",
+                "GridstatusApiKeySecret",
                 "NeptuneInstance",
                 "AossCollection",
                 "NeptuneHostParam",

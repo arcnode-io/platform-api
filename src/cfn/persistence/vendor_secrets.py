@@ -80,8 +80,11 @@ def agent_api_key_secrets() -> dict[str, dict]:
     """CFN-native secrets for analyst-agent vendor APIs.
 
     Per ADR-024 + ADR-025: chat + embed go through Bedrock (cloud) or
-    Ollama (airgapped); the only third-party API key still needed is
-    OpenWeatherMap for the weather-forecast tool.
+    Ollama (airgapped). Two third-party API keys remain: OpenWeatherMap
+    (weather-forecast tool) and GridStatus (ISO market-data tool, see
+    ems-analyst's markets.py — has a labelled-synthetic-data fallback when
+    the key's missing/rate-limited, so this isn't fatal to omit, just
+    degrades that one tool).
     """
     return {
         "OpenweathermapApiKeySecret": {
@@ -98,16 +101,35 @@ def agent_api_key_secrets() -> dict[str, dict]:
                 "SecretString": {"Ref": "OpenweathermapApiKey"},
             },
         },
+        "GridstatusApiKeySecret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": {
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}" "/gridstatus-api-key",
+                },
+                "Description": (
+                    "GridStatus (gridstatus.io) API key consumed by "
+                    "analyst-agent's ISO market-data tool."
+                ),
+                "SecretString": {"Ref": "GridstatusApiKey"},
+            },
+        },
     }
 
 
 def agent_api_key_parameters() -> dict[str, dict]:
-    """One NoEcho String CFN param — OpenWeatherMap (only third-party left)."""
+    """NoEcho String CFN params — the third-party keys analyst-agent uses."""
     return {
         "OpenweathermapApiKey": {
             "Type": "String",
             "NoEcho": True,
             "MinLength": 1,
             "Description": "OpenWeatherMap API key (32-char hex).",
+        },
+        "GridstatusApiKey": {
+            "Type": "String",
+            "NoEcho": True,
+            "MinLength": 1,
+            "Description": "GridStatus (gridstatus.io) API key.",
         },
     }
