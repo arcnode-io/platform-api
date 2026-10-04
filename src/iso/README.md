@@ -39,7 +39,18 @@ gotcha worth not reintroducing.
 | 1 | `late_command` can write a static file | motd echo → login shows it |
 | 2 | `late_command` can install + run a real package | `apt-get install nginx` → `curl` reachable post-reboot, zero login steps |
 | 3 | `late_command` can set up a persistent daemon | unit file + `systemctl enable` (works offline/in a chroot) → placeholder `arcnode-dummy.service` active every boot |
-| … | real provisioning payload (Docker, EMS stack) behind the daemon pattern | not yet started |
+| 4 | real payload: Docker + the actual ems-hmi image, docker-native restart | `arcnode-hmi` container, `--restart unless-stopped`, survives reboot with zero systemd-vs-docker fighting |
+| 5 | `late_command` triggers a real fetched script, not an inline one-liner | `setup.sh` copied from install media, run in the target chroot |
+| 6 | first **daemon-layer** (native, non-docker) service | MinIO — binary + systemd unit, running as the install's own user, auto-generated root credentials |
+| … | rest of the daemon layer (postgres+timescale+pgvector, neo4j, ollama+models), then the full docker layer (hivemq + remaining app services) | not yet started — see Roadmap |
+
+Per the real deployment diagram (`~/arcnode/ems/readme.md`'s On-Prem
+diagram), **daemons** (the DBs, MinIO, Ollama) and **docker_runtime** (the
+app services) are two distinct layers — mirrors
+`~/engineering-with-ai/tooling-playbooks/main.yml` +
+`dev-services-setup.yml` almost exactly (same native-install-then-docker-
+compose split, same services). Building depth-first by layer (all daemons,
+then all docker services), not a thin vertical slice through both at once.
 
 ## Architecture
 
@@ -47,9 +58,13 @@ gotcha worth not reintroducing.
   partitioning — guided, whole-disk, no LVM yet — account) so a real-hardware
   install runs start to finish with zero clicking. This part is dev-loop
   scaffolding only, not product config (see `MANUAL_TESTS.md`).
-- **`preseed.cfg`'s `late_command`** is the one piece that's a real
-  rehearsal of the product mechanism: auto-provisioning before first boot,
-  no manual steps, no login required after.
+- **`preseed.cfg`'s `late_command`** copies `setup.sh` from the install
+  media into the target and runs it there — the real rehearsal of the
+  product mechanism (auto-provisioning before first boot, no manual steps,
+  no login required after). `late_command` itself stopped being able to
+  hold the actual provisioning logic once it needed three levels of nested
+  shell quoting for one container; `setup.sh` is the growing, readable home
+  for everything it sets up, one `==> [n/6]`-logged phase at a time.
 - **`grub.cfg` / `gtk.cfg` / `txt.cfg`** are the stock Debian boot configs
   with one line inserted (`preseed/file=/cdrom/preseed.cfg`) so both BIOS
   and UEFI boot paths pick up the preseed automatically.
@@ -71,9 +86,15 @@ afterward.
 
 ## Roadmap
 
-Real provisioning payload behind the systemd-unit pattern (Docker, EMS
-stack) · per-order parameterization (a real `dtm.json` baked in per this
-repo's own order flow — separate, later work; don't carry this module's
-dev-loop defaults into that design without re-deriving them) · secrets
-handling · OS hardening, revisited only if a real need shows up, not
-preemptively.
+Rest of the daemon layer — postgres + TimescaleDB + pgvector extensions,
+Neo4j, Ollama + models (ported from
+`~/engineering-with-ai/tooling-playbooks/dev-services-setup.yml`, same
+proven sequence) · then the docker layer (hivemq + der_control_api +
+industrial_gateway + analyst_server/agent/model + mlflow + prometheus +
+grafana, via a real `docker compose` file, not more one-off bootstrap
+units per container) · per-order parameterization (a real `dtm.json` baked
+in per this repo's own order flow — separate, later work; don't carry this
+module's dev-loop defaults into that design without re-deriving them) ·
+dynamic motd secrets-nag (only needed once something requires a secret
+that *can't* be auto-generated, e.g. a third-party API key) · OS hardening,
+revisited only if a real need shows up, not preemptively.

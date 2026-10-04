@@ -33,26 +33,43 @@ automated pipeline.
 - [ ] Install completed with **zero manual intervention** (no prompts were
       sat through — if you had to click anything, something's not preseeded
       and that's a bug in `preseed.cfg`, not a one-off)
-- [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
-      returns `HTTP/1.1 200 OK` with `Server: nginx`
+- [ ] `cat /var/log/arcnode-late-command.log` on the box shows a clean run
+      through all of `setup.sh`'s `==> [n/6]` progress lines, no errors —
+      this is the authoritative pass/fail signal; check it first before
+      re-flashing anything over any other symptom below
 - [ ] Console login banner reads `ArcNode EMS` (figlet)
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
-- [ ] `cat /var/log/arcnode-late-command.log` on the box shows a clean run,
-      no errors — this is the authoritative pass/fail signal if anything
-      above fails; check it first before re-flashing anything
+- [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
+      returns `HTTP/1.1 200 OK` serving the real ems-hmi SPA shell
+- [ ] `docker ps` on the box shows `arcnode-hmi` running; `systemctl status
+      arcnode-hmi-docker.service` shows `active (exited)` (correct steady
+      state for a oneshot + `RemainAfterExit=yes` unit, not a failure)
+- [ ] `systemctl is-active minio` on the box reports `active`; `curl -I
+      http://<ip>:9000/minio/health/live` returns `200`
+- [ ] `cat /etc/arcnode/secrets.env` on the box shows an auto-generated
+      `MINIO_ROOT_PASSWORD` (not a placeholder, not empty)
 
-## Known gotcha — do not reintroduce
+## Known gotchas — do not reintroduce
 
-`late_command` must NOT run `apt-get update`. Confirmed via
-`/var/log/installer/syslog` timestamps on a real install:
-`finish-install.d/07preseed` (fires `late_command`) always runs before
-`finish-install.d/10apt-cdrom-setup` (comments out the installer's own
-`deb cdrom:` sources.list entry). So at the moment `late_command` runs, the
-cdrom entry is still active, and `apt-get update` deterministically fails
-with exit 100 on it — not flaky, structural. `apt-get install` works fine
-off the base install's already-fetched package lists; it doesn't need its
-own `update` first. No public writeup covers this specific ordering
-interaction — confirmed absent via direct search.
+- `setup.sh` must strip the dead `deb cdrom:` sources.list entry **before**
+  its one `apt-get update` call (needed for Docker's brand-new-to-apt repo).
+  Confirmed via `/var/log/installer/syslog` timestamps on a real install:
+  `finish-install.d/07preseed` (fires `late_command`) always runs before
+  `finish-install.d/10apt-cdrom-setup` (which would otherwise comment out
+  that entry itself) — so at `late_command` time the cdrom entry is always
+  still active, and `apt-get update` deterministically fails with exit 100
+  on it otherwise. `curl`/`figlet` install fine with no update at all (base
+  install's already-fetched package lists cover them). No public writeup
+  covers this specific ordering interaction — confirmed absent via direct
+  search.
+- Containers that need to survive reboot must use Docker's own `--restart
+  unless-stopped` policy, not a systemd unit wrapping a foregrounded
+  `docker run` with its own `Restart=`. The latter was tried and confirmed
+  broken on real hardware (unit showed enabled, `docker.service` showed
+  active, but `docker ps` showed nothing running) — likely because its
+  `network-online.target` dependency never resolves on this box's plain
+  ifupdown/DHCP networking (no NetworkManager/systemd-networkd). The
+  one-shot-bootstrap-then-docker-owns-it pattern in `setup.sh` is the fix.
 
 ## Credentials
 
