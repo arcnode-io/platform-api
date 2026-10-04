@@ -19,7 +19,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/6] Installing Docker + compose plugin"
+echo "==> [1/7] Installing Docker + compose plugin"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -36,10 +36,10 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable docker
 
-echo "==> [2/6] Writing MOTD"
+echo "==> [2/7] Writing MOTD"
 figlet "ArcNode EMS" > /etc/motd
 
-echo "==> [3/6] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [3/7] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -53,7 +53,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [4/6] Setting up ems-hmi (docker)"
+echo "==> [4/7] Setting up ems-hmi (docker)"
 # One-shot bootstrap, not a long-running wrapper: Docker's own
 # --restart unless-stopped policy owns the container's lifecycle from here
 # on — the daemon resumes it on every future boot with zero systemd
@@ -78,7 +78,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-hmi-docker.service
 
-echo "==> [5/6] Setting up MinIO (native daemon — storage layer, not docker)"
+echo "==> [5/7] Setting up MinIO (native daemon — storage layer, not docker)"
 # Ported from ~/engineering-with-ai/tooling-playbooks/templates/minio.service.j2
 # (proven, year-maintained reference) — same binary/systemd shape, user
 # changed from a dedicated minio system user to TARGET_USER (per above),
@@ -129,7 +129,34 @@ SendSIGKILL=no
 WantedBy=multi-user.target
 EOF
 
-echo "==> [6/6] Enabling services"
+echo "==> [6/7] Setting up the first-boot setup wizard (docker)"
+# wizard-src was copied in by late_command (outside the chroot, same as
+# this script itself) to /opt/arcnode-wizard-src. Same constraint as
+# arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
+# running in this chroot — so build AND run both defer to the bootstrap
+# unit's first real boot, not just the run step. /etc/arcnode is
+# bind-mounted straight through so whatever the wizard writes (secrets.env,
+# TLS cert/key) lands at the same host path main.py already hardcodes —
+# one source of truth whether code runs natively or in a container.
+cat > /etc/systemd/system/arcnode-wizard-docker.service <<'EOF'
+[Unit]
+Description=arcnode setup wizard bootstrap (docker, run once)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5
+ExecStart=/bin/sh -c "docker image inspect arcnode-wizard >/dev/null 2>&1 || docker build -f /opt/arcnode-wizard-src/src/wizard/Dockerfile -t arcnode-wizard /opt/arcnode-wizard-src; docker inspect arcnode-wizard-app >/dev/null 2>&1 || docker run -d --name arcnode-wizard-app --restart unless-stopped -p 8080:8080 -v /etc/arcnode:/etc/arcnode arcnode-wizard"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-wizard-docker.service
+
+echo "==> [7/7] Enabling services"
 systemctl daemon-reload
 systemctl enable minio
 
