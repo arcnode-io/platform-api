@@ -21,6 +21,12 @@ checks:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+
+shell:
+  stage: check
+  script:
+    - docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable src/iso/build.sh
+
 build:
   stage: publish
   script:
