@@ -6,6 +6,14 @@ set -e
 # echoes progress since this is otherwise a silent, opaque stretch of the
 # install from the person watching the screen.
 #
+# Ordering here reflects a real dependency analysis, not just the order
+# things got built in: Docker has no dependency on the daemon layer (and
+# vice versa — they only contend on the apt lock, so still serialized, but
+# not because one needs the other); the wizard needs Docker; the app layer
+# (ems-hmi, standing in for the real EMS stack) needs the wizard's output
+# (secrets.env) before it's meaningful to expose, enforced via a systemd
+# .path unit watching the wizard's apply-marker, not a boot-order guess.
+#
 # TARGET_USER: reuse whatever account the installer actually created
 # (preseed.cfg's passwd/username) instead of inventing dedicated per-daemon
 # system users — same "if they have root, dedicated users buy nothing"
@@ -53,32 +61,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [4/7] Setting up ems-hmi (docker)"
-# One-shot bootstrap, not a long-running wrapper: Docker's own
-# --restart unless-stopped policy owns the container's lifecycle from here
-# on — the daemon resumes it on every future boot with zero systemd
-# involvement. docker inspect guard makes every later boot's run of this
-# same unit a safe no-op. Restart=on-failure covers only the
-# before-network-is-ready case on the very first attempt.
-cat > /etc/systemd/system/arcnode-hmi-docker.service <<'EOF'
-[Unit]
-Description=arcnode hmi bootstrap (docker, run once)
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-Restart=on-failure
-RestartSec=5
-ExecStart=/bin/sh -c "docker inspect arcnode-hmi >/dev/null 2>&1 || docker run -d --name arcnode-hmi --restart unless-stopped -p 80:80 public.ecr.aws/y1d2j6a8/ems-hmi:latest"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl enable arcnode-hmi-docker.service
-
-echo "==> [5/7] Setting up MinIO (native daemon — storage layer, not docker)"
+echo "==> [4/7] Setting up MinIO (native daemon — storage layer, not docker)"
 # Ported from ~/engineering-with-ai/tooling-playbooks/templates/minio.service.j2
 # (proven, year-maintained reference) — same binary/systemd shape, user
 # changed from a dedicated minio system user to TARGET_USER (per above),
@@ -129,7 +112,7 @@ SendSIGKILL=no
 WantedBy=multi-user.target
 EOF
 
-echo "==> [6/7] Setting up the first-boot setup wizard (docker)"
+echo "==> [5/7] Setting up the first-boot setup wizard (docker)"
 # wizard-src was copied in by late_command (outside the chroot, same as
 # this script itself) to /opt/arcnode-wizard-src. Same constraint as
 # arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
@@ -155,6 +138,49 @@ ExecStart=/bin/sh -c "docker image inspect arcnode-wizard >/dev/null 2>&1 || doc
 WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-wizard-docker.service
+
+echo "==> [6/7] Setting up ems-hmi (docker), gated on the wizard"
+# Product-level gate, not a literal data dependency for THIS container:
+# ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
+# this walking skeleton) — device-api is what will actually read
+# AUTH_OPERATOR_PW/AUTH_VIEWER_PW once it lands, not ems-hmi itself. But
+# there's no point exposing the HMI as a visible entrypoint before the
+# wizard has even run — logins can't work yet regardless. Rehearsing the
+# gating mechanism here now so it's proven before device-api needs it for
+# real.
+#
+# A systemd .path unit, not a boot-order guess or a poll-and-retry hack:
+# PathExists= fires immediately if the marker already exists when the
+# path unit starts (confirmed current behavior on systemd 257, Debian
+# trixie's version — an old related bug was closed "version-too-ancient"
+# against systemd 245 from 2020), so this is correct on every reboot
+# after the first successful apply, not just the first time the marker
+# file appears.
+cat > /etc/systemd/system/arcnode-hmi-docker.service <<'EOF'
+[Unit]
+Description=arcnode hmi bootstrap (docker, run once)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=5
+ExecStart=/bin/sh -c "docker inspect arcnode-hmi >/dev/null 2>&1 || docker run -d --name arcnode-hmi --restart unless-stopped -p 80:80 public.ecr.aws/y1d2j6a8/ems-hmi:latest"
+EOF
+cat > /etc/systemd/system/arcnode-hmi-docker.path <<'EOF'
+[Unit]
+Description=Wait for wizard apply before starting arcnode-hmi
+
+[Path]
+PathExists=/etc/arcnode/.wizard-applied
+Unit=arcnode-hmi-docker.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-hmi-docker.path
 
 echo "==> [7/7] Enabling services"
 systemctl daemon-reload
