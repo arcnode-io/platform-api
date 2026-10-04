@@ -27,7 +27,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/7] Installing Docker + compose plugin"
+echo "==> [1/8] Installing Docker + compose plugin"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -44,10 +44,29 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable docker
 
-echo "==> [2/7] Writing MOTD"
+echo "==> [2/8] Writing MOTD"
 figlet "ArcNode EMS" > /etc/motd
 
-echo "==> [3/7] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [3/8] Writing ems-hmi's runtime config overlay"
+# Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
+# the image no longer bakes a site — it reads /opt/arcnode/hmi-cfg.customer.yml
+# (nginx serves it at /cfg.customer.yml) and fails closed ("HMI configuration
+# error") without it. Exact same shape as cfn_resources.py's cloud UserData
+# (siteId/deploymentName/deviceApiUri/chatApiUri/mqttUri) — "arcnode-dev" is
+# a dev-loop placeholder, not real per-order site identity (that pipeline
+# doesn't exist yet). Written here, not gated on the wizard: this content
+# doesn't depend on anything the wizard collects, only arcnode-hmi's own
+# startup is gated on the wizard, for the product-level reason below.
+mkdir -p /opt/arcnode
+cat > /opt/arcnode/hmi-cfg.customer.yml <<'EOF'
+siteId: arcnode-dev
+deploymentName: arcnode-dev
+deviceApiUri: /api
+chatApiUri: ""
+mqttUri: ""
+EOF
+
+echo "==> [4/8] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -61,7 +80,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [4/7] Setting up MinIO (native daemon — storage layer, not docker)"
+echo "==> [5/8] Setting up MinIO (native daemon — storage layer, not docker)"
 # Ported from ~/engineering-with-ai/tooling-playbooks/templates/minio.service.j2
 # (proven, year-maintained reference) — same binary/systemd shape, user
 # changed from a dedicated minio system user to TARGET_USER (per above),
@@ -112,7 +131,7 @@ SendSIGKILL=no
 WantedBy=multi-user.target
 EOF
 
-echo "==> [5/7] Setting up the first-boot setup wizard (docker)"
+echo "==> [6/8] Setting up the first-boot setup wizard (docker)"
 # wizard-src was copied in by late_command (outside the chroot, same as
 # this script itself) to /opt/arcnode-wizard-src. Same constraint as
 # arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
@@ -139,7 +158,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-wizard-docker.service
 
-echo "==> [6/7] Setting up ems-hmi (docker), gated on the wizard"
+echo "==> [7/8] Setting up ems-hmi (docker), gated on the wizard"
 # Product-level gate, not a literal data dependency for THIS container:
 # ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
 # this walking skeleton) — device-api is what will actually read
@@ -167,7 +186,7 @@ Type=oneshot
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=5
-ExecStart=/bin/sh -c "docker inspect arcnode-hmi >/dev/null 2>&1 || docker run -d --name arcnode-hmi --restart unless-stopped -p 80:80 public.ecr.aws/y1d2j6a8/ems-hmi:latest"
+ExecStart=/bin/sh -c "docker inspect arcnode-hmi >/dev/null 2>&1 || docker run -d --name arcnode-hmi --restart unless-stopped -p 80:80 -v /opt/arcnode/hmi-cfg.customer.yml:/opt/arcnode/hmi-cfg.customer.yml:ro public.ecr.aws/y1d2j6a8/ems-hmi:latest"
 EOF
 cat > /etc/systemd/system/arcnode-hmi-docker.path <<'EOF'
 [Unit]
@@ -182,7 +201,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-hmi-docker.path
 
-echo "==> [7/7] Enabling services"
+echo "==> [8/8] Enabling services"
 systemctl daemon-reload
 systemctl enable minio
 
