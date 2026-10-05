@@ -54,6 +54,25 @@ function ChevronW({ color, size = 14, dir = 'right' }) {
     </svg>
   );
 }
+function EyeW({ color, size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12 C 4 5, 20 5, 23 12 C 20 19, 4 19, 1 12 Z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+function EyeOffW({ color, size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12 C 4 5, 20 5, 23 12 C 20 19, 4 19, 1 12 Z"/>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M3 3 L21 21"/>
+    </svg>
+  );
+}
 function LockW({ color, size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
@@ -231,13 +250,15 @@ function FieldLabelW({ t, children, optional, required }) {
     </label>
   );
 }
-function TextInputW({ t, value, onChange, placeholder, type = 'text', disabled, mono, error }) {
-  return (
+function TextInputW({ t, value, onChange, placeholder, type = 'text', disabled, mono, error, visible, onToggleVisible }) {
+  const showToggle = type === 'password' && onToggleVisible;
+  const effectiveType = showToggle && visible ? 'text' : type;
+  const input = (
     <input
-      type={type} value={value} onChange={e => onChange && onChange(e.target.value)}
+      type={effectiveType} value={value} onChange={e => onChange && onChange(e.target.value)}
       placeholder={placeholder} disabled={disabled}
       style={{
-        width: '100%', height: 40, padding: '0 12px',
+        width: '100%', height: 40, padding: showToggle ? '0 40px 0 12px' : '0 12px',
         boxSizing: 'border-box',
         background: disabled ? t.surface : t.bg,
         border: `1px solid ${error ? t.statusAlarm : t.border}`,
@@ -247,6 +268,20 @@ function TextInputW({ t, value, onChange, placeholder, type = 'text', disabled, 
         outline: 'none',
       }}
     />
+  );
+  if (!showToggle) return input;
+  return (
+    <div style={{ position: 'relative' }}>
+      {input}
+      <button type="button" onClick={onToggleVisible} aria-label={visible ? 'Hide password' : 'Show password'}
+        style={{
+          position: 'absolute', right: 10, top: 0, height: 40,
+          display: 'flex', alignItems: 'center',
+          appearance: 'none', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+        }}>
+        {visible ? <EyeOffW color={t.textSoft} size={16}/> : <EyeW color={t.textSoft} size={16}/>}
+      </button>
+    </div>
   );
 }
 function HelperW({ t, children, error }) {
@@ -517,26 +552,42 @@ function FileFieldW({ t, label, ext, filename, onPick }) {
 // real auth model exactly (AUTH_OPERATOR_PW/AUTH_VIEWER_PW, bcrypt-hashed
 // at boot), not a generic single "admin" account.
 function Step4HumanAuth({ t, values, onChange }) {
+  // One shared visibility map, not per-field local state: a global
+  // "show all" toggle needs somewhere to actually live above both cards.
+  const [visible, setVisible] = useStateW({ operator: false, viewer: false });
+  const allVisible = visible.operator && visible.viewer;
+  const toggleAll = () => {
+    const next = !allVisible;
+    setVisible({ operator: next, viewer: next });
+  };
   return (
     <StepShellW t={t} title="Create the operator and viewer logins"
       blurb="Two fixed HMI roles: operator (dispatch + full access) and viewer (read-only). Separate from the SSH key you already have — these are for the HMI web login only.">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: SPACE[3] }}>
+        <button type="button" onClick={toggleAll} style={{
+          appearance: 'none', cursor: 'pointer', background: 'transparent', border: 'none',
+          display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0,
+          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.18,
+          color: t.textSoft, textTransform: 'uppercase',
+        }}>
+          {allVisible ? <EyeOffW color={t.textSoft} size={13}/> : <EyeW color={t.textSoft} size={13}/>}
+          {allVisible ? 'Hide all passwords' : 'Show all passwords'}
+        </button>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[4] }}>
         <PasswordPairCard t={t} title="Operator" roleDesc="Dispatch + full HMI access."
-          password={values.operatorPassword} confirm={values.operatorConfirm}
-          onPassword={(v) => onChange('operatorPassword', v)}
-          onConfirm={(v) => onChange('operatorConfirm', v)}/>
+          password={values.operatorPassword} onPassword={(v) => onChange('operatorPassword', v)}
+          visible={visible.operator} onToggleVisible={() => setVisible(s => ({ ...s, operator: !s.operator }))}/>
         <PasswordPairCard t={t} title="Viewer" roleDesc="Read-only HMI access."
-          password={values.viewerPassword} confirm={values.viewerConfirm}
-          onPassword={(v) => onChange('viewerPassword', v)}
-          onConfirm={(v) => onChange('viewerConfirm', v)}/>
+          password={values.viewerPassword} onPassword={(v) => onChange('viewerPassword', v)}
+          visible={visible.viewer} onToggleVisible={() => setVisible(s => ({ ...s, viewer: !s.viewer }))}/>
       </div>
     </StepShellW>
   );
 }
-function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, onConfirm }) {
+function PasswordPairCard({ t, title, roleDesc, password, onPassword, visible, onToggleVisible }) {
   const strength = passwordStrength(password);
   const policyUnmet = password.length > 0 && !passwordMeetsPolicy(password);
-  const mismatch = confirm.length > 0 && confirm !== password;
   return (
     <div style={{
       background: t.panel, border: `1px solid ${t.border}`,
@@ -549,14 +600,10 @@ function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, o
       </div>
       <div>
         <FieldLabelW t={t} required>Password</FieldLabelW>
-        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="8+ chars, 1 upper, 1 number, 1 special" error={policyUnmet}/>
+        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="8+ chars, 1 upper, 1 number, 1 special"
+          error={policyUnmet} visible={visible} onToggleVisible={onToggleVisible}/>
         <PasswordStrengthW t={t} strength={strength} password={password}/>
         {policyUnmet && <HelperW t={t} error>Needs {MIN_PASSWORD_LENGTH}+ characters, one uppercase letter, one number, and one special character.</HelperW>}
-      </div>
-      <div>
-        <FieldLabelW t={t} required>Confirm password</FieldLabelW>
-        <TextInputW t={t} type="password" value={confirm} onChange={onConfirm} error={mismatch}/>
-        {mismatch && <HelperW t={t} error>Passwords don't match.</HelperW>}
       </div>
     </div>
   );
@@ -588,9 +635,7 @@ function passwordMeetsPolicy(pw) {
 function isHumanAuthValid(humanAuth) {
   return (
     passwordMeetsPolicy(humanAuth.operatorPassword) &&
-    humanAuth.operatorPassword === humanAuth.operatorConfirm &&
-    passwordMeetsPolicy(humanAuth.viewerPassword) &&
-    humanAuth.viewerPassword === humanAuth.viewerConfirm
+    passwordMeetsPolicy(humanAuth.viewerPassword)
   );
 }
 function PasswordStrengthW({ t, strength, password }) {
@@ -971,7 +1016,7 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
       gridstatus:     { key: '', skipped: false },
     },
     tls: { mode: 'selfsigned', cert: null, certPem: null, key: null, keyPem: null },
-    humanAuth: { operatorPassword: '', operatorConfirm: '', viewerPassword: '', viewerConfirm: '' },
+    humanAuth: { operatorPassword: '', viewerPassword: '' },
   });
 
   // GET /setup/api/identity once on mount — real data, no mock fallback.
@@ -1014,10 +1059,13 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
         api_keys: values.apiKeys,
         tls: { mode: values.tls.mode, cert_pem: values.tls.certPem, key_pem: values.tls.keyPem },
         human_auth: {
+          // Backend's HumanAuthInput still wants a confirm field — the UI
+          // dropped the second input, so mirror password into confirm
+          // here rather than touch the validator on that model.
           operator_password: values.humanAuth.operatorPassword,
-          operator_confirm:  values.humanAuth.operatorConfirm,
+          operator_confirm:  values.humanAuth.operatorPassword,
           viewer_password:   values.humanAuth.viewerPassword,
-          viewer_confirm:    values.humanAuth.viewerConfirm,
+          viewer_confirm:    values.humanAuth.viewerPassword,
         },
       }),
     })
