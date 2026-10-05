@@ -24,8 +24,11 @@ automated pipeline.
    remasters it, verifies the preseed landed correctly.
 2. `lsblk -o NAME,SIZE,RM,TRAN,MODEL` — confirm the target device.
 3. `sudo dd if=/tmp/debian-13.7.0-amd64-netinst-arcnode.iso of=/dev/sdX bs=4M status=progress conv=fsync`
-4. Boot the laptop from the drive. Walk away — it's fully unattended from
-   here (locale/partitioning/account/late_command all preseeded).
+4. Boot the laptop from the drive. The installer's own routine questions
+   (locale/partitioning/account) are preseeded — no clicking through those.
+   This is attended provisioning from there: once the wizard comes up
+   (fast — see below), someone's at it, choosing real passwords under
+   their own policy. Not a walk-away/unattended install.
 5. Once it's back up, check from another machine on the network.
 
 ## Checklist
@@ -34,14 +37,20 @@ automated pipeline.
       sat through — if you had to click anything, something's not preseeded
       and that's a bug in `preseed.cfg`, not a one-off)
 - [ ] `cat /var/log/arcnode-late-command.log` on the box shows a clean run
-      through all of `setup.sh`'s `==> [n/8]` progress lines, no errors —
+      through all of `setup.sh`'s `==> [n/9]` progress lines, no errors —
       this is the authoritative pass/fail signal; check it first before
-      re-flashing anything over any other symptom below. **Phase 2
-      (PostgreSQL) is the thing to scrutinize first this round** — this is
-      the first time a *native* package's postinst (not a `docker
-      build`/`run`) has hit the `policy-rc.d` chroot constraint; confirm
-      `apt-get install -y postgresql` didn't error, not just that the
-      script as a whole exited 0
+      re-flashing anything over any other symptom below. **Two things to
+      scrutinize first this round:** phase 2 (the wizard, native —
+      `apt-get install python3-fastapi` is a new package set, confirm it
+      actually resolved rather than needing a repo we don't have), and
+      phase 4 (PostgreSQL — first test of `policy-rc.d` against a
+      *native* package's postinst, not a `docker build`/`run`)
+- [ ] `systemctl is-active arcnode-wizard` reports `active`; `curl -I
+      http://<ip>:8080/setup` returns `HTTP/1.1 200 OK` — check this
+      **before** waiting for the rest of the log to finish scrolling.
+      This is the whole point of running it natively: it should be up and
+      answering long before Docker/Postgres are done installing, not
+      after
 - [ ] Console login banner reads `ArcNode EMS` (figlet)
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
 - [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
@@ -79,6 +88,15 @@ automated pipeline.
   `network-online.target` dependency never resolves on this box's plain
   ifupdown/DHCP networking (no NetworkManager/systemd-networkd). The
   one-shot-bootstrap-then-docker-owns-it pattern in `setup.sh` is the fix.
+- The Debian installer's own screen shows **zero progress** for anything
+  `late_command` does internally — it has no visibility into the script,
+  so a multi-minute run (Docker + Postgres installs) just looks stalled
+  on whatever generic "finishing the installation" step it's on.
+  Confirmed via Debian bug #610525 and community reports, not just this
+  project's own observation. We don't control or alter that screen (hard
+  invariant) — the fix is routing anything slow to come up somewhere we
+  *do* control: the wizard, now native specifically so it starts before
+  the slow stuff rather than after.
 
 ## Credentials
 

@@ -1,9 +1,11 @@
 # ARCNODE Appliance ISO 📦
 
-> Stock Debian netinst, remastered with a preseed file so it installs fully
-> unattended and drops the EMS stack in via the installer's own
-> `late_command` hook. No control node, no self-convergence loop — install
-> once, done.
+> Stock Debian netinst, remastered with a preseed file so its own routine
+> questions (locale/partitioning/account) need zero clicking, then drops
+> the EMS stack in via the installer's own `late_command` hook. This is
+> attended provisioning, not a walk-away install — a person is at the
+> wizard choosing real passwords under their own policy. No control node,
+> no self-convergence loop — install once, done.
 
 ## History
 
@@ -30,7 +32,8 @@ a single install.
 
 ## Walking skeleton
 
-Every row below was proven via a real, fully-unattended reinstall — see
+Every row below was proven via a real reinstall (the installer's own
+questions preseeded, same as always) — see
 `MANUAL_TESTS.md` for the exact checklist and the one confirmed installer
 gotcha worth not reintroducing.
 
@@ -41,8 +44,9 @@ gotcha worth not reintroducing.
 | 3 | `late_command` can set up a persistent daemon | unit file + `systemctl enable` (works offline/in a chroot) → placeholder `arcnode-dummy.service` active every boot |
 | 4 | real payload: Docker + the actual ems-hmi image, docker-native restart | `arcnode-hmi` container, `--restart unless-stopped`, survives reboot with zero systemd-vs-docker fighting |
 | 5 | `late_command` triggers a real fetched script, not an inline one-liner | `setup.sh` copied from install media, run in the target chroot |
-| 6 | first real **daemon-layer** (native, non-docker) service — and the first test of `policy-rc.d` against a *native* package's postinst, not a `docker build`/`run` | PostgreSQL 17 (apt) + `arcnode-postgres-bootstrap.service` creates the `device_api` role/`document` db on first real boot, writes `DOCUMENT_URL` to `secrets.env` |
-| … | rest of the daemon layer (timescale+pgvector, neo4j, ollama+models), then device-api itself (needs `AUTH_JWT_SECRET` + MQTT creds the wizard doesn't generate yet, and HiveMQ), then the rest of the docker layer | not yet started — see Roadmap |
+| 6 | the wizard runs **natively**, not in Docker — starts before Docker/Postgres even finish installing | `apt-get install python3-fastapi python3-uvicorn python3-pydantic` (real Debian packages, confirmed via apt-cache — no PyPI/pip dependency); plain FastAPI `APIRouter`, not `classy_fastapi` (no Debian package for it) |
+| 7 | first real **daemon-layer** (native, non-docker) service — and the first test of `policy-rc.d` against a *native* package's postinst, not a `docker build`/`run` | PostgreSQL 17 (apt) + `arcnode-postgres-bootstrap.service` creates the `device_api` role/`document` db on first real boot, writes `DOCUMENT_URL` to `secrets.env` |
+| … | rest of the daemon layer (timescale+pgvector, neo4j, ollama+models), then device-api itself (needs `AUTH_JWT_SECRET` + MQTT creds — machine-generated, not wizard-collected, per `auth_secrets.py`'s own categorization — and HiveMQ), then the rest of the docker layer | not yet started — see Roadmap |
 
 MinIO was tried here first and cut: upstream retired the community edition's
 binary/Docker distribution entirely (dl.min.io now 410s, Docker Hub images
@@ -88,9 +92,9 @@ lsblk -o NAME,SIZE,RM,TRAN,MODEL                   # confirm the USB device — 
 sudo dd if=/tmp/debian-13.7.0-amd64-netinst-arcnode.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-Boot the laptop from it. Fully unattended from power-on to a running,
-network-reachable system — see `MANUAL_TESTS.md` for what to check
-afterward.
+Boot the laptop from it. The installer's own questions need no clicking;
+from the wizard on, this is attended — see `MANUAL_TESTS.md` for the full
+checklist.
 
 ## Roadmap
 

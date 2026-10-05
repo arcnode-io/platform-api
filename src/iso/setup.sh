@@ -7,12 +7,18 @@ set -e
 # install from the person watching the screen.
 #
 # Ordering here reflects a real dependency analysis, not just the order
-# things got built in: Docker has no dependency on the daemon layer (and
-# vice versa — they only contend on the apt lock, so still serialized, but
-# not because one needs the other); the wizard needs Docker; the app layer
-# (ems-hmi, standing in for the real EMS stack) needs the wizard's output
-# (secrets.env) before it's meaningful to expose, enforced via a systemd
-# .path unit watching the wizard's apply-marker, not a boot-order guess.
+# things got built in: the wizard runs natively (apt-installed
+# python3-fastapi, not Docker) specifically so it can start immediately —
+# it has NO dependency on Docker, Postgres, or anything else here, and
+# comes right after the one apt-get update everything else also needs.
+# Reason it's not a Docker container: the Debian installer's own screen
+# shows zero progress for anything late_command does (confirmed — see
+# MANUAL_TESTS.md), so the one thing that actually can show the person
+# real progress (the wizard) needs to exist before the slow stuff (Docker,
+# Postgres) does, not after. The app layer (ems-hmi, standing in for the
+# real EMS stack) needs the wizard's output (secrets.env) before it's
+# meaningful to expose, enforced via a systemd .path unit watching the
+# wizard's apply-marker, not a boot-order guess.
 
 # Reason: the log redirect lives HERE, not in preseed.cfg's late_command
 # invocation. `in-target sh /root/setup.sh > logfile` would put the `>`
@@ -37,7 +43,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/8] Installing Docker + compose plugin"
+echo "==> [1/9] Preparing apt (cdrom fix + Docker's repo) and updating"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -50,11 +56,41 @@ curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/doc
 chmod a+r /etc/apt/keyrings/docker.asc
 # shellcheck disable=SC1091 # /etc/os-release is a runtime-only file on the target, not something to statically follow
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+# One update covers everything below that isn't in the base install's own
+# already-fetched lists (Docker's brand-new repo, and — unverified whether
+# actually needed, but harmless either way — python3-fastapi/postgresql).
 apt-get update
+
+echo "==> [2/9] Setting up the first-boot setup wizard (native)"
+# Native, not Docker: python3-fastapi/uvicorn/pydantic are real Debian
+# packages (confirmed via apt-cache against trixie) — installable from the
+# same local mirror as everything else, no PyPI/pip dependency at all.
+# classy_fastapi (used elsewhere in this repo) has no Debian package, so
+# wizard_controller.py uses plain FastAPI APIRouter instead — see its own
+# header comment. This has zero dependency on Docker, Postgres, or
+# anything below: it can and should start before any of that finishes.
+apt-get install -y python3 python3-fastapi python3-uvicorn python3-pydantic
+cat > /etc/systemd/system/arcnode-wizard.service <<'EOF'
+[Unit]
+Description=arcnode first-boot setup wizard (native)
+
+[Service]
+WorkingDirectory=/opt/arcnode-wizard-src
+Environment=PYTHONPATH=/opt/arcnode-wizard-src
+ExecStart=/usr/bin/python3 -m src.wizard.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-wizard.service
+
+echo "==> [3/9] Installing Docker + compose plugin"
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable docker
 
-echo "==> [2/8] Installing PostgreSQL (native daemon)"
+echo "==> [4/9] Installing PostgreSQL (native daemon)"
 # Reason: device-api (the next real consumer, not yet in this walking
 # skeleton) hard-fails at boot without DOCUMENT_URL — a real postgres
 # connection string, per its own TypeOrmModule.forRootAsync
@@ -108,10 +144,10 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-postgres-bootstrap.service
 
-echo "==> [3/8] Writing MOTD"
+echo "==> [5/9] Writing MOTD"
 figlet "ArcNode EMS" > /etc/motd
 
-echo "==> [4/8] Writing ems-hmi's runtime config overlay"
+echo "==> [6/9] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
 # the image no longer bakes a site — it reads /opt/arcnode/hmi-cfg.customer.yml
 # (nginx serves it at /cfg.customer.yml) and fails closed ("HMI configuration
@@ -130,7 +166,7 @@ chatApiUri: ""
 mqttUri: ""
 EOF
 
-echo "==> [5/8] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [7/9] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -144,34 +180,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [6/8] Setting up the first-boot setup wizard (docker)"
-# wizard-src was copied in by late_command (outside the chroot, same as
-# this script itself) to /opt/arcnode-wizard-src. Same constraint as
-# arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
-# running in this chroot — so build AND run both defer to the bootstrap
-# unit's first real boot, not just the run step. /etc/arcnode is
-# bind-mounted straight through so whatever the wizard writes (secrets.env,
-# TLS cert/key) lands at the same host path main.py already hardcodes —
-# one source of truth whether code runs natively or in a container.
-cat > /etc/systemd/system/arcnode-wizard-docker.service <<'EOF'
-[Unit]
-Description=arcnode setup wizard bootstrap (docker, run once)
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-Restart=on-failure
-RestartSec=5
-ExecStart=/bin/sh -c "docker image inspect arcnode-wizard >/dev/null 2>&1 || docker build -f /opt/arcnode-wizard-src/src/wizard/Dockerfile -t arcnode-wizard /opt/arcnode-wizard-src; docker inspect arcnode-wizard-app >/dev/null 2>&1 || docker run -d --name arcnode-wizard-app --restart unless-stopped -p 8080:8080 -v /etc/arcnode:/etc/arcnode arcnode-wizard"
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl enable arcnode-wizard-docker.service
-
-echo "==> [7/8] Setting up ems-hmi (docker), gated on the wizard"
+echo "==> [8/9] Setting up ems-hmi (docker), gated on the wizard"
 # Product-level gate, not a literal data dependency for THIS container:
 # ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
 # this walking skeleton) — device-api is what will actually read
@@ -214,7 +223,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-hmi-docker.path
 
-echo "==> [8/8] Enabling services"
+echo "==> [9/9] Enabling services"
 systemctl daemon-reload
 
 echo "==> arcnode setup complete"

@@ -3,13 +3,18 @@
 Standalone app (see main.py) — not mounted into platform-api's own router,
 a completely different deployment target (the appliance / an EC2 instance,
 not platform-api's own running service).
+
+Plain FastAPI APIRouter, not classy_fastapi's Routable (the convention used
+elsewhere in this repo): the appliance runs this natively, installed via
+apt (python3-fastapi) rather than Docker+pip, specifically so it has no
+dependency on PyPI being reachable during provisioning. classy_fastapi has
+no Debian package — see src/wizard/README.md for the full reasoning.
 """
 
 from pathlib import Path
 from typing import Final, Optional
 
-from classy_fastapi import Routable, get, post
-from fastapi import HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse
 
 from src.wizard.wizard_record import ApplyRequest, ApplyResult, InstallIdentity
@@ -18,7 +23,7 @@ from src.wizard.wizard_service import WizardAlreadyAppliedError, WizardService
 _STATIC_DIR: Final[Path] = Path(__file__).parent / "static"
 
 
-class WizardController(Routable):
+class WizardController:
     """GET /setup (+ its static assets), GET /setup/api/identity, POST /setup/api/apply.
 
     ``install_identity_path`` points at install.json — written at ISO-build
@@ -26,17 +31,40 @@ class WizardController(Routable):
     """
 
     def __init__(self, *, service: WizardService, install_identity_path: Path) -> None:
-        super().__init__()
         self._service = service
         self._install_identity_path = install_identity_path
+        self.router = APIRouter()
+        self.router.add_api_route(
+            "/setup",
+            self.index,
+            methods=["GET"],
+            summary="Serve the wizard UI, or 404 once applied",
+        )
+        self.router.add_api_route(
+            "/setup/{filename}",
+            self.static_asset,
+            methods=["GET"],
+            summary="Serve a static JSX/JS asset the UI references",
+        )
+        self.router.add_api_route(
+            "/setup/api/identity",
+            self.identity,
+            methods=["GET"],
+            summary="Read-only install identity for step 1",
+        )
+        self.router.add_api_route(
+            "/setup/api/apply",
+            self.apply,
+            methods=["POST"],
+            response_model=ApplyResult,
+            summary="Write secrets.env + TLS, then disable this wizard for good",
+        )
 
-    @get("/setup", summary="Serve the wizard UI, or 404 once applied")
     async def index(self) -> HTMLResponse:
         """Entry point the operator's browser loads."""
         self._refuse_if_applied()
         return HTMLResponse((_STATIC_DIR / "index.html").read_text())
 
-    @get("/setup/{filename}", summary="Serve a static JSX/JS asset the UI references")
     async def static_asset(self, filename: str) -> FileResponse:
         """tokens.jsx / setup-wizard.jsx — whatever index.html's script tags need.
 
@@ -50,10 +78,6 @@ class WizardController(Routable):
             raise HTTPException(status.HTTP_404_NOT_FOUND)
         return FileResponse(path)
 
-    @get(
-        "/setup/api/identity",
-        summary="Read-only install identity for step 1",
-    )
     async def identity(self) -> Optional[InstallIdentity]:
         """None if install.json isn't there yet — the UI shows a loading state."""
         self._refuse_if_applied()
@@ -63,11 +87,6 @@ class WizardController(Routable):
             self._install_identity_path.read_text()
         )
 
-    @post(
-        "/setup/api/apply",
-        response_model=ApplyResult,
-        summary="Write secrets.env + TLS, then disable this wizard for good",
-    )
     async def apply(self, request: ApplyRequest) -> ApplyResult:
         """The one irreversible action — see WizardService.apply's own docstring."""
         try:
