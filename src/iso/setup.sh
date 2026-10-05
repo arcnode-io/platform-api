@@ -13,7 +13,17 @@ set -e
 # (ems-hmi, standing in for the real EMS stack) needs the wizard's output
 # (secrets.env) before it's meaningful to expose, enforced via a systemd
 # .path unit watching the wizard's apply-marker, not a boot-order guess.
-#
+
+# Reason: the log redirect lives HERE, not in preseed.cfg's late_command
+# invocation. `in-target sh /root/setup.sh > logfile` would put the `>`
+# outside the in-target call, resolved by the live installer environment's
+# OWN shell — writing to its ephemeral RAM filesystem, gone forever at
+# reboot, never actually landing in /target. Confirmed the hard way: a
+# real setup.sh failure left no log at all on the installed system.
+# Self-redirecting from inside the chroot is correct regardless of how
+# this script gets invoked.
+exec > /var/log/arcnode-late-command.log 2>&1
+
 # TARGET_USER: reuse whatever account the installer actually created
 # (preseed.cfg's passwd/username) instead of inventing dedicated per-daemon
 # system users — same "if they have root, dedicated users buy nothing"
