@@ -159,13 +159,24 @@ echo "==> [5/9] Writing MOTD"
 # wasn't actually idempotent (a stray blank line accumulated on every
 # boot); rewriting the full file each time is correct by construction
 # instead of needing a correct diff/strip step.
+#
+# `ip route get` (the real outbound-route IP), not `hostname -I`'s first
+# entry: confirmed on real hardware that `hostname -I` lists every
+# interface including docker0 (Docker's bridge, 172.17.0.1 by default),
+# and its ordering put docker0 first — motd showed the bridge gateway,
+# not the LAN IP a person would actually use to reach the box. Every
+# deployment's LAN differs (this is meant for an industrial local
+# network as often as not), so this derives the IP from the routing
+# table instead of assuming anything about subnet ranges. No real
+# connectivity needed — this is a route-table lookup, not a network
+# probe, so it works fully offline/airgapped too.
 cat > /usr/local/sbin/arcnode-motd-ip.sh <<'EOF'
 #!/bin/sh
 set -e
 IP=""
 i=0
 while [ -z "$IP" ] && [ "$i" -lt 10 ]; do
-  IP=$(hostname -I | awk '{print $1}')
+  IP=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
   [ -z "$IP" ] && sleep 1
   i=$((i + 1))
 done

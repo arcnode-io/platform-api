@@ -881,7 +881,7 @@ function FooterW({ t, current, applyState, hwScenario, canApply, onBack, onNext,
         fontFamily: t.fontLabel, fontSize: 10, color: t.textSoft, letterSpacing: 0.1,
       }}>
         {isApplying  ? 'Do not refresh the page.'
-         : isDone    ? 'Redirecting to HMI…'
+         : isDone    ? 'Waiting for the HMI to start, then redirecting — can take up to a minute.'
          : isLast    ? 'Applies all changes in a single transaction.'
          : isPreflight && hwBlocked
                      ? 'Move the ISO to hardware that meets the minimums.'
@@ -1028,17 +1028,42 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
         }
         setApplyState('done');
         // Real navigation, not fake progress — the footer already promises
-        // this ("Redirecting to HMI…"); this was the missing half of that.
-        // Brief delay so "Setup complete" is actually readable before the
-        // page leaves, not simulating work that isn't happening.
-        setTimeout(() => {
-          window.location.href = `${window.location.protocol}//${window.location.hostname}/`;
-        }, 1500);
+        // this ("Redirecting to HMI…"). A flat setTimeout here was tried
+        // first and was wrong: ems-hmi's container can take up to a
+        // minute to pull + start on first real boot (confirmed on real
+        // hardware), so a fixed delay either redirects too early (dead
+        // page, looks broken) or wastes time waiting longer than needed.
+        // Poll the real target instead of guessing how long it takes.
+        pollForHmiThenRedirect();
       })
       .catch((err) => {
         setApplyError(String(err.message || err));
         setApplyState('error');
       });
+  };
+  // ems-hmi's docker image can take up to a minute to pull + start on
+  // first real boot. no-cors: the HMI is on a different port (different
+  // origin), and we don't need to read the response, just confirm the
+  // connection succeeds instead of being refused — that's enough signal
+  // that nginx is up. 60 attempts * 2s = 2 minutes before giving up.
+  const pollForHmiThenRedirect = () => {
+    const target = `${window.location.protocol}//${window.location.hostname}/`;
+    const maxAttempts = 60;
+    let attempt = 0;
+    const tryOnce = () => {
+      attempt += 1;
+      fetch(target, { mode: 'no-cors', cache: 'no-store' })
+        .then(() => { window.location.href = target; })
+        .catch(() => {
+          if (attempt < maxAttempts) {
+            setTimeout(tryOnce, 2000);
+          } else {
+            setApplyError('The HMI did not come up within 2 minutes. Check `docker ps` on the box.');
+            setApplyState('error');
+          }
+        });
+    };
+    setTimeout(tryOnce, 1000);
   };
   const onJump = (id) => setCurrent(id);
 
