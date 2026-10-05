@@ -535,7 +535,7 @@ function Step4HumanAuth({ t, values, onChange }) {
 }
 function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, onConfirm }) {
   const strength = passwordStrength(password);
-  const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
+  const policyUnmet = password.length > 0 && !passwordMeetsPolicy(password);
   const mismatch = confirm.length > 0 && confirm !== password;
   return (
     <div style={{
@@ -549,9 +549,9 @@ function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, o
       </div>
       <div>
         <FieldLabelW t={t} required>Password</FieldLabelW>
-        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="at least 12 characters" error={tooShort}/>
+        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="8+ chars, 1 upper, 1 number, 1 special" error={policyUnmet}/>
         <PasswordStrengthW t={t} strength={strength} password={password}/>
-        {tooShort && <HelperW t={t} error>Needs at least {MIN_PASSWORD_LENGTH} characters.</HelperW>}
+        {policyUnmet && <HelperW t={t} error>Needs {MIN_PASSWORD_LENGTH}+ characters, one uppercase letter, one number, and one special character.</HelperW>}
       </div>
       <div>
         <FieldLabelW t={t} required>Confirm password</FieldLabelW>
@@ -561,10 +561,11 @@ function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, o
     </div>
   );
 }
-// Must match MIN_HUMAN_PASSWORD_LENGTH in wizard_record.py — the backend
-// is the source of truth, this is just the client-side mirror of it so
-// a too-short password never reaches a round trip to find out.
-const MIN_PASSWORD_LENGTH = 12;
+// Must match MIN_HUMAN_PASSWORD_LENGTH + password_meets_complexity in
+// wizard_record.py — the backend is the source of truth, this is just the
+// client-side mirror of it so a non-compliant password never reaches a
+// round trip to find out.
+const MIN_PASSWORD_LENGTH = 8;
 
 function passwordStrength(pw) {
   if (!pw) return 0;
@@ -576,12 +577,19 @@ function passwordStrength(pw) {
   if (/[^A-Za-z0-9]/.test(pw)) s++;
   return Math.min(s, 4);
 }
-function isHumanAuthValid(humanAuth) {
-  const longEnough = (pw) => pw.length >= MIN_PASSWORD_LENGTH;
+function passwordMeetsPolicy(pw) {
   return (
-    longEnough(humanAuth.operatorPassword) &&
+    pw.length >= MIN_PASSWORD_LENGTH &&
+    /[A-Z]/.test(pw) &&
+    /\d/.test(pw) &&
+    /[^A-Za-z0-9]/.test(pw)
+  );
+}
+function isHumanAuthValid(humanAuth) {
+  return (
+    passwordMeetsPolicy(humanAuth.operatorPassword) &&
     humanAuth.operatorPassword === humanAuth.operatorConfirm &&
-    longEnough(humanAuth.viewerPassword) &&
+    passwordMeetsPolicy(humanAuth.viewerPassword) &&
     humanAuth.viewerPassword === humanAuth.viewerConfirm
   );
 }
@@ -1019,6 +1027,13 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
           throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
         }
         setApplyState('done');
+        // Real navigation, not fake progress — the footer already promises
+        // this ("Redirecting to HMI…"); this was the missing half of that.
+        // Brief delay so "Setup complete" is actually readable before the
+        // page leaves, not simulating work that isn't happening.
+        setTimeout(() => {
+          window.location.href = `${window.location.protocol}//${window.location.hostname}/`;
+        }, 1500);
       })
       .catch((err) => {
         setApplyError(String(err.message || err));

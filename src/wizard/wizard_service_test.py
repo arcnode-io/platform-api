@@ -7,8 +7,8 @@ import pytest
 from src.wizard.wizard_record import ApiKeyInput, ApplyRequest, HumanAuthInput, TlsInput
 from src.wizard.wizard_service import WizardAlreadyAppliedError, WizardService
 
-OPERATOR_PASSWORD = "correct-horse-battery"
-VIEWER_PASSWORD = "another-strong-password"
+OPERATOR_PASSWORD = "Correct-Horse1!"
+VIEWER_PASSWORD = "Another-Strong1!"
 
 
 def _service(tmp_path: Path) -> WizardService:
@@ -177,6 +177,39 @@ def test_human_auth_rejects_operator_password_mismatch() -> None:
         HumanAuthInput(
             operator_password=OPERATOR_PASSWORD,
             operator_confirm="different",
+            viewer_password=VIEWER_PASSWORD,
+            viewer_confirm=VIEWER_PASSWORD,
+        )
+
+
+def test_human_auth_rejects_password_missing_uppercase() -> None:
+    # Arrange + Act + Assert
+    with pytest.raises(ValueError, match="uppercase"):
+        HumanAuthInput(
+            operator_password="lowercase1!",
+            operator_confirm="lowercase1!",
+            viewer_password=VIEWER_PASSWORD,
+            viewer_confirm=VIEWER_PASSWORD,
+        )
+
+
+def test_human_auth_rejects_password_missing_number() -> None:
+    # Arrange + Act + Assert
+    with pytest.raises(ValueError, match="number"):
+        HumanAuthInput(
+            operator_password="NoDigitsHere!",
+            operator_confirm="NoDigitsHere!",
+            viewer_password=VIEWER_PASSWORD,
+            viewer_confirm=VIEWER_PASSWORD,
+        )
+
+
+def test_human_auth_rejects_password_missing_special_char() -> None:
+    # Arrange + Act + Assert
+    with pytest.raises(ValueError, match="special character"):
+        HumanAuthInput(
+            operator_password="NoSpecial1",
+            operator_confirm="NoSpecial1",
             viewer_password=VIEWER_PASSWORD,
             viewer_confirm=VIEWER_PASSWORD,
         )

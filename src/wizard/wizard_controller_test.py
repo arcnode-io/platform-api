@@ -14,8 +14,10 @@ from fastapi.testclient import TestClient
 
 from src.wizard.wizard_module import WizardModule
 
-VALID_PASSWORD = "testpass1234"
-TOO_SHORT_PASSWORD = "testpass123"
+VALID_PASSWORD = "Testpass1!"
+# 7 characters — one under the 8-char minimum, otherwise policy-compliant
+# (has upper/digit/special) — isolates the length check specifically.
+TOO_SHORT_PASSWORD = "Tsp1!ab"
 
 
 def _client(tmp_path: Path) -> TestClient:

@@ -1,10 +1,11 @@
 """Pydantic DTOs for the first-boot setup wizard's apply request/result."""
 
+import re
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-MIN_HUMAN_PASSWORD_LENGTH = 12
+MIN_HUMAN_PASSWORD_LENGTH = 8
 
 
 class ApiKeyInput(BaseModel):
@@ -47,12 +48,27 @@ class HumanAuthInput(BaseModel):
     boot from secrets.env plaintext) — not the wizard mockup's single
     "admin" user, which doesn't match what device-api actually expects.
     Two fixed roles, no customizable username.
+
+    Policy: at least MIN_HUMAN_PASSWORD_LENGTH characters, one uppercase
+    letter, one digit, one special character.
     """
 
     operator_password: str = Field(min_length=MIN_HUMAN_PASSWORD_LENGTH)
     operator_confirm: str
     viewer_password: str = Field(min_length=MIN_HUMAN_PASSWORD_LENGTH)
     viewer_confirm: str
+
+    @field_validator("operator_password", "viewer_password")
+    @classmethod
+    def password_meets_complexity(cls, value: str) -> str:
+        """Length is already enforced by the Field constraint above."""
+        if not re.search(r"[A-Z]", value):
+            raise ValueError("must contain at least one uppercase letter")
+        if not re.search(r"\d", value):
+            raise ValueError("must contain at least one number")
+        if not re.search(r"[^A-Za-z0-9]", value):
+            raise ValueError("must contain at least one special character")
+        return value
 
     @model_validator(mode="after")
     def passwords_match(self) -> "HumanAuthInput":
