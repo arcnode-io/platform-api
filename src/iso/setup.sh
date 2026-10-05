@@ -145,62 +145,38 @@ EOF
 systemctl enable arcnode-postgres-bootstrap.service
 
 echo "==> [5/9] Writing MOTD"
-# The wizard's URL needs the box's real DHCP-assigned IP, which isn't
-# known until boot — so this is a bootstrap unit like everything else
-# here, not something setup.sh can write statically. Deliberately NOT
-# ordered on network-online.target: that target is confirmed to never
-# resolve on this box's plain ifupdown/DHCP networking (see
-# MANUAL_TESTS.md's "Known gotchas" — same reason the old
-# systemd-wraps-docker-run pattern broke). Polling hostname -I briefly
-# instead of trusting a target that doesn't fire.
+# A real validation gate, not a guessed timeout: an earlier version of
+# this polled `ip route get` up to 10 times (1s apart, a guessed window)
+# before falling back to a literal "<this-box-ip>" placeholder — on real
+# hardware that guess was too short, and the useless placeholder shipped
+# instead of a real IP. Fixed by hooking the actual event instead of
+# guessing how long it takes: ifupdown runs scripts in
+# /etc/network/if-up.d/ the instant an interface actually gets an
+# address — event-driven, zero polling, zero guessing, and it naturally
+# fires again (self-correcting) if the DHCP lease ever changes, which a
+# one-shot-at-boot script never would have.
 #
-# Regenerates the WHOLE motd from scratch every run rather than patching
-# the existing file — tried the patch-in-place approach first and it
-# wasn't actually idempotent (a stray blank line accumulated on every
-# boot); rewriting the full file each time is correct by construction
-# instead of needing a correct diff/strip step.
-#
-# `ip route get` (the real outbound-route IP), not `hostname -I`'s first
-# entry: confirmed on real hardware that `hostname -I` lists every
-# interface including docker0 (Docker's bridge, 172.17.0.1 by default),
-# and its ordering put docker0 first — motd showed the bridge gateway,
-# not the LAN IP a person would actually use to reach the box. Every
-# deployment's LAN differs (this is meant for an industrial local
-# network as often as not), so this derives the IP from the routing
-# table instead of assuming anything about subnet ranges. No real
-# connectivity needed — this is a route-table lookup, not a network
-# probe, so it works fully offline/airgapped too.
-cat > /usr/local/sbin/arcnode-motd-ip.sh <<'EOF'
+# `ip route get`'s src address (the real outbound-route IP), not
+# `hostname -I`'s first entry: confirmed on real hardware that
+# `hostname -I` lists every interface including docker0 (Docker's
+# bridge, 172.17.0.1 by default), and its ordering put docker0 first —
+# motd showed the bridge gateway, not the LAN IP a person would actually
+# use to reach the box. Every deployment's LAN differs (this targets an
+# industrial local network as often as not), so this derives the IP from
+# the routing table instead of assuming anything about subnet ranges. No
+# real connectivity needed — a route-table lookup, not a network probe —
+# so it's correct fully offline/airgapped too.
+cat > /etc/network/if-up.d/arcnode-motd <<'EOF'
 #!/bin/sh
 set -e
-IP=""
-i=0
-while [ -z "$IP" ] && [ "$i" -lt 10 ]; do
-  IP=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
-  [ -z "$IP" ] && sleep 1
-  i=$((i + 1))
-done
+IP=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+[ -z "$IP" ] && exit 0
 {
   figlet "ArcNode EMS"
-  printf '\nSetup: http://%s:8080/setup\n' "${IP:-<this-box-ip>}"
+  printf '\nSetup: http://%s:8080/setup\n' "$IP"
 } > /etc/motd
 EOF
-chmod 0755 /usr/local/sbin/arcnode-motd-ip.sh
-
-cat > /etc/systemd/system/arcnode-motd-ip.service <<'EOF'
-[Unit]
-Description=arcnode write the wizard URL into motd with the real IP
-After=network.target
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/sbin/arcnode-motd-ip.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl enable arcnode-motd-ip.service
+chmod 0755 /etc/network/if-up.d/arcnode-motd
 
 echo "==> [6/9] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):

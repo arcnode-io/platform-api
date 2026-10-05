@@ -53,9 +53,9 @@ automated pipeline.
       after
 - [ ] Console login banner reads `ArcNode EMS` (figlet) **and** shows a
       `Setup: http://<real-ip>:8080/setup` line underneath with the box's
-      actual DHCP IP, not the `<this-box-ip>` placeholder (placeholder
-      means `arcnode-motd-ip.service` couldn't get an IP in its 10s poll
-      — a real finding, not a cosmetic miss)
+      actual DHCP IP. No banner at all, or it's missing the Setup line,
+      means `/etc/network/if-up.d/arcnode-motd` didn't fire — check it's
+      executable and `ip route get 1.1.1.1` works on the box
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
 - [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
       returns `HTTP/1.1 200 OK` serving the real ems-hmi SPA shell
@@ -110,6 +110,15 @@ automated pipeline.
   1.1.1.1`'s src address (the real outbound-route IP; works airgapped
   too, it's a routing-table lookup not a network probe) — don't go back
   to naively taking `hostname -I`'s first entry.
+- Motd's IP originally came from a systemd unit polling `ip route get`
+  up to 10 times (a guessed window) before falling back to a literal
+  `<this-box-ip>` placeholder — confirmed on real hardware that 10s
+  wasn't long enough for DHCP, so the placeholder shipped. Fixed by
+  hooking a real event instead of guessing a wait: `/etc/network/
+  if-up.d/arcnode-motd` fires exactly when an interface gets an address
+  (ifupdown's own mechanism), zero polling, zero timeout to get wrong.
+  Don't reintroduce a poll-with-fallback here — if motd ever needs this
+  again, find the real readiness signal first.
 - The post-apply redirect must poll the HMI's real reachability, not
   wait a fixed delay — `ems-hmi`'s container can take up to a minute to
   pull + start on first real boot (confirmed on real hardware), so a
