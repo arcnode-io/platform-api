@@ -34,9 +34,14 @@ automated pipeline.
       sat through — if you had to click anything, something's not preseeded
       and that's a bug in `preseed.cfg`, not a one-off)
 - [ ] `cat /var/log/arcnode-late-command.log` on the box shows a clean run
-      through all of `setup.sh`'s `==> [n/7]` progress lines, no errors —
+      through all of `setup.sh`'s `==> [n/8]` progress lines, no errors —
       this is the authoritative pass/fail signal; check it first before
-      re-flashing anything over any other symptom below
+      re-flashing anything over any other symptom below. **Phase 2
+      (PostgreSQL) is the thing to scrutinize first this round** — this is
+      the first time a *native* package's postinst (not a `docker
+      build`/`run`) has hit the `policy-rc.d` chroot constraint; confirm
+      `apt-get install -y postgresql` didn't error, not just that the
+      script as a whole exited 0
 - [ ] Console login banner reads `ArcNode EMS` (figlet)
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
 - [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
@@ -44,6 +49,14 @@ automated pipeline.
 - [ ] `docker ps` on the box shows `arcnode-hmi` running; `systemctl status
       arcnode-hmi-docker.service` shows `active (exited)` (correct steady
       state for a oneshot + `RemainAfterExit=yes` unit, not a failure)
+- [ ] `systemctl is-active postgresql` reports `active`; `systemctl status
+      arcnode-postgres-bootstrap.service` shows `active (exited)`
+- [ ] `cat /etc/arcnode/secrets.env` shows a `DOCUMENT_URL=postgres://
+      device_api:...@localhost:5432/document` line (hex password, not a
+      placeholder)
+- [ ] `psql "$(grep DOCUMENT_URL /etc/arcnode/secrets.env | cut -d= -f2-)"
+      -c 'select 1'` on the box succeeds — confirms the generated
+      credential actually authenticates, not just that the lines exist
 
 ## Known gotchas — do not reintroduce
 

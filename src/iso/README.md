@@ -41,7 +41,8 @@ gotcha worth not reintroducing.
 | 3 | `late_command` can set up a persistent daemon | unit file + `systemctl enable` (works offline/in a chroot) → placeholder `arcnode-dummy.service` active every boot |
 | 4 | real payload: Docker + the actual ems-hmi image, docker-native restart | `arcnode-hmi` container, `--restart unless-stopped`, survives reboot with zero systemd-vs-docker fighting |
 | 5 | `late_command` triggers a real fetched script, not an inline one-liner | `setup.sh` copied from install media, run in the target chroot |
-| … | first real **daemon-layer** (native, non-docker) service, then the rest (postgres+timescale+pgvector, neo4j, ollama+models), then the full docker layer (hivemq + remaining app services) | not yet started — see Roadmap |
+| 6 | first real **daemon-layer** (native, non-docker) service — and the first test of `policy-rc.d` against a *native* package's postinst, not a `docker build`/`run` | PostgreSQL 17 (apt) + `arcnode-postgres-bootstrap.service` creates the `device_api` role/`document` db on first real boot, writes `DOCUMENT_URL` to `secrets.env` |
+| … | rest of the daemon layer (timescale+pgvector, neo4j, ollama+models), then device-api itself (needs `AUTH_JWT_SECRET` + MQTT creds the wizard doesn't generate yet, and HiveMQ), then the rest of the docker layer | not yet started — see Roadmap |
 
 MinIO was tried here first and cut: upstream retired the community edition's
 binary/Docker distribution entirely (dl.min.io now 410s, Docker Hub images

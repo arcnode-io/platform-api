@@ -37,7 +37,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/7] Installing Docker + compose plugin"
+echo "==> [1/8] Installing Docker + compose plugin"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -54,10 +54,64 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable docker
 
-echo "==> [2/7] Writing MOTD"
+echo "==> [2/8] Installing PostgreSQL (native daemon)"
+# Reason: device-api (the next real consumer, not yet in this walking
+# skeleton) hard-fails at boot without DOCUMENT_URL — a real postgres
+# connection string, per its own TypeOrmModule.forRootAsync
+# ("DOCUMENT_URL is required"). This is just the first piece of that:
+# install + enable here, same chroot-safe shape as Docker above —
+# postgresql's postinst tries to start the service immediately after
+# install, and policy-rc.d denies that the same way it already does for
+# Docker (this is the first real test of that same constraint against a
+# *native* package's postinst, not a docker build/run — confirmed via
+# this exact reinstall, see MANUAL_TESTS.md). Role + database creation
+# needs a LIVE server, so that's deferred to
+# arcnode-postgres-bootstrap.service on first real boot, same split as
+# every other daemon here.
+apt-get install -y postgresql
+systemctl enable postgresql
+
+cat > /usr/local/sbin/arcnode-postgres-bootstrap.sh <<'EOF'
+#!/bin/sh
+set -e
+# Idempotent: this re-runs every boot ([Install] WantedBy=), must be a
+# no-op once the role exists — same guard shape as the
+# `docker image inspect ... ||` pattern the docker-based units use.
+if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='device_api'" | grep -q 1; then
+  echo "device_api role already exists, skipping"
+  exit 0
+fi
+
+# hex, not base64 -- this goes straight into a postgres:// URL below, and
+# base64's default alphabet (+/=) is not URL-safe in that position.
+DOCUMENT_PW=$(openssl rand -hex 24)
+runuser -u postgres -- psql -c "CREATE ROLE device_api WITH LOGIN PASSWORD '$DOCUMENT_PW'"
+runuser -u postgres -- createdb -O device_api document
+
+echo "DOCUMENT_URL=postgres://device_api:$DOCUMENT_PW@localhost:5432/document" >> /etc/arcnode/secrets.env
+EOF
+chmod 0755 /usr/local/sbin/arcnode-postgres-bootstrap.sh
+
+cat > /etc/systemd/system/arcnode-postgres-bootstrap.service <<'EOF'
+[Unit]
+Description=arcnode postgres role+database bootstrap (run once)
+After=postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/arcnode-postgres-bootstrap.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-postgres-bootstrap.service
+
+echo "==> [3/8] Writing MOTD"
 figlet "ArcNode EMS" > /etc/motd
 
-echo "==> [3/7] Writing ems-hmi's runtime config overlay"
+echo "==> [4/8] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
 # the image no longer bakes a site — it reads /opt/arcnode/hmi-cfg.customer.yml
 # (nginx serves it at /cfg.customer.yml) and fails closed ("HMI configuration
@@ -76,7 +130,7 @@ chatApiUri: ""
 mqttUri: ""
 EOF
 
-echo "==> [4/7] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [5/8] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -90,7 +144,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [5/7] Setting up the first-boot setup wizard (docker)"
+echo "==> [6/8] Setting up the first-boot setup wizard (docker)"
 # wizard-src was copied in by late_command (outside the chroot, same as
 # this script itself) to /opt/arcnode-wizard-src. Same constraint as
 # arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
@@ -117,7 +171,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-wizard-docker.service
 
-echo "==> [6/7] Setting up ems-hmi (docker), gated on the wizard"
+echo "==> [7/8] Setting up ems-hmi (docker), gated on the wizard"
 # Product-level gate, not a literal data dependency for THIS container:
 # ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
 # this walking skeleton) — device-api is what will actually read
@@ -160,7 +214,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-hmi-docker.path
 
-echo "==> [7/7] Enabling services"
+echo "==> [8/8] Enabling services"
 systemctl daemon-reload
 
 echo "==> arcnode setup complete"
