@@ -112,23 +112,32 @@ automated pipeline.
   1.1.1.1`'s src address (the real outbound-route IP; works airgapped
   too, it's a routing-table lookup not a network probe) — don't go back
   to naively taking `hostname -I`'s first entry.
-- Motd's IP went through three iterations before landing right — don't
-  reintroduce either earlier bug. (1) A systemd unit polling `ip route
-  get` up to 10 times (a guessed window) before falling back to a
-  literal `<this-box-ip>` placeholder — wrong on real hardware, 10s
-  wasn't long enough for DHCP. (2) `/etc/network/if-up.d/arcnode-motd`,
-  which only fires via ifupdown's `auto`-interface sweep at boot —
-  confirmed on real hardware this box's wireless interface is configured
-  `allow-hotplug` (not `auto`), which that sweep skips entirely, so the
-  hook silently never ran and motd stayed completely empty. Units in the
-  field usually have Ethernet but not always, so this can't assume
-  `auto` vs `allow-hotplug` either way. (3, current) `ip monitor route`
-  watches the kernel's actual routing table directly — a real netlink
-  event that fires the instant ANY mechanism adds a route, regardless of
-  what brought the interface up. `stdbuf -oL` is required in the pipe
-  (`ip monitor` fully buffers stdout otherwise, so `while read` never
-  sees the event). Verified locally: both the fast path (route already
-  present) and the blocking-then-unblocking path work correctly.
+- Motd's IP went through four iterations before landing right — don't
+  reintroduce any earlier bug. (1) A systemd unit polling `ip route get`
+  up to 10 times (a guessed window) before falling back to a literal
+  `<this-box-ip>` placeholder — wrong on real hardware, 10s wasn't long
+  enough for DHCP. (2) `/etc/network/if-up.d/arcnode-motd`, which only
+  fires via ifupdown's `auto`-interface sweep at boot — confirmed on real
+  hardware this box's wireless interface is configured `allow-hotplug`
+  (not `auto`), which that sweep skips entirely, so the hook silently
+  never ran and motd stayed completely empty. Units in the field usually
+  have Ethernet but not always, so this can't assume `auto` vs
+  `allow-hotplug` either way. (3) `ip monitor route` alone, watching the
+  kernel's routing table via a real netlink event — but confirmed stuck
+  on real hardware (`systemctl status` showed `activating` for 2+
+  minutes, `ip monitor route` genuinely still running): a real race
+  between the initial `get_ip` check and the monitor's netlink
+  subscription actually going live let a route-add event slip through
+  with nothing left to catch it. (4, current) Loop forever re-checking
+  `get_ip` directly, with `timeout 2` bounding each wait on the monitor —
+  the monitor is a wake-up accelerant, not the only signal; even if it
+  misses the event (the exact race that bit us), the loop re-checks
+  within 2 real seconds regardless, forever, with no giving-up condition
+  and no fallback output ever. `stdbuf -oL` is still required (`ip
+  monitor` fully buffers stdout otherwise). Verified: fast path instant,
+  the exact race (route added immediately after start) now caught
+  correctly, and confirmed it never gives up or writes wrong output when
+  a route genuinely never appears.
 - The post-apply redirect must poll the HMI's real reachability, not
   wait a fixed delay — `ems-hmi`'s container can take up to a minute to
   pull + start on first real boot (confirmed on real hardware), so a

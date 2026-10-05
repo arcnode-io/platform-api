@@ -156,13 +156,27 @@ echo "==> [5/9] Writing MOTD"
 # wired vs wireless, or even ifupdown vs some other mechanism owning the
 # interface.
 #
-# Fixed by watching the kernel's actual routing table directly instead
-# of hooking any particular userspace mechanism: `ip monitor route`
-# blocks on a real netlink event, firing the instant ANY subsystem adds
-# a route — ifupdown, wpa_supplicant, whatever. Doesn't care who brought
-# the interface up or how. Verified locally: confirmed the fast path (a
-# route already exists) and the blocking path (no route yet, a route
-# appears, the script unblocks immediately) both work correctly.
+# Third pass, watching the kernel's actual routing table directly
+# instead of hooking any particular userspace mechanism: `ip monitor
+# route` fires the instant ANY subsystem adds a route — ifupdown,
+# wpa_supplicant, whatever. Doesn't care who brought the interface up or
+# how. BUT confirmed stuck on real hardware (`systemctl status` showed
+# `activating` for 2+ minutes, `ip monitor route` genuinely still
+# running): a real race between the initial get_ip check and the
+# monitor's netlink subscription actually going live can let a route-add
+# event slip through unseen, with nothing left to catch it afterward.
+#
+# Fixed by making the monitor a wake-up accelerant, not the only signal:
+# loop forever re-checking get_ip directly, with `timeout 2` bounding
+# each iteration's wait on the monitor. If the monitor catches the event,
+# we notice almost instantly; if it doesn't (the exact race that bit us),
+# we still recheck within 2 real seconds regardless, forever, until the
+# condition is genuinely true — never a guessed cutoff with a wrong
+# fallback, just a bounded recheck cadence with no giving-up condition
+# at all. Verified: fast path instant, the exact race (route added
+# immediately after start) still caught correctly, and confirmed it
+# never gives up or writes wrong output when a route genuinely never
+# appears (left running 8s, still correctly waiting, nothing written).
 #
 # `ip route get`'s src address (the real outbound-route IP), not
 # `hostname -I`'s first entry: confirmed on real hardware that
@@ -179,19 +193,13 @@ get_ip() {
   ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p'
 }
 IP=$(get_ip)
-if [ -z "$IP" ]; then
+while [ -z "$IP" ]; do
   # stdbuf -oL: `ip monitor` fully buffers its stdout when piped
-  # otherwise, so `while read` never sees a line until a buffer's worth
-  # accumulates (which may be never, for one single real event).
-  stdbuf -oL ip monitor route 2>/dev/null | while read -r _; do
-    IP=$(get_ip)
-    [ -n "$IP" ] && break
-  done
-  # The while loop runs in a subshell (it's the right side of a pipe) —
-  # IP set in there doesn't propagate out, so recompute once more here.
+  # otherwise, so the read below would never see a line until a buffer's
+  # worth accumulates (which may be never, for one single real event).
+  timeout 2 stdbuf -oL ip monitor route 2>/dev/null | { read -r _ || true; }
   IP=$(get_ip)
-fi
-[ -z "$IP" ] && exit 0
+done
 {
   figlet "ArcNode EMS"
   printf '\nSetup: http://%s:8080/setup\n' "$IP"
