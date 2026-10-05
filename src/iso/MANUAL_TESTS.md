@@ -59,9 +59,11 @@ automated pipeline.
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
 - [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
       returns `HTTP/1.1 200 OK` serving the real ems-hmi SPA shell
-- [ ] `docker ps` on the box shows `arcnode-hmi` running; `systemctl status
-      arcnode-hmi-docker.service` shows `active (exited)` (correct steady
-      state for a oneshot + `RemainAfterExit=yes` unit, not a failure)
+- [ ] `docker compose -f /opt/arcnode/docker-compose.yaml ps` on the box
+      shows `ems-hmi` running; `systemctl status
+      arcnode-docker-runtime.service` shows `active (exited)` (correct
+      steady state for a oneshot + `RemainAfterExit=yes` unit, not a
+      failure)
 - [ ] `systemctl is-active postgresql` reports `active`; `systemctl status
       arcnode-postgres-bootstrap.service` shows `active (exited)`
 - [ ] `cat /etc/arcnode/secrets.env` shows a `DOCUMENT_URL=postgres://
@@ -92,15 +94,26 @@ automated pipeline.
   `network-online.target` dependency never resolves on this box's plain
   ifupdown/DHCP networking (no NetworkManager/systemd-networkd). The
   one-shot-bootstrap-then-docker-owns-it pattern in `setup.sh` is the fix.
-- The Debian installer's own screen shows **zero progress** for anything
-  `late_command` does internally — it has no visibility into the script,
-  so a multi-minute run (Docker + Postgres installs) just looks stalled
-  on whatever generic "finishing the installation" step it's on.
-  Confirmed via Debian bug #610525 and community reports, not just this
-  project's own observation. We don't control or alter that screen (hard
-  invariant) — the fix is routing anything slow to come up somewhere we
-  *do* control: the wizard, now native specifically so it starts before
-  the slow stuff rather than after.
+- An earlier version of this doc claimed the Debian installer's screen
+  shows zero progress during `late_command` (cited Debian bug #610525 +
+  community reports). **Corrected directly on real hardware: preseed does
+  show a progress indicator.** That research was real but wasn't checked
+  against this specific install before being written down — direct
+  observation on the actual target beats a web-sourced inference, every
+  time. Doesn't undo the native-wizard decision (still correct on its own
+  merit: no PyPI/pip dependency during provisioning), just don't restate
+  "looks hung" as settled fact.
+- `hostname -I` lists every interface, including Docker's own `docker0`
+  bridge (172.17.0.1 by default) — confirmed on real hardware that its
+  ordering put docker0 ahead of the real LAN NIC, so motd showed the
+  bridge gateway instead of a usable IP. Fixed via `ip route get
+  1.1.1.1`'s src address (the real outbound-route IP; works airgapped
+  too, it's a routing-table lookup not a network probe) — don't go back
+  to naively taking `hostname -I`'s first entry.
+- The post-apply redirect must poll the HMI's real reachability, not
+  wait a fixed delay — `ems-hmi`'s container can take up to a minute to
+  pull + start on first real boot (confirmed on real hardware), so a
+  guessed `setTimeout` either fires at a dead port or wastes time.
 
 ## Credentials
 

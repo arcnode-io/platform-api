@@ -33,6 +33,7 @@ xorriso -indev "$SOURCE_ISO" \
   -boot_image any replay \
   -map "$ISO_DIR/preseed.cfg" /preseed.cfg \
   -map "$ISO_DIR/setup.sh" /setup.sh \
+  -map "$ISO_DIR/docker-compose.yaml" /docker-compose.yaml \
   -map "$ISO_DIR/grub.cfg" /boot/grub/grub.cfg \
   -map "$ISO_DIR/gtk.cfg" /isolinux/gtk.cfg \
   -map "$ISO_DIR/txt.cfg" /isolinux/txt.cfg \
@@ -44,6 +45,7 @@ MOUNT_DIR="$(mktemp -d)"
 sudo mount -o loop,ro "$OUTPUT_ISO" "$MOUNT_DIR"
 diff "$MOUNT_DIR/preseed.cfg" "$ISO_DIR/preseed.cfg"
 diff "$MOUNT_DIR/setup.sh" "$ISO_DIR/setup.sh"
+diff "$MOUNT_DIR/docker-compose.yaml" "$ISO_DIR/docker-compose.yaml"
 diff "$MOUNT_DIR/wizard-src/src/wizard/main.py" "$REPO_ROOT/src/wizard/main.py"
 diff "$MOUNT_DIR/wizard-src/src/wizard/Dockerfile" "$REPO_ROOT/src/wizard/Dockerfile"
 sudo umount "$MOUNT_DIR"

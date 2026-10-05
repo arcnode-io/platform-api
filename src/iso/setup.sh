@@ -235,15 +235,24 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [8/9] Setting up ems-hmi (docker), gated on the wizard"
-# Product-level gate, not a literal data dependency for THIS container:
-# ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
-# this walking skeleton) — device-api is what will actually read
-# AUTH_OPERATOR_PW/AUTH_VIEWER_PW once it lands, not ems-hmi itself. But
-# there's no point exposing the HMI as a visible entrypoint before the
-# wizard has even run — logins can't work yet regardless. Rehearsing the
-# gating mechanism here now so it's proven before device-api needs it for
-# real.
+echo "==> [8/9] Setting up the docker_runtime layer (compose), gated on the wizard"
+# docker-compose.yaml (landed at /opt/arcnode/docker-compose.yaml by
+# late_command) is the real mechanism — same `docker compose up -d`
+# EC2 UserData already proves in cfn_resources.py, not a one-off `docker
+# run` per container anymore. Switched from the old per-container systemd
+# unit specifically because ems-hmi's nginx hardcodes compose-style
+# service-name hostnames (http://device-api:3000, http://hivemq:8000) —
+# those only resolve via Docker's embedded DNS on a shared compose
+# network, which one-off `docker run` calls never had. `docker compose
+# up -d` is naturally idempotent (confirmed: re-running it is a no-op
+# once containers are already up), so no manual `docker inspect ... ||`
+# guard needed the way the old per-container units required.
+#
+# Product-level gate, not a literal data dependency for ems-hmi
+# specifically: there's no point exposing the HMI as a visible entrypoint
+# before the wizard has even run — logins can't work yet regardless.
+# Rehearsing the gating mechanism here now so it's proven before
+# device-api needs it for real.
 #
 # A systemd .path unit, not a boot-order guess or a poll-and-retry hack:
 # PathExists= fires immediately if the marker already exists when the
@@ -252,9 +261,9 @@ echo "==> [8/9] Setting up ems-hmi (docker), gated on the wizard"
 # against systemd 245 from 2020), so this is correct on every reboot
 # after the first successful apply, not just the first time the marker
 # file appears.
-cat > /etc/systemd/system/arcnode-hmi-docker.service <<'EOF'
+cat > /etc/systemd/system/arcnode-docker-runtime.service <<'EOF'
 [Unit]
-Description=arcnode hmi bootstrap (docker, run once)
+Description=arcnode docker_runtime layer (docker compose, run once per boot)
 After=docker.service
 Requires=docker.service
 
@@ -263,20 +272,21 @@ Type=oneshot
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=5
-ExecStart=/bin/sh -c "docker inspect arcnode-hmi >/dev/null 2>&1 || docker run -d --name arcnode-hmi --restart unless-stopped -p 80:80 -v /opt/arcnode/hmi-cfg.customer.yml:/opt/arcnode/hmi-cfg.customer.yml:ro public.ecr.aws/y1d2j6a8/ems-hmi:latest"
+WorkingDirectory=/opt/arcnode
+ExecStart=/usr/bin/docker compose -f /opt/arcnode/docker-compose.yaml up -d
 EOF
-cat > /etc/systemd/system/arcnode-hmi-docker.path <<'EOF'
+cat > /etc/systemd/system/arcnode-docker-runtime.path <<'EOF'
 [Unit]
-Description=Wait for wizard apply before starting arcnode-hmi
+Description=Wait for wizard apply before starting the docker_runtime layer
 
 [Path]
 PathExists=/etc/arcnode/.wizard-applied
-Unit=arcnode-hmi-docker.service
+Unit=arcnode-docker-runtime.service
 
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable arcnode-hmi-docker.path
+systemctl enable arcnode-docker-runtime.path
 
 echo "==> [9/9] Enabling services"
 systemctl daemon-reload
