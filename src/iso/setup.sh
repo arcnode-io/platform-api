@@ -145,16 +145,24 @@ EOF
 systemctl enable arcnode-postgres-bootstrap.service
 
 echo "==> [5/9] Writing MOTD"
-# A real validation gate, not a guessed timeout: an earlier version of
-# this polled `ip route get` up to 10 times (1s apart, a guessed window)
-# before falling back to a literal "<this-box-ip>" placeholder — on real
-# hardware that guess was too short, and the useless placeholder shipped
-# instead of a real IP. Fixed by hooking the actual event instead of
-# guessing how long it takes: ifupdown runs scripts in
-# /etc/network/if-up.d/ the instant an interface actually gets an
-# address — event-driven, zero polling, zero guessing, and it naturally
-# fires again (self-correcting) if the DHCP lease ever changes, which a
-# one-shot-at-boot script never would have.
+# A real validation gate, not a guessed timeout — two iterations in:
+# first was a 10x1s poll with a placeholder fallback, wrong on real
+# hardware (10s wasn't long enough for DHCP). Second hooked
+# /etc/network/if-up.d/, which only fires via ifupdown's `auto`-interface
+# sweep — confirmed on real hardware this box's interfaces.d entry uses
+# `allow-hotplug` (wireless, wpa-ssid/wpa-psk), which that sweep skips
+# entirely, so the hook never ran at all. Per Joe: real units usually
+# have Ethernet, but not always — can't assume `auto` vs `allow-hotplug`,
+# wired vs wireless, or even ifupdown vs some other mechanism owning the
+# interface.
+#
+# Fixed by watching the kernel's actual routing table directly instead
+# of hooking any particular userspace mechanism: `ip monitor route`
+# blocks on a real netlink event, firing the instant ANY subsystem adds
+# a route — ifupdown, wpa_supplicant, whatever. Doesn't care who brought
+# the interface up or how. Verified locally: confirmed the fast path (a
+# route already exists) and the blocking path (no route yet, a route
+# appears, the script unblocks immediately) both work correctly.
 #
 # `ip route get`'s src address (the real outbound-route IP), not
 # `hostname -I`'s first entry: confirmed on real hardware that
@@ -163,20 +171,47 @@ echo "==> [5/9] Writing MOTD"
 # motd showed the bridge gateway, not the LAN IP a person would actually
 # use to reach the box. Every deployment's LAN differs (this targets an
 # industrial local network as often as not), so this derives the IP from
-# the routing table instead of assuming anything about subnet ranges. No
-# real connectivity needed — a route-table lookup, not a network probe —
-# so it's correct fully offline/airgapped too.
-cat > /etc/network/if-up.d/arcnode-motd <<'EOF'
+# the routing table instead of assuming anything about subnet ranges.
+cat > /usr/local/sbin/arcnode-motd-ip.sh <<'EOF'
 #!/bin/sh
 set -e
-IP=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+get_ip() {
+  ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p'
+}
+IP=$(get_ip)
+if [ -z "$IP" ]; then
+  # stdbuf -oL: `ip monitor` fully buffers its stdout when piped
+  # otherwise, so `while read` never sees a line until a buffer's worth
+  # accumulates (which may be never, for one single real event).
+  stdbuf -oL ip monitor route 2>/dev/null | while read -r _; do
+    IP=$(get_ip)
+    [ -n "$IP" ] && break
+  done
+  # The while loop runs in a subshell (it's the right side of a pipe) —
+  # IP set in there doesn't propagate out, so recompute once more here.
+  IP=$(get_ip)
+fi
 [ -z "$IP" ] && exit 0
 {
   figlet "ArcNode EMS"
   printf '\nSetup: http://%s:8080/setup\n' "$IP"
 } > /etc/motd
 EOF
-chmod 0755 /etc/network/if-up.d/arcnode-motd
+chmod 0755 /usr/local/sbin/arcnode-motd-ip.sh
+
+cat > /etc/systemd/system/arcnode-motd-ip.service <<'EOF'
+[Unit]
+Description=arcnode write the wizard URL into motd once a route exists
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/arcnode-motd-ip.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-motd-ip.service
 
 echo "==> [6/9] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
