@@ -51,8 +51,12 @@ def _extract_heredoc(write_target: str) -> str:
 MOTD_IP_SCRIPT = _extract_heredoc("/usr/local/sbin/arcnode-motd-ip.sh")
 
 
-def _write_file(container: DockerContainer, path: str, content: str, executable: bool = False) -> None:
-    exit_code, output = container.exec(["sh", "-c", f"cat > {path} <<'TEST_EOF'\n{content}\nTEST_EOF"])
+def _write_file(
+    container: DockerContainer, path: str, content: str, executable: bool = False
+) -> None:
+    exit_code, output = container.exec(
+        ["sh", "-c", f"cat > {path} <<'TEST_EOF'\n{content}\nTEST_EOF"]
+    )
     assert exit_code == 0, output
     if executable:
         exit_code, output = container.exec(["chmod", "+x", path])
@@ -61,11 +65,17 @@ def _write_file(container: DockerContainer, path: str, content: str, executable:
 
 def _reset_and_deploy(container: DockerContainer) -> None:
     """Arrange: clean slate + deploy the real script + the fake `ip`."""
-    # Reason: these /tmp paths live inside a throwaway container, not the host.
-    container.exec(["rm", "-f", "/etc/motd", "/var/log/arcnode-motd-ip.log",
-                     "/tmp/fake-route-state", "/tmp/fake-route-addr"])  # noqa: S108
+    container.exec(
+        [
+            "sh",
+            "-c",
+            "rm -f /etc/motd /var/log/arcnode-motd-ip.log /tmp/fake-route-state /tmp/fake-route-addr",
+        ]
+    )
     _write_file(container, "/usr/local/bin/ip", FAKE_IP_SCRIPT, executable=True)
-    _write_file(container, "/usr/local/sbin/arcnode-motd-ip.sh", MOTD_IP_SCRIPT, executable=True)
+    _write_file(
+        container, "/usr/local/sbin/arcnode-motd-ip.sh", MOTD_IP_SCRIPT, executable=True
+    )
 
 
 def _read_motd(container: DockerContainer) -> str:
@@ -73,7 +83,9 @@ def _read_motd(container: DockerContainer) -> str:
     return output.decode() if exit_code == 0 else ""
 
 
-def _wait_until(container: DockerContainer, predicate: Callable[[str], bool], timeout: float = 15.0) -> str:
+def _wait_until(
+    container: DockerContainer, predicate: Callable[[str], bool], timeout: float = 15.0
+) -> str:
     """Poll /etc/motd until `predicate` matches — bounded, not a blind sleep."""
     deadline = time.monotonic() + timeout
     content = ""
@@ -82,7 +94,9 @@ def _wait_until(container: DockerContainer, predicate: Callable[[str], bool], ti
         if predicate(content):
             return content
         time.sleep(0.2)
-    raise AssertionError(f"timed out waiting for motd condition; last content: {content!r}")
+    raise AssertionError(
+        f"timed out waiting for motd condition; last content: {content!r}"
+    )
 
 
 def _start_container() -> DockerContainer:
@@ -104,13 +118,27 @@ def test_shows_waiting_placeholder_before_route_then_final_banner_once_ready() -
         _reset_and_deploy(container)
         container.exec(["sh", "-c", "echo down > /tmp/fake-route-state"])
 
-        container.exec(["sh", "-c", "nohup /usr/local/sbin/arcnode-motd-ip.sh >/tmp/out.log 2>&1 &"])
+        container.exec(
+            [
+                "sh",
+                "-c",
+                "nohup /usr/local/sbin/arcnode-motd-ip.sh >/tmp/out.log 2>&1 &",
+            ]
+        )
 
-        waiting_motd = _wait_until(container, lambda c: "waiting for network" in c, timeout=10.0)
+        waiting_motd = _wait_until(
+            container, lambda c: "waiting for network" in c, timeout=10.0
+        )
         assert "/var/log/arcnode-motd-ip.log" in waiting_motd
         assert "http://" not in waiting_motd
 
-        container.exec(["sh", "-c", "echo 10.0.0.55 > /tmp/fake-route-addr && echo up > /tmp/fake-route-state"])
+        container.exec(
+            [
+                "sh",
+                "-c",
+                "echo 10.0.0.55 > /tmp/fake-route-addr && echo up > /tmp/fake-route-state",
+            ]
+        )
 
         final_motd = _wait_until(container, lambda c: "http://" in c, timeout=15.0)
         assert "http://10.0.0.55:8080/setup" in final_motd
@@ -126,7 +154,13 @@ def test_skips_placeholder_when_route_already_exists() -> None:
     container = _start_container()
     try:
         _reset_and_deploy(container)
-        container.exec(["sh", "-c", "echo 10.0.0.77 > /tmp/fake-route-addr && echo up > /tmp/fake-route-state"])
+        container.exec(
+            [
+                "sh",
+                "-c",
+                "echo 10.0.0.77 > /tmp/fake-route-addr && echo up > /tmp/fake-route-state",
+            ]
+        )
 
         exit_code, output = container.exec(["/usr/local/sbin/arcnode-motd-ip.sh"])
         assert exit_code == 0, output
