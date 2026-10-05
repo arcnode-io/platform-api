@@ -145,65 +145,80 @@ EOF
 systemctl enable arcnode-postgres-bootstrap.service
 
 echo "==> [5/9] Writing MOTD"
-# A real validation gate, not a guessed timeout — two iterations in:
-# first was a 10x1s poll with a placeholder fallback, wrong on real
-# hardware (10s wasn't long enough for DHCP). Second hooked
-# /etc/network/if-up.d/, which only fires via ifupdown's `auto`-interface
-# sweep — confirmed on real hardware this box's interfaces.d entry uses
-# `allow-hotplug` (wireless, wpa-ssid/wpa-psk), which that sweep skips
-# entirely, so the hook never ran at all. Per Joe: real units usually
-# have Ethernet, but not always — can't assume `auto` vs `allow-hotplug`,
-# wired vs wireless, or even ifupdown vs some other mechanism owning the
-# interface.
+# Static figlet banner — proven since the very first walking-skeleton
+# step, zero risk.
+figlet "ArcNode EMS" > /etc/motd
+
+# Attempting the dynamic Setup-URL line again — same race-fixed logic
+# that already passed all three tests last time (fast path, the exact
+# monitor-subscribe race reproduced, and the never-gives-up property),
+# now with full timestamped logging to its own file so a failure is
+# diagnosable from one `cat`, not another round of console photos.
 #
-# Third pass, watching the kernel's actual routing table directly
-# instead of hooking any particular userspace mechanism: `ip monitor
-# route` fires the instant ANY subsystem adds a route — ifupdown,
-# wpa_supplicant, whatever. Doesn't care who brought the interface up or
-# how. BUT confirmed stuck on real hardware (`systemctl status` showed
-# `activating` for 2+ minutes, `ip monitor route` genuinely still
-# running): a real race between the initial get_ip check and the
-# monitor's netlink subscription actually going live can let a route-add
-# event slip through unseen, with nothing left to catch it afterward.
-#
-# Fixed by making the monitor a wake-up accelerant, not the only signal:
-# loop forever re-checking get_ip directly, with `timeout 2` bounding
-# each iteration's wait on the monitor. If the monitor catches the event,
-# we notice almost instantly; if it doesn't (the exact race that bit us),
-# we still recheck within 2 real seconds regardless, forever, until the
-# condition is genuinely true — never a guessed cutoff with a wrong
-# fallback, just a bounded recheck cadence with no giving-up condition
-# at all. Verified: fast path instant, the exact race (route added
-# immediately after start) still caught correctly, and confirmed it
-# never gives up or writes wrong output when a route genuinely never
-# appears (left running 8s, still correctly waiting, nothing written).
-#
-# `ip route get`'s src address (the real outbound-route IP), not
-# `hostname -I`'s first entry: confirmed on real hardware that
-# `hostname -I` lists every interface including docker0 (Docker's
-# bridge, 172.17.0.1 by default), and its ordering put docker0 first —
-# motd showed the bridge gateway, not the LAN IP a person would actually
-# use to reach the box. Every deployment's LAN differs (this targets an
-# industrial local network as often as not), so this derives the IP from
-# the routing table instead of assuming anything about subnet ranges.
+# Root cause research this time, not a guess: read Debian trixie's real
+# networking.service unit (confirmed via a real debian:trixie container,
+# not assumed) — its `--allow=hotplug` ExecStart line is gated on
+# /run/network/restart-hotplug existing, which only happens after a
+# PRIOR stop of networking.service, never on a fresh first boot. So
+# allow-hotplug interfaces are structurally never brought up by
+# networking.service on first boot at all; what actually brings them up
+# is a separate udev rule (80-ifupdown.rules) starting a templated
+# ifup@<iface>.service unit, asynchronously, outside networking.service
+# entirely. This is exactly why hooking any specific ifupdown/udev code
+# path is fragile — which one does the work depends on interface type —
+# and why watching the kernel's own routing table directly (not any
+# particular mechanism's hook point) is the structurally correct
+# approach regardless of wired/wireless/auto/allow-hotplug.
 cat > /usr/local/sbin/arcnode-motd-ip.sh <<'EOF'
 #!/bin/sh
 set -e
+exec >> /var/log/arcnode-motd-ip.log 2>&1
+echo "$(date -Is) arcnode-motd-ip starting"
+
 get_ip() {
-  ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p'
+  # Confirmed on real hardware: attempt 7 found a 169.254.x.x address and
+  # happily wrote it to motd — a link-local self-assigned address (RFC
+  # 3927), which Linux can briefly hold before the real DHCP lease lands.
+  # A route existing isn't enough; it has to be a REAL route. Rejected
+  # explicitly rather than silently treated as "not ready yet" so the
+  # log shows which case fired, not just another empty result.
+  RAW=$(ip route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+  case "$RAW" in
+    169.254.*)
+      echo "$(date -Is) ignoring link-local address: $RAW" >&2
+      ;;
+    *)
+      echo "$RAW"
+      ;;
+  esac
 }
+
 IP=$(get_ip)
+echo "$(date -Is) initial get_ip: '${IP:-<empty>}'"
+
+ATTEMPT=0
 while [ -z "$IP" ]; do
+  ATTEMPT=$((ATTEMPT + 1))
+  echo "$(date -Is) attempt $ATTEMPT: waiting up to 2s on ip monitor route..."
   # stdbuf -oL: `ip monitor` fully buffers its stdout when piped
   # otherwise, so the read below would never see a line until a buffer's
   # worth accumulates (which may be never, for one single real event).
+  # timeout 2: the monitor is a wake-up accelerant, not the only signal —
+  # bounds each wait so a route added in the race between our last check
+  # and the monitor's subscription actually going live is still caught
+  # on the next iteration, not missed forever. Never gives up, no
+  # fallback output — just keeps re-checking the real condition.
   timeout 2 stdbuf -oL ip monitor route 2>/dev/null | { read -r _ || true; }
   IP=$(get_ip)
+  echo "$(date -Is) attempt $ATTEMPT: get_ip now: '${IP:-<empty>}'"
 done
+
+echo "$(date -Is) got IP: $IP -- writing motd"
 {
   figlet "ArcNode EMS"
   printf '\nSetup: http://%s:8080/setup\n' "$IP"
 } > /etc/motd
+echo "$(date -Is) motd written successfully"
 EOF
 chmod 0755 /usr/local/sbin/arcnode-motd-ip.sh
 

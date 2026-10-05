@@ -112,32 +112,40 @@ automated pipeline.
   1.1.1.1`'s src address (the real outbound-route IP; works airgapped
   too, it's a routing-table lookup not a network probe) — don't go back
   to naively taking `hostname -I`'s first entry.
-- Motd's IP went through four iterations before landing right — don't
-  reintroduce any earlier bug. (1) A systemd unit polling `ip route get`
-  up to 10 times (a guessed window) before falling back to a literal
-  `<this-box-ip>` placeholder — wrong on real hardware, 10s wasn't long
-  enough for DHCP. (2) `/etc/network/if-up.d/arcnode-motd`, which only
-  fires via ifupdown's `auto`-interface sweep at boot — confirmed on real
-  hardware this box's wireless interface is configured `allow-hotplug`
-  (not `auto`), which that sweep skips entirely, so the hook silently
-  never ran and motd stayed completely empty. Units in the field usually
+- Motd's IP went through five iterations before landing right (confirmed
+  working on real hardware) — don't reintroduce any earlier bug.
+  (1) A systemd unit polling `ip route get` up to 10 times (a guessed
+  window) before falling back to a literal `<this-box-ip>` placeholder —
+  wrong on real hardware, 10s wasn't long enough for DHCP. (2)
+  `/etc/network/if-up.d/arcnode-motd`, which only fires via ifupdown's
+  `auto`-interface sweep at boot — confirmed on real hardware this box's
+  wireless interface is `allow-hotplug` (not `auto`), which that sweep
+  skips entirely (and per real Debian source: `networking.service`'s own
+  `--allow=hotplug` ExecStart is gated on `/run/network/restart-hotplug`,
+  which doesn't exist on a fresh first boot either — allow-hotplug
+  interfaces are brought up by a separate udev→`ifup@.service` path
+  instead), so the hook silently never ran. Units in the field usually
   have Ethernet but not always, so this can't assume `auto` vs
-  `allow-hotplug` either way. (3) `ip monitor route` alone, watching the
-  kernel's routing table via a real netlink event — but confirmed stuck
-  on real hardware (`systemctl status` showed `activating` for 2+
-  minutes, `ip monitor route` genuinely still running): a real race
+  `allow-hotplug` either way. (3) `ip monitor route` alone — a real race
   between the initial `get_ip` check and the monitor's netlink
   subscription actually going live let a route-add event slip through
-  with nothing left to catch it. (4, current) Loop forever re-checking
-  `get_ip` directly, with `timeout 2` bounding each wait on the monitor —
-  the monitor is a wake-up accelerant, not the only signal; even if it
-  misses the event (the exact race that bit us), the loop re-checks
-  within 2 real seconds regardless, forever, with no giving-up condition
-  and no fallback output ever. `stdbuf -oL` is still required (`ip
-  monitor` fully buffers stdout otherwise). Verified: fast path instant,
-  the exact race (route added immediately after start) now caught
-  correctly, and confirmed it never gives up or writes wrong output when
-  a route genuinely never appears.
+  with nothing left to catch it (confirmed stuck on real hardware,
+  `activating` for 2+ minutes). (4) Loop forever re-checking `get_ip`
+  directly with `timeout 2` bounding each wait (monitor as accelerant,
+  not the only signal) — closed the race, but confirmed on real hardware
+  it can latch onto a `169.254.x.x` **link-local** address (RFC 3927,
+  Linux's own pre-DHCP self-assigned fallback) and treat that as done.
+  (5, current) `get_ip` explicitly rejects `169.254.*` via the same
+  "treat as not-ready, keep looping" path, logging which case fired. All
+  of (1)-(4)'s fixes stay in place; this only narrows what counts as a
+  real address. Full timestamped log at `/var/log/arcnode-motd-ip.log`
+  (started, every attempt, link-local rejections, final success) so a
+  6th failure is diagnosable from one `cat`, not another round of
+  console photos. Verified pre-ship: fast path, the exact
+  monitor-subscribe race, never-gives-up with nothing ever appearing, and
+  the exact link-local scenario (starts with only a 169.254 route, waits,
+  then picks up the real one once it replaces it) — all four, confirmed
+  working on real hardware after.
 - The post-apply redirect must poll the HMI's real reachability, not
   wait a fixed delay — `ems-hmi`'s container can take up to a minute to
   pull + start on first real boot (confirmed on real hardware), so a
