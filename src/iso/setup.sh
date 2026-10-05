@@ -248,6 +248,16 @@ get_ip() {
 IP=$(get_ip)
 echo "$(date -Is) initial get_ip: '${IP:-<empty>}'"
 
+if [ -z "$IP" ]; then
+  # WiFi can take noticeably longer than wired (association + DHCP vs.
+  # just DHCP) — without this, the console shows the same static figlet
+  # banner the whole time, indistinguishable from actually being stuck.
+  {
+    figlet "ArcNode EMS"
+    printf '\nSetup: waiting for network... (see /var/log/arcnode-motd-ip.log)\n'
+  } > /etc/motd
+fi
+
 ATTEMPT=0
 while [ -z "$IP" ]; do
   ATTEMPT=$((ATTEMPT + 1))
