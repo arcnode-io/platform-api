@@ -134,6 +134,15 @@ apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable --now docker
 echo "$(date -Is) Docker installed and active: $(systemctl is-active docker)"
 
+# Verify, playbook-style: "active" only means systemd started it — the
+# daemon actually answering API calls is what docker_runtime needs.
+if DOCKER_VERSION=$(docker info --format '{{.ServerVersion}}') && [ -n "$DOCKER_VERSION" ]; then
+  echo "$(date -Is) verify docker: ok (server $DOCKER_VERSION)"
+else
+  echo "$(date -Is) verify docker: FAILED (docker info got no server answer)"
+  exit 1
+fi
+
 echo "$(date -Is) installing PostgreSQL..."
 apt-get install -y postgresql
 systemctl enable --now postgresql
@@ -155,6 +164,17 @@ else
   echo "$(date -Is) device_api role/db created, DOCUMENT_URL written"
 fi
 
+# Verify with the exact credential consumers will use — the idempotent
+# branch above trusts secrets.env and the real role still agree, this
+# proves it instead of handing off a stack that can't connect.
+DOCUMENT_URL=$(sed -n 's/^DOCUMENT_URL=//p' /etc/arcnode/secrets.env)
+if [ "$(psql "$DOCUMENT_URL" -tAc 'select current_user' 2>&1)" = "device_api" ]; then
+  echo "$(date -Is) verify postgres: ok (DOCUMENT_URL authenticates as device_api)"
+else
+  echo "$(date -Is) verify postgres: FAILED (DOCUMENT_URL in /etc/arcnode/secrets.env does not authenticate)"
+  exit 1
+fi
+
 echo "$(date -Is) arcnode-daemon-layer complete"
 EOF
 chmod 0755 /usr/local/sbin/arcnode-daemon-layer.sh
@@ -173,6 +193,7 @@ cat > /etc/systemd/system/arcnode-daemon-layer.service <<'EOF'
 Description=arcnode daemon layer (Docker + Postgres), installed at wizard-apply time
 Wants=arcnode-docker-runtime.service
 Before=arcnode-docker-runtime.service
+ConditionPathExists=/etc/arcnode/.wizard-applied
 
 [Service]
 Type=oneshot
@@ -182,13 +203,19 @@ ExecStart=/usr/local/sbin/arcnode-daemon-layer.sh
 [Install]
 WantedBy=multi-user.target
 EOF
+systemctl enable arcnode-daemon-layer.service
 
 cat > /etc/systemd/system/arcnode-daemon-layer.path <<'EOF'
 [Unit]
 Description=Wait for wizard apply before installing the daemon layer
 
 [Path]
-PathExists=/etc/arcnode/.wizard-applied
+# PathChanged= (edge), not PathExists= (level): PathExists re-fires every
+# time the unit goes inactive while the marker still exists, so a real
+# failure (e.g. verify postgres) looped forever instead of staying
+# "failed" — confirmed on the Vagrant VM. Once-per-boot runs come from
+# the service's own WantedBy= + ConditionPathExists=, not this watcher.
+PathChanged=/etc/arcnode/.wizard-applied
 Unit=arcnode-daemon-layer.service
 
 [Install]
@@ -350,13 +377,10 @@ echo "==> [7/8] Setting up the docker_runtime layer (compose), gated on the wiza
 # Rehearsing the gating mechanism here now so it's proven before
 # device-api needs it for real.
 #
-# A systemd .path unit, not a boot-order guess or a poll-and-retry hack:
-# PathExists= fires immediately if the marker already exists when the
-# path unit starts (confirmed current behavior on systemd 257, Debian
-# trixie's version — an old related bug was closed "version-too-ancient"
-# against systemd 245 from 2020), so this is correct on every reboot
-# after the first successful apply, not just the first time the marker
-# file appears.
+# Two triggers, same split as the daemon layer: the .path unit
+# (PathChanged=) catches the wizard's apply live; WantedBy= +
+# ConditionPathExists= runs it once per boot after that. No level-trigger
+# watcher, so a real failure stays "failed" instead of re-firing.
 cat > /etc/systemd/system/arcnode-docker-runtime.service <<'EOF'
 [Unit]
 Description=arcnode docker_runtime layer (docker compose, run once per boot)
@@ -366,6 +390,7 @@ Description=arcnode docker_runtime layer (docker compose, run once per boot)
 # comment for why the reverse alone isn't enough.
 After=docker.service arcnode-daemon-layer.service
 Requires=docker.service arcnode-daemon-layer.service
+ConditionPathExists=/etc/arcnode/.wizard-applied
 
 [Service]
 Type=oneshot
@@ -374,13 +399,18 @@ Restart=on-failure
 RestartSec=5
 WorkingDirectory=/opt/arcnode
 ExecStart=/usr/bin/docker compose -f /opt/arcnode/docker-compose.yaml up -d
+
+[Install]
+WantedBy=multi-user.target
 EOF
+systemctl enable arcnode-docker-runtime.service
 cat > /etc/systemd/system/arcnode-docker-runtime.path <<'EOF'
 [Unit]
 Description=Wait for wizard apply before starting the docker_runtime layer
 
 [Path]
-PathExists=/etc/arcnode/.wizard-applied
+# PathChanged=, not PathExists= — see arcnode-daemon-layer.path.
+PathChanged=/etc/arcnode/.wizard-applied
 Unit=arcnode-docker-runtime.service
 
 [Install]
