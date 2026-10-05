@@ -145,7 +145,51 @@ EOF
 systemctl enable arcnode-postgres-bootstrap.service
 
 echo "==> [5/9] Writing MOTD"
-figlet "ArcNode EMS" > /etc/motd
+# The wizard's URL needs the box's real DHCP-assigned IP, which isn't
+# known until boot — so this is a bootstrap unit like everything else
+# here, not something setup.sh can write statically. Deliberately NOT
+# ordered on network-online.target: that target is confirmed to never
+# resolve on this box's plain ifupdown/DHCP networking (see
+# MANUAL_TESTS.md's "Known gotchas" — same reason the old
+# systemd-wraps-docker-run pattern broke). Polling hostname -I briefly
+# instead of trusting a target that doesn't fire.
+#
+# Regenerates the WHOLE motd from scratch every run rather than patching
+# the existing file — tried the patch-in-place approach first and it
+# wasn't actually idempotent (a stray blank line accumulated on every
+# boot); rewriting the full file each time is correct by construction
+# instead of needing a correct diff/strip step.
+cat > /usr/local/sbin/arcnode-motd-ip.sh <<'EOF'
+#!/bin/sh
+set -e
+IP=""
+i=0
+while [ -z "$IP" ] && [ "$i" -lt 10 ]; do
+  IP=$(hostname -I | awk '{print $1}')
+  [ -z "$IP" ] && sleep 1
+  i=$((i + 1))
+done
+{
+  figlet "ArcNode EMS"
+  printf '\nSetup: http://%s:8080/setup\n' "${IP:-<this-box-ip>}"
+} > /etc/motd
+EOF
+chmod 0755 /usr/local/sbin/arcnode-motd-ip.sh
+
+cat > /etc/systemd/system/arcnode-motd-ip.service <<'EOF'
+[Unit]
+Description=arcnode write the wizard URL into motd with the real IP
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/arcnode-motd-ip.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-motd-ip.service
 
 echo "==> [6/9] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):

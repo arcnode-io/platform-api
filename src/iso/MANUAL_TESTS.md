@@ -51,7 +51,11 @@ automated pipeline.
       This is the whole point of running it natively: it should be up and
       answering long before Docker/Postgres are done installing, not
       after
-- [ ] Console login banner reads `ArcNode EMS` (figlet)
+- [ ] Console login banner reads `ArcNode EMS` (figlet) **and** shows a
+      `Setup: http://<real-ip>:8080/setup` line underneath with the box's
+      actual DHCP IP, not the `<this-box-ip>` placeholder (placeholder
+      means `arcnode-motd-ip.service` couldn't get an IP in its 10s poll
+      — a real finding, not a cosmetic miss)
 - [ ] `systemctl is-active arcnode-dummy` on the box reports `active`
 - [ ] `hostname -I` on the box, then from this machine: `curl -I http://<ip>`
       returns `HTTP/1.1 200 OK` serving the real ems-hmi SPA shell
