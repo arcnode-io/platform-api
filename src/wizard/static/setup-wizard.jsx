@@ -535,6 +535,7 @@ function Step4HumanAuth({ t, values, onChange }) {
 }
 function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, onConfirm }) {
   const strength = passwordStrength(password);
+  const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
   const mismatch = confirm.length > 0 && confirm !== password;
   return (
     <div style={{
@@ -548,8 +549,9 @@ function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, o
       </div>
       <div>
         <FieldLabelW t={t} required>Password</FieldLabelW>
-        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="at least 12 characters"/>
+        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="at least 12 characters" error={tooShort}/>
         <PasswordStrengthW t={t} strength={strength} password={password}/>
+        {tooShort && <HelperW t={t} error>Needs at least {MIN_PASSWORD_LENGTH} characters.</HelperW>}
       </div>
       <div>
         <FieldLabelW t={t} required>Confirm password</FieldLabelW>
@@ -559,6 +561,11 @@ function PasswordPairCard({ t, title, roleDesc, password, confirm, onPassword, o
     </div>
   );
 }
+// Must match MIN_HUMAN_PASSWORD_LENGTH in wizard_record.py — the backend
+// is the source of truth, this is just the client-side mirror of it so
+// a too-short password never reaches a round trip to find out.
+const MIN_PASSWORD_LENGTH = 12;
+
 function passwordStrength(pw) {
   if (!pw) return 0;
   let s = 0;
@@ -568,6 +575,15 @@ function passwordStrength(pw) {
   if (/\d/.test(pw))   s++;
   if (/[^A-Za-z0-9]/.test(pw)) s++;
   return Math.min(s, 4);
+}
+function isHumanAuthValid(humanAuth) {
+  const longEnough = (pw) => pw.length >= MIN_PASSWORD_LENGTH;
+  return (
+    longEnough(humanAuth.operatorPassword) &&
+    humanAuth.operatorPassword === humanAuth.operatorConfirm &&
+    longEnough(humanAuth.viewerPassword) &&
+    humanAuth.viewerPassword === humanAuth.viewerConfirm
+  );
 }
 function PasswordStrengthW({ t, strength, password }) {
   const labels = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
@@ -808,7 +824,7 @@ function HeaderW({ t, current, isDark, onToggleTheme }) {
 }
 
 // ─── Footer (Back / Continue) ───────────────────────────────────────
-function FooterW({ t, current, applyState, hwScenario, onBack, onNext, onApply }) {
+function FooterW({ t, current, applyState, hwScenario, canApply, onBack, onNext, onApply }) {
   const idx = STEPS.findIndex(s => s.id === current);
   const isLast = current === 'review';
   const isPreflight = current === 'preflight';
@@ -868,11 +884,12 @@ function FooterW({ t, current, applyState, hwScenario, onBack, onNext, onApply }
       </span>
 
       {isLast ? (
-        <button onClick={onApply} disabled={isApplying || isDone}
-          style={primaryBtnStyle(t, isApplying || isDone)}>
+        <button onClick={onApply} disabled={isApplying || isDone || !canApply}
+          style={primaryBtnStyle(t, isApplying || isDone || !canApply)}>
           {isApplying && <SpinnerW color="#fff" size={13}/>}
           {isDone && <CheckW color="#fff" size={13}/>}
-          {isApplying ? 'Applying' : isDone ? 'Complete' : 'Apply & start ARCNODE'}
+          {isApplying ? 'Applying' : isDone ? 'Complete'
+            : !canApply ? 'Fix passwords to continue' : 'Apply & start ARCNODE'}
         </button>
       ) : (
         <button onClick={hwBlocked ? undefined : onNext}
@@ -899,6 +916,19 @@ function secondaryBtnStyle(t, disabled) {
     fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.18,
     textTransform: 'uppercase',
   };
+}
+// FastAPI's 422 body is {detail: [{loc, msg, ...}, ...]} — a plain string
+// detail (e.g. the 404 "already applied" case) also reaches here, so
+// handle both rather than assuming one shape.
+function formatApplyError(detail) {
+  if (!detail) return null;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((e) => `${Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : 'field'}: ${e.msg}`)
+      .join('; ');
+  }
+  return null;
 }
 function primaryBtnStyle(t, disabled) {
   return {
@@ -986,7 +1016,7 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
-          throw new Error(body.detail || `HTTP ${r.status}`);
+          throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
         }
         setApplyState('done');
       })
@@ -1031,7 +1061,7 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
         </div>
       </div>
       <FooterW t={t} current={current} applyState={applyState}
-        hwScenario="ok"
+        hwScenario="ok" canApply={isHumanAuthValid(values.humanAuth)}
         onBack={onBack} onNext={onNext} onApply={onApply}/>
     </div>
   );
