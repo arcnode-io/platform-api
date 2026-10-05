@@ -16,3 +16,6 @@ wheels/
 .coverage
 **/.coverage
 secrets.env
+
+# Vagrant local VM state (box disk images, machine id) — gigabytes, host-local
+.vagrant/

@@ -15,10 +15,29 @@ set -e
 # shows zero progress for anything late_command does (confirmed — see
 # MANUAL_TESTS.md), so the one thing that actually can show the person
 # real progress (the wizard) needs to exist before the slow stuff (Docker,
-# Postgres) does, not after. The app layer (ems-hmi, standing in for the
-# real EMS stack) needs the wizard's output (secrets.env) before it's
-# meaningful to expose, enforced via a systemd .path unit watching the
-# wizard's apply-marker, not a boot-order guess.
+# Postgres) does, not after.
+#
+# Docker and PostgreSQL themselves are NOT installed here anymore — only
+# Docker's apt repo gets configured here (cheap, no live daemon needed).
+# The actual `apt-get install` for both, plus Postgres's role/db
+# bootstrap, is deferred to arcnode-daemon-layer.service, gated on the
+# wizard's apply-marker the same way the docker_runtime layer already
+# was — so installing them can eventually show real, live progress
+# through the wizard's own UI instead of happening silently before
+# anyone's looking. The app layer (ems-hmi, standing in for the real EMS
+# stack) needs BOTH the wizard's output (secrets.env) AND the daemon
+# layer actually installed before it's meaningful to expose — enforced
+# via systemd's own unit dependencies (Requires=/After=, Wants=/Before=),
+# not a boot-order guess or a poll-and-retry hack. Proven first on a
+# local Vagrant/QEMU VM (src/iso/vagrant/), not guessed: an earlier
+# version gated docker_runtime on the daemon layer via Requires=/After=
+# alone and it silently never started, because the one-shot .path trigger
+# had already fired (and aborted) once before the daemon layer finished —
+# Requires=/After= only stops something from starting early, it doesn't
+# retroactively start it once a dependency becomes ready later. The fix:
+# the daemon layer unit itself declares Wants=/Before= on docker_runtime,
+# so completing successfully actively pulls it in next, every time,
+# regardless of what triggered the daemon layer in the first place.
 
 # Reason: the log redirect lives HERE, not in preseed.cfg's late_command
 # invocation. `in-target sh /root/setup.sh > logfile` would put the `>`
@@ -43,7 +62,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/9] Preparing apt (cdrom fix + Docker's repo) and updating"
+echo "==> [1/8] Preparing apt (cdrom fix + Docker's repo) and updating"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -61,7 +80,7 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.
 # actually needed, but harmless either way — python3-fastapi/postgresql).
 apt-get update
 
-echo "==> [2/9] Setting up the first-boot setup wizard (native)"
+echo "==> [2/8] Setting up the first-boot setup wizard (native)"
 # Native, not Docker: python3-fastapi/uvicorn/pydantic are real Debian
 # packages (confirmed via apt-cache against trixie) — installable from the
 # same local mirror as everything else, no PyPI/pip dependency at all.
@@ -86,65 +105,98 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-wizard.service
 
-echo "==> [3/9] Installing Docker + compose plugin"
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-systemctl enable docker
-
-echo "==> [4/9] Installing PostgreSQL (native daemon)"
-# Reason: device-api (the next real consumer, not yet in this walking
-# skeleton) hard-fails at boot without DOCUMENT_URL — a real postgres
-# connection string, per its own TypeOrmModule.forRootAsync
-# ("DOCUMENT_URL is required"). This is just the first piece of that:
-# install + enable here, same chroot-safe shape as Docker above —
-# postgresql's postinst tries to start the service immediately after
-# install, and policy-rc.d denies that the same way it already does for
-# Docker (this is the first real test of that same constraint against a
-# *native* package's postinst, not a docker build/run — confirmed via
-# this exact reinstall, see MANUAL_TESTS.md). Role + database creation
-# needs a LIVE server, so that's deferred to
-# arcnode-postgres-bootstrap.service on first real boot, same split as
-# every other daemon here.
-apt-get install -y postgresql
-systemctl enable postgresql
-
-cat > /usr/local/sbin/arcnode-postgres-bootstrap.sh <<'EOF'
+echo "==> [3/8] Setting up the daemon layer (Docker + PostgreSQL), gated on the wizard"
+# Docker's repo was already configured in phase 1 (chroot-safe, no live
+# daemon needed); the actual package installs — and Postgres's role/db
+# bootstrap — happen here instead, deferred to first real boot, gated on
+# the same wizard apply-marker as the docker_runtime layer. Re-runs
+# `apt-get update` itself (cheap, idempotent) rather than trusting
+# phase 1's cache is still fresh by the time a person actually finishes
+# the wizard, which could be minutes or longer after boot.
+#
+# device-api (the next real consumer, not yet in this walking skeleton)
+# hard-fails at boot without DOCUMENT_URL — a real postgres connection
+# string, per its own TypeOrmModule.forRootAsync ("DOCUMENT_URL is
+# required"). Role + database creation needs a LIVE server, so that's
+# bootstrapped here too, in the same script, after postgresql actually
+# starts — no separate deferred unit needed now that this whole phase
+# already runs at a point where live daemons are expected to work.
+cat > /usr/local/sbin/arcnode-daemon-layer.sh <<'EOF'
 #!/bin/sh
 set -e
-# Idempotent: this re-runs every boot ([Install] WantedBy=), must be a
-# no-op once the role exists — same guard shape as the
-# `docker image inspect ... ||` pattern the docker-based units use.
+exec >> /var/log/arcnode-daemon-layer.log 2>&1
+echo "$(date -Is) arcnode-daemon-layer starting"
+
+apt-get update
+
+echo "$(date -Is) installing Docker..."
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+systemctl enable --now docker
+echo "$(date -Is) Docker installed and active: $(systemctl is-active docker)"
+
+echo "$(date -Is) installing PostgreSQL..."
+apt-get install -y postgresql
+systemctl enable --now postgresql
+echo "$(date -Is) PostgreSQL installed and active: $(systemctl is-active postgresql)"
+
+echo "$(date -Is) bootstrapping postgres role/db..."
+# Idempotent: re-running this must be a no-op once the role exists —
+# same guard shape as the `docker image inspect ... ||` pattern the
+# docker-based units use.
 if runuser -u postgres -- psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='device_api'" | grep -q 1; then
-  echo "device_api role already exists, skipping"
-  exit 0
+  echo "$(date -Is) device_api role already exists, skipping"
+else
+  # hex, not base64 -- this goes straight into a postgres:// URL below,
+  # and base64's default alphabet (+/=) is not URL-safe in that position.
+  DOCUMENT_PW=$(openssl rand -hex 24)
+  runuser -u postgres -- psql -c "CREATE ROLE device_api WITH LOGIN PASSWORD '$DOCUMENT_PW'"
+  runuser -u postgres -- createdb -O device_api document
+  echo "DOCUMENT_URL=postgres://device_api:$DOCUMENT_PW@localhost:5432/document" >> /etc/arcnode/secrets.env
+  echo "$(date -Is) device_api role/db created, DOCUMENT_URL written"
 fi
 
-# hex, not base64 -- this goes straight into a postgres:// URL below, and
-# base64's default alphabet (+/=) is not URL-safe in that position.
-DOCUMENT_PW=$(openssl rand -hex 24)
-runuser -u postgres -- psql -c "CREATE ROLE device_api WITH LOGIN PASSWORD '$DOCUMENT_PW'"
-runuser -u postgres -- createdb -O device_api document
-
-echo "DOCUMENT_URL=postgres://device_api:$DOCUMENT_PW@localhost:5432/document" >> /etc/arcnode/secrets.env
+echo "$(date -Is) arcnode-daemon-layer complete"
 EOF
-chmod 0755 /usr/local/sbin/arcnode-postgres-bootstrap.sh
+chmod 0755 /usr/local/sbin/arcnode-daemon-layer.sh
 
-cat > /etc/systemd/system/arcnode-postgres-bootstrap.service <<'EOF'
+# Wants=/Before= on docker_runtime (not just the reverse Requires=/After=
+# docker_runtime already declares on this unit): confirmed on a local
+# Vagrant/QEMU VM that without this, docker_runtime's own .path trigger
+# can fire and abort (dependency not ready yet) before this unit ever
+# finishes, and nothing re-triggers it afterward — Requires=/After= alone
+# only blocks an early start, it doesn't retroactively start something
+# once its dependency becomes ready later. This unit actively pulling
+# docker_runtime in on its own successful completion is what actually
+# makes the chain work, regardless of what triggered this unit itself.
+cat > /etc/systemd/system/arcnode-daemon-layer.service <<'EOF'
 [Unit]
-Description=arcnode postgres role+database bootstrap (run once)
-After=postgresql.service
-Requires=postgresql.service
+Description=arcnode daemon layer (Docker + Postgres), installed at wizard-apply time
+Wants=arcnode-docker-runtime.service
+Before=arcnode-docker-runtime.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/local/sbin/arcnode-postgres-bootstrap.sh
+ExecStart=/usr/local/sbin/arcnode-daemon-layer.sh
 
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl enable arcnode-postgres-bootstrap.service
 
-echo "==> [5/9] Writing MOTD"
+cat > /etc/systemd/system/arcnode-daemon-layer.path <<'EOF'
+[Unit]
+Description=Wait for wizard apply before installing the daemon layer
+
+[Path]
+PathExists=/etc/arcnode/.wizard-applied
+Unit=arcnode-daemon-layer.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable arcnode-daemon-layer.path
+
+echo "==> [4/8] Writing MOTD"
 # Static figlet banner — proven since the very first walking-skeleton
 # step, zero risk.
 figlet "ArcNode EMS" > /etc/motd
@@ -236,7 +288,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-motd-ip.service
 
-echo "==> [6/9] Writing ems-hmi's runtime config overlay"
+echo "==> [5/8] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
 # the image no longer bakes a site — it reads /opt/arcnode/hmi-cfg.customer.yml
 # (nginx serves it at /cfg.customer.yml) and fails closed ("HMI configuration
@@ -255,7 +307,7 @@ chatApiUri: ""
 mqttUri: ""
 EOF
 
-echo "==> [7/9] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [6/8] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -269,7 +321,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [8/9] Setting up the docker_runtime layer (compose), gated on the wizard"
+echo "==> [7/8] Setting up the docker_runtime layer (compose), gated on the wizard"
 # docker-compose.yaml (landed at /opt/arcnode/docker-compose.yaml by
 # late_command) is the real mechanism — same `docker compose up -d`
 # EC2 UserData already proves in cfn_resources.py, not a one-off `docker
@@ -298,8 +350,12 @@ echo "==> [8/9] Setting up the docker_runtime layer (compose), gated on the wiza
 cat > /etc/systemd/system/arcnode-docker-runtime.service <<'EOF'
 [Unit]
 Description=arcnode docker_runtime layer (docker compose, run once per boot)
-After=docker.service
-Requires=docker.service
+# arcnode-daemon-layer.service here too (not just docker.service): this
+# only stops a too-early start. The thing that actually makes the chain
+# work is the Wants=/Before= THAT unit declares on this one — see its own
+# comment for why the reverse alone isn't enough.
+After=docker.service arcnode-daemon-layer.service
+Requires=docker.service arcnode-daemon-layer.service
 
 [Service]
 Type=oneshot
@@ -322,7 +378,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-docker-runtime.path
 
-echo "==> [9/9] Enabling services"
+echo "==> [8/8] Enabling services"
 systemctl daemon-reload
 
 echo "==> arcnode setup complete"
