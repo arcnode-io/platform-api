@@ -34,7 +34,7 @@ automated pipeline.
       sat through — if you had to click anything, something's not preseeded
       and that's a bug in `preseed.cfg`, not a one-off)
 - [ ] `cat /var/log/arcnode-late-command.log` on the box shows a clean run
-      through all of `setup.sh`'s `==> [n/6]` progress lines, no errors —
+      through all of `setup.sh`'s `==> [n/7]` progress lines, no errors —
       this is the authoritative pass/fail signal; check it first before
       re-flashing anything over any other symptom below
 - [ ] Console login banner reads `ArcNode EMS` (figlet)
@@ -44,10 +44,6 @@ automated pipeline.
 - [ ] `docker ps` on the box shows `arcnode-hmi` running; `systemctl status
       arcnode-hmi-docker.service` shows `active (exited)` (correct steady
       state for a oneshot + `RemainAfterExit=yes` unit, not a failure)
-- [ ] `systemctl is-active minio` on the box reports `active`; `curl -I
-      http://<ip>:9000/minio/health/live` returns `200`
-- [ ] `cat /etc/arcnode/secrets.env` on the box shows an auto-generated
-      `MINIO_ROOT_PASSWORD` (not a placeholder, not empty)
 
 ## Known gotchas — do not reintroduce
 

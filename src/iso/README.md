@@ -41,11 +41,18 @@ gotcha worth not reintroducing.
 | 3 | `late_command` can set up a persistent daemon | unit file + `systemctl enable` (works offline/in a chroot) → placeholder `arcnode-dummy.service` active every boot |
 | 4 | real payload: Docker + the actual ems-hmi image, docker-native restart | `arcnode-hmi` container, `--restart unless-stopped`, survives reboot with zero systemd-vs-docker fighting |
 | 5 | `late_command` triggers a real fetched script, not an inline one-liner | `setup.sh` copied from install media, run in the target chroot |
-| 6 | first **daemon-layer** (native, non-docker) service | MinIO — binary + systemd unit, running as the install's own user, auto-generated root credentials |
-| … | rest of the daemon layer (postgres+timescale+pgvector, neo4j, ollama+models), then the full docker layer (hivemq + remaining app services) | not yet started — see Roadmap |
+| … | first real **daemon-layer** (native, non-docker) service, then the rest (postgres+timescale+pgvector, neo4j, ollama+models), then the full docker layer (hivemq + remaining app services) | not yet started — see Roadmap |
+
+MinIO was tried here first and cut: upstream retired the community edition's
+binary/Docker distribution entirely (dl.min.io now 410s, Docker Hub images
+delisted, repo archived) while this walking skeleton had zero actual
+consumers of it — nothing in this codebase talks to S3/MinIO today, mlflow
+included (it runs sqlite + local filesystem artifacts, see
+`src/compose/*/docker-compose.yaml`). Picking a real object-storage backend
+is deferred until something actually needs one.
 
 Per the real deployment diagram (`~/arcnode/ems/readme.md`'s On-Prem
-diagram), **daemons** (the DBs, MinIO, Ollama) and **docker_runtime** (the
+diagram), **daemons** (the DBs, Ollama) and **docker_runtime** (the
 app services) are two distinct layers — mirrors
 `~/engineering-with-ai/tooling-playbooks/main.yml` +
 `dev-services-setup.yml` almost exactly (same native-install-then-docker-
@@ -64,7 +71,7 @@ then all docker services), not a thin vertical slice through both at once.
   no login required after). `late_command` itself stopped being able to
   hold the actual provisioning logic once it needed three levels of nested
   shell quoting for one container; `setup.sh` is the growing, readable home
-  for everything it sets up, one `==> [n/6]`-logged phase at a time.
+  for everything it sets up, one `==> [n/N]`-logged phase at a time.
 - **`grub.cfg` / `gtk.cfg` / `txt.cfg`** are the stock Debian boot configs
   with one line inserted (`preseed/file=/cdrom/preseed.cfg`) so both BIOS
   and UEFI boot paths pick up the preseed automatically.

@@ -37,7 +37,7 @@ mkdir -p /etc/arcnode
 touch /etc/arcnode/secrets.env
 chmod 0600 /etc/arcnode/secrets.env
 
-echo "==> [1/8] Installing Docker + compose plugin"
+echo "==> [1/7] Installing Docker + compose plugin"
 apt-get install -y curl figlet
 # Reason: finish-install.d/07preseed (which runs this script) always runs
 # before finish-install.d/10apt-cdrom-setup (which comments out the
@@ -54,10 +54,10 @@ apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 systemctl enable docker
 
-echo "==> [2/8] Writing MOTD"
+echo "==> [2/7] Writing MOTD"
 figlet "ArcNode EMS" > /etc/motd
 
-echo "==> [3/8] Writing ems-hmi's runtime config overlay"
+echo "==> [3/7] Writing ems-hmi's runtime config overlay"
 # Per handoff from the ems-hmi frontend-engineer session (ems-hmi c9c7843):
 # the image no longer bakes a site — it reads /opt/arcnode/hmi-cfg.customer.yml
 # (nginx serves it at /cfg.customer.yml) and fails closed ("HMI configuration
@@ -76,7 +76,7 @@ chatApiUri: ""
 mqttUri: ""
 EOF
 
-echo "==> [4/8] Setting up placeholder daemon (arcnode-dummy)"
+echo "==> [4/7] Setting up placeholder daemon (arcnode-dummy)"
 cat > /etc/systemd/system/arcnode-dummy.service <<'EOF'
 [Unit]
 Description=arcnode dummy placeholder daemon
@@ -90,58 +90,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-dummy.service
 
-echo "==> [5/8] Setting up MinIO (native daemon — storage layer, not docker)"
-# Ported from ~/engineering-with-ai/tooling-playbooks/templates/minio.service.j2
-# (proven, year-maintained reference) — same binary/systemd shape, user
-# changed from a dedicated minio system user to TARGET_USER (per above),
-# and root credentials auto-generated instead of left at MinIO's
-# well-known, network-scannable "minioadmin:minioadmin" default — unlike
-# local-root-access secrets, default network-facing credentials are a real,
-# remotely-exploitable risk class, not security theater.
-curl -fsSL https://dl.min.io/server/minio/release/linux-amd64/minio -o /usr/local/bin/minio
-chmod +x /usr/local/bin/minio
-
-mkdir -p /data/minio
-chown "$TARGET_USER":"$TARGET_USER" /data/minio
-chmod 0750 /data/minio
-
-MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
-{
-  echo "MINIO_ROOT_USER=arcnode"
-  echo "MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD"
-} >> /etc/arcnode/secrets.env
-
-cat > /etc/default/minio <<EOF
-MINIO_ROOT_USER=arcnode
-MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
-MINIO_OPTS="--console-address :9001"
-EOF
-chmod 0600 /etc/default/minio
-
-cat > /etc/systemd/system/minio.service <<EOF
-[Unit]
-Description=MinIO
-Documentation=https://docs.min.io
-Wants=network-online.target
-After=network-online.target
-AssertFileIsExecutable=/usr/local/bin/minio
-
-[Service]
-WorkingDirectory=/usr/local/
-User=$TARGET_USER
-Group=$TARGET_USER
-EnvironmentFile=-/etc/default/minio
-ExecStart=/usr/local/bin/minio server \$MINIO_OPTS /data/minio
-Restart=always
-LimitNOFILE=65536
-TimeoutStopSec=infinity
-SendSIGKILL=no
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-echo "==> [6/8] Setting up the first-boot setup wizard (docker)"
+echo "==> [5/7] Setting up the first-boot setup wizard (docker)"
 # wizard-src was copied in by late_command (outside the chroot, same as
 # this script itself) to /opt/arcnode-wizard-src. Same constraint as
 # arcnode-hmi: `docker build` ALSO needs the live daemon, which isn't
@@ -168,7 +117,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-wizard-docker.service
 
-echo "==> [7/8] Setting up ems-hmi (docker), gated on the wizard"
+echo "==> [6/7] Setting up ems-hmi (docker), gated on the wizard"
 # Product-level gate, not a literal data dependency for THIS container:
 # ems-hmi's nginx just proxies /api/auth/* to device-api (not built yet in
 # this walking skeleton) — device-api is what will actually read
@@ -211,8 +160,7 @@ WantedBy=multi-user.target
 EOF
 systemctl enable arcnode-hmi-docker.path
 
-echo "==> [8/8] Enabling services"
+echo "==> [7/7] Enabling services"
 systemctl daemon-reload
-systemctl enable minio
 
 echo "==> arcnode setup complete"
