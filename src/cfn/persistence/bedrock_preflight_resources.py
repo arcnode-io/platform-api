@@ -12,7 +12,7 @@ Three resources:
     Other resources should `DependsOn` this so the stack fails fast with
     a useful Reason before any billable infra spins up.
 
-Cloud-only (commercial + defense). Airgapped customers ship without
+Cloud-only (commercial + defense). On-prem customers ship without
 Bedrock so this resource set is omitted from their template.
 """
 

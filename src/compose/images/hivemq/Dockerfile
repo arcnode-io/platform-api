@@ -4,7 +4,7 @@
 # pub/sub works out of the box. We replace it with the File RBAC extension
 # (username/password + topic ACL) so the broker rejects anonymous and
 # enforces per-role topic permissions. Baked (not runtime-fetched) for the
-# same reason telemetry-writer is — airgap-clean + version-pinned.
+# same reason telemetry-writer is — offline-safe + version-pinned.
 #
 # credentials.xml is NOT baked — it carries per-deploy passwords and is
 # bind-mounted at runtime from /opt/arcnode (written by UserData from

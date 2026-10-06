@@ -80,7 +80,7 @@ def agent_api_key_secrets() -> dict[str, dict]:
     """CFN-native secrets for analyst-agent vendor APIs.
 
     Per ADR-024 + ADR-025: chat + embed go through Bedrock (cloud) or
-    Ollama (airgapped). Two third-party API keys remain: OpenWeatherMap
+    Ollama (on-prem). Two third-party API keys remain: OpenWeatherMap
     (weather-forecast tool) and GridStatus (ISO market-data tool, see
     ems-analyst's markets.py — has a labelled-synthetic-data fallback when
     the key's missing/rate-limited, so this isn't fatal to omit, just

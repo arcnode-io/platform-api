@@ -34,7 +34,7 @@ INSERT_SQL = (
 # Idempotent schema bootstrap — runs every restart, three-tier safe.
 # Defense uses Aurora + pg_partman (no TimescaleDB), so the hypertable
 # call must be conditional on the extension being present. Tiger Cloud
-# ships TimescaleDB preinstalled; airgapped operators install it on
+# ships TimescaleDB preinstalled; on-prem operators install it on
 # their self-hosted Postgres. Same INSERT signature everywhere so
 # consumer code doesn't branch.
 SCHEMA_SQL: tuple[str, ...] = (
@@ -124,7 +124,7 @@ conn.autocommit = True
 # created the table + index as the master user, and telemetry-writer
 # connects as ems_ts_app (GRANT ALL, but not the owner). Postgres
 # requires ownership for CREATE INDEX even with IF NOT EXISTS — log
-# and continue. On commercial (Tiger) + airgapped (self-hosted) the
+# and continue. On commercial (Tiger) + on-prem (self-hosted) the
 # writer creates first → owns → all statements succeed.
 with conn.cursor() as _cur:
     for _stmt in SCHEMA_SQL:

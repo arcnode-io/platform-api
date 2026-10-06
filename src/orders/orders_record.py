@@ -19,7 +19,7 @@ class DeliveryPath(StrEnum):
 
 
 # Reason: edp-api no longer emits routing — platform-api derives it from the
-# customer's AWS partition choice. ISO path covers air-gapped (no AWS).
+# customer's AWS partition choice. ISO path covers on-prem (no AWS).
 _PARTITION_TO_PATH: dict[AwsPartition, DeliveryPath] = {
     AwsPartition.STANDARD: DeliveryPath.CFN_STANDARD,
     AwsPartition.GOVCLOUD: DeliveryPath.CFN_GOVCLOUD,

@@ -210,7 +210,7 @@ class OrchestratorService:
     ) -> list[ManifestArtifact]:
         """Compose the System Images section: APK from cfg.yml + per-order CFN yaml.
 
-        Future: ISO from the air-gapped build pipeline lands here too as A1.
+        Future: ISO from the on-prem build pipeline lands here too as A1.
         """
         artifacts: list[ManifestArtifact] = []
 
