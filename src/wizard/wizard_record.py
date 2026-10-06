@@ -1,109 +1,72 @@
-"""Pydantic DTOs for the first-boot setup wizard's apply request/result."""
+"""Pydantic DTOs for the first-boot setup wizard."""
 
-import re
-from typing import Literal, Optional
-
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-MIN_HUMAN_PASSWORD_LENGTH = 8
+from enum import StrEnum
+from pathlib import Path
+from pydantic import BaseModel, Field
 
 
-class ApiKeyInput(BaseModel):
-    """One third-party integration's wizard-collected value.
+class Deployment(StrEnum):
+    """Where this box runs — decides who sets up SSH access."""
 
-    ``skipped`` disables the integration rather than leaving it misconfigured
-    — markets.py's labelled-synthetic-data fallback (GridStatus) or the
-    forecast tool going historicals-only (OpenWeatherMap) depend on the key
-    being genuinely absent from the environment, not set to an empty string.
-    """
-
-    key: str = ""
-    skipped: bool = False
+    CLOUD = "cloud"  # EC2: the key pair chosen at launch already works
+    ON_PREM = "on-prem"  # appliance: the wizard creates the key pair
 
 
-class TlsInput(BaseModel):
-    """Self-signed (generated here) or customer-uploaded cert + key.
+class WizardConfig(BaseModel):
+    """/etc/arcnode/wizard-cfg.yml, written by the provisioning path."""
 
-    Let's Encrypt isn't modeled yet — real ACME client integration is its
-    own scope, deferred; see src/wizard/README.md.
-    """
-
-    mode: Literal["selfsigned", "upload"]
-    cert_pem: Optional[str] = None
-    key_pem: Optional[str] = None
-
-    @model_validator(mode="after")
-    def upload_requires_both_pem_fields(self) -> "TlsInput":
-        """Refuse a half-uploaded cert — a cert with no key (or vice versa) is unusable."""
-        if self.mode == "upload" and (not self.cert_pem or not self.key_pem):
-            raise ValueError("upload mode requires both cert_pem and key_pem")
-        return self
+    deployment: Deployment
 
 
-class HumanAuthInput(BaseModel):
-    """First operator + viewer login passwords.
+class SshAccount(BaseModel):
+    """The login account the customer created in the Debian installer —
+    their SSH key gets installed for it."""
 
-    Matches the real, already-established model exactly (auth_secrets.py:
-    AUTH_OPERATOR_PW / AUTH_VIEWER_PW, device-api bcrypt-hashes these at
-    boot from secrets.env plaintext) — not the wizard mockup's single
-    "admin" user, which doesn't match what device-api actually expects.
-    Two fixed roles, no customizable username.
-
-    Policy: at least MIN_HUMAN_PASSWORD_LENGTH characters, one uppercase
-    letter, one digit, one special character.
-    """
-
-    operator_password: str = Field(min_length=MIN_HUMAN_PASSWORD_LENGTH)
-    operator_confirm: str
-    viewer_password: str = Field(min_length=MIN_HUMAN_PASSWORD_LENGTH)
-    viewer_confirm: str
-
-    @field_validator("operator_password", "viewer_password")
-    @classmethod
-    def password_meets_complexity(cls, value: str) -> str:
-        """Length is already enforced by the Field constraint above."""
-        if not re.search(r"[A-Z]", value):
-            raise ValueError("must contain at least one uppercase letter")
-        if not re.search(r"\d", value):
-            raise ValueError("must contain at least one number")
-        if not re.search(r"[^A-Za-z0-9]", value):
-            raise ValueError("must contain at least one special character")
-        return value
-
-    @model_validator(mode="after")
-    def passwords_match(self) -> "HumanAuthInput":
-        """Catch a typo'd confirm field before it locks an operator out."""
-        if self.operator_password != self.operator_confirm:
-            raise ValueError("operator password and confirm do not match")
-        if self.viewer_password != self.viewer_confirm:
-            raise ValueError("viewer password and confirm do not match")
-        return self
+    name: str
+    home: Path
+    uid: int
+    gid: int
 
 
 class ApplyRequest(BaseModel):
-    """POST /api/apply body — everything the wizard collected."""
+    """POST /api/ssh body — the public half of the customer's own key
+    (``ssh-keygen -y -f private-key.pem``)."""
 
-    api_keys: dict[str, ApiKeyInput]
-    tls: TlsInput
-    human_auth: HumanAuthInput
+    ssh_public_key: str = Field(min_length=1)
+
+
+class CommandOutput(BaseModel):
+    """What a verification probe got back from a system command."""
+
+    returncode: int
+    stdout: str
+
+
+class VerifyCheck(BaseModel):
+    """One playbook-style verification row: did it pass, what was seen, and
+    the console command that debugs this specific failure."""
+
+    name: str
+    ok: bool
+    detail: str
+    hint: str
 
 
 class ApplyResult(BaseModel):
-    """POST /api/apply response."""
+    """POST /api/ssh response.
 
-    success: bool
-    message: str
-
-
-class InstallIdentity(BaseModel):
-    """Step 1's read-only display — confirms the right build landed at the
-    right site. Mirrors the old iso_bake_service's install.json shape
-    (customer/site/market/isoVersion/orderId), read from a file written at
-    ISO-build or AMI-launch time, not collected by the wizard itself.
+    ``verified`` is the gate: only when every check passes is the wizard
+    marked applied. ``account`` lets the UI show the exact ``ssh -i``
+    command.
     """
 
-    customer: str
-    site: str
-    market: str
-    iso_version: str
-    order_id: str
+    verified: bool
+    account: str
+    checks: list[VerifyCheck]
+
+
+class SetupInfo(BaseModel):
+    """GET /api/config — what the UI needs before apply."""
+
+    deployment: Deployment
+    account: str

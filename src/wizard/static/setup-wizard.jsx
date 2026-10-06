@@ -1,39 +1,17 @@
 // setup-wizard.jsx — ARCNODE first-boot setup wizard.
-// Served by FastAPI at https://<ip>/setup; runs once, then the URL 404s.
-// 5 steps: identity → API keys → TLS → admin → review/apply.
+// Served by FastAPI at http://<ip>:8080; runs once, then the URL 404s.
+// One page per daemon: its input, apply, and verification rows together —
+// Continue unlocks only when every check is green. SSH first, on-prem only:
+// paste the public half of your own .pem. In the cloud there is no SSH step
+// — EC2 already set it up.
 
 const { useState: useStateW, useEffect: useEffectW } = React;
 
-// ─── Install identity — fetched from GET /setup/api/identity, which reads
-// it from /etc/arcnode/install.json. No hardcoded mock data: this step
-// exists specifically to confirm the right build landed at the right
-// site, so showing a fake fallback value here would defeat its purpose.
-
-// ─── API keys schema (extend here as new integrations land) ──────────
-const API_KEYS = [
-  {
-    id: 'openweathermap',
-    label: 'OpenWeatherMap',
-    desc: 'Powers the Forecast agent — temperature and irradiance inputs for load and PV prediction.',
-    skippedNote: 'Forecast agent will run with site historicals only; no live weather.',
-    placeholder: 'a1b2c3d4e5f6…',
-  },
-  {
-    id: 'gridstatus',
-    label: 'GridStatus',
-    desc: 'Live ISO market data for the bidding agent — LMPs, ancillary services, congestion.',
-    skippedNote: 'Bidding agent disabled. Site stays in self-consumption mode.',
-    placeholder: 'gs_live_…',
-  },
-];
-
 // ─── Steps definition ────────────────────────────────────────────────
-const STEPS = [
-  { id: 'identity', n: 1, title: 'Install identity', sub: 'Confirm the right ISO' },
-  { id: 'apikeys',  n: 2, title: 'API keys',         sub: 'Optional agent integrations' },
-  { id: 'tls',      n: 3, title: 'TLS for HMI',      sub: 'How operators connect' },
-  { id: 'humanauth',n: 4, title: 'Operator & viewer', sub: 'First HMI logins' },
-  { id: 'review',   n: 5, title: 'Review & apply',   sub: 'Read back and start' },
+// Each step lists the deployments it exists in — the body filters to this
+// box's deployment. SSH is on-prem only: in the cloud EC2 already set it up.
+const ALL_STEPS = [
+  { id: 'ssh', n: 1, title: 'SSH access', sub: 'Add + verify your key', deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -54,31 +32,20 @@ function ChevronW({ color, size = 14, dir = 'right' }) {
     </svg>
   );
 }
-function EyeW({ color, size = 14 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
-         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12 C 4 5, 20 5, 23 12 C 20 19, 4 19, 1 12 Z"/>
-      <circle cx="12" cy="12" r="3"/>
-    </svg>
-  );
-}
-function EyeOffW({ color, size = 14 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
-         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12 C 4 5, 20 5, 23 12 C 20 19, 4 19, 1 12 Z"/>
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M3 3 L21 21"/>
-    </svg>
-  );
-}
 function LockW({ color, size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4" y="11" width="16" height="10" rx="2"/>
       <path d="M8 11 V7 a 4 4 0 0 1 8 0 V11"/>
+    </svg>
+  );
+}
+function FailW({ color, size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+         strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 6 L18 18 M18 6 L6 18"/>
     </svg>
   );
 }
@@ -91,17 +58,8 @@ function SpinnerW({ color, size = 14 }) {
     </svg>
   );
 }
-function DotW({ color, size = 8 }) {
-  return (
-    <span style={{
-      display: 'inline-block', width: size, height: size, borderRadius: '50%',
-      background: color, boxShadow: `0 0 0 3px ${color}30`,
-    }}/>
-  );
-}
-
 // ─── Step rail (left column) ─────────────────────────────────────────
-function StepRailW({ t, current, completed, onJump }) {
+function StepRailW({ t, steps, current, completed, onJump }) {
   const isSov = t.name === 'sovereign';
   const preflightActive = current === 'preflight';
   const preflightDone = completed.has('preflight');
@@ -117,7 +75,7 @@ function StepRailW({ t, current, completed, onJump }) {
         fontFamily: t.fontLabel, fontSize: 9, fontWeight: 700,
         letterSpacing: 0.22, color: t.textFaint, textTransform: 'uppercase',
         marginBottom: SPACE[3],
-      }}>Setup · 5 steps</div>
+      }}>Setup · {steps.length} {steps.length === 1 ? 'step' : 'steps'}</div>
 
       {/* preflight chip — above the numbered list, not part of the count */}
       <div style={{
@@ -159,7 +117,7 @@ function StepRailW({ t, current, completed, onJump }) {
         </div>
       </div>
 
-      {STEPS.map(s => {
+      {steps.map(s => {
         const isActive = current === s.id;
         const isDone   = completed.has(s.id);
         const isUpcoming = !isActive && !isDone;
@@ -225,7 +183,7 @@ function StepRailW({ t, current, completed, onJump }) {
           fontFamily: t.fontLabel, fontSize: 11,
           color: t.text, marginTop: 6, lineHeight: 1.4,
           wordBreak: 'break-all',
-        }}>https://10.0.1.42/setup</div>
+        }}>http://{window.location.host}</div>
         <div style={{
           fontFamily: t.fontLabel, fontSize: 9, color: t.textSoft,
           marginTop: 4, letterSpacing: 0.05,
@@ -250,40 +208,6 @@ function FieldLabelW({ t, children, optional, required }) {
     </label>
   );
 }
-function TextInputW({ t, value, onChange, placeholder, type = 'text', disabled, mono, error, visible, onToggleVisible }) {
-  const showToggle = type === 'password' && onToggleVisible;
-  const effectiveType = showToggle && visible ? 'text' : type;
-  const input = (
-    <input
-      type={effectiveType} value={value} onChange={e => onChange && onChange(e.target.value)}
-      placeholder={placeholder} disabled={disabled}
-      style={{
-        width: '100%', height: 40, padding: showToggle ? '0 40px 0 12px' : '0 12px',
-        boxSizing: 'border-box',
-        background: disabled ? t.surface : t.bg,
-        border: `1px solid ${error ? t.statusAlarm : t.border}`,
-        borderRadius: RADIUS[2],
-        fontFamily: mono ? t.fontLabel : t.fontBody, fontSize: 13,
-        color: disabled ? t.textSoft : t.text,
-        outline: 'none',
-      }}
-    />
-  );
-  if (!showToggle) return input;
-  return (
-    <div style={{ position: 'relative' }}>
-      {input}
-      <button type="button" onClick={onToggleVisible} aria-label={visible ? 'Hide password' : 'Show password'}
-        style={{
-          position: 'absolute', right: 10, top: 0, height: 40,
-          display: 'flex', alignItems: 'center',
-          appearance: 'none', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
-        }}>
-        {visible ? <EyeOffW color={t.textSoft} size={16}/> : <EyeW color={t.textSoft} size={16}/>}
-      </button>
-    </div>
-  );
-}
 function HelperW({ t, children, error }) {
   return (
     <div style={{
@@ -294,481 +218,103 @@ function HelperW({ t, children, error }) {
   );
 }
 
-// ─── Step 1 — Install identity (read-only) ───────────────────────────
-function Step1Identity({ t, identity }) {
-  const isSov = t.name === 'sovereign';
-  if (!identity) {
+// ─── Step 1 — SSH access ─────────────────────────────────────────────
+// applyState: idle | applying | done (all checks green) | unverified (a
+// check failed — retry is safe) | error (the request itself failed)
+const WIZARD_LOG_HINT = 'sudo journalctl -u arcnode-wizard';
+
+function StepSsh({ t, setup, sshKey, onKey, applyState, applyError, result, onApply }) {
+  if (!setup) {
     return (
-      <StepShellW t={t} title="Confirm install identity" blurb="Loading…">
+      <StepShellW t={t} title="SSH access" blurb="Loading…">
         <SpinnerW color={t.accent} size={16}/>
       </StepShellW>
     );
   }
-  const items = [
-    { label: 'Customer',       value: identity.customer },
-    { label: 'Site',           value: identity.site },
-    { label: 'Market',         value: identity.market },
-    { label: 'ISO version',    value: identity.iso_version, mono: true },
-    { label: 'Configurator order', value: identity.order_id, mono: true },
-  ];
-  return (
-    <StepShellW t={t} title="Confirm install identity"
-      blurb="Make sure this is the ISO that was built for your site. If anything below is wrong, stop and contact your ARCNODE configurator.">
-      <div style={{
-        background: t.panel,
-        border: `1px solid ${t.border}`,
-        borderRadius: RADIUS[3],
-        overflow: 'hidden',
-      }}>
-        {items.map((it, i) => (
-          <div key={it.label} style={{
-            display: 'grid',
-            gridTemplateColumns: '180px 1fr',
-            padding: `${SPACE[3]}px ${SPACE[4]}px`,
-            borderBottom: i < items.length - 1 ? `1px solid ${t.border}` : 'none',
-            alignItems: 'center',
-          }}>
-            <span style={{
-              fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
-              letterSpacing: 0.18, color: t.textSoft, textTransform: 'uppercase',
-            }}>{it.label}</span>
-            <span style={{
-              fontFamily: it.mono ? t.fontLabel : t.fontBody,
-              fontSize: it.mono ? 13 : 14,
-              color: t.text, fontWeight: it.mono ? 500 : 600,
-            }}>{it.value}</span>
-          </div>
-        ))}
-      </div>
-      <div style={{
-        marginTop: SPACE[4], padding: `${SPACE[3]}px ${SPACE[4]}px`,
-        background: t.accent + '12',
-        border: `1px solid ${t.accent}30`,
-        borderRadius: RADIUS[2],
-        fontFamily: t.fontBody, fontSize: 12, color: t.textMid, lineHeight: 1.5,
-      }}>
-        This wizard captures what Debian's own installer doesn't ask about:
-        API keys, TLS, and the first HMI logins. Network, disk, timezone,
-        and SSH access were already set up before this ran.
-      </div>
-    </StepShellW>
-  );
-}
-
-// ─── Step 2 — API keys ───────────────────────────────────────────────
-function Step2APIKeys({ t, values, onChange }) {
-  return (
-    <StepShellW t={t} title="Connect optional integrations"
-      blurb="ARCNODE agents call out to a few third-party services. Provide a key, or skip — skipped integrations disable their agent tool at runtime. You can add keys later from HMI settings.">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3] }}>
-        {API_KEYS.map(k => {
-          const v = values[k.id] || { key: '', skipped: false };
-          return (
-            <div key={k.id} style={{
-              background: t.panel,
-              border: `1px solid ${t.border}`,
-              borderRadius: RADIUS[3],
-              padding: `${SPACE[4]}px`,
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-                gap: SPACE[4], marginBottom: 4,
-              }}>
-                <div style={{
-                  fontFamily: t.fontBody, fontSize: 14, fontWeight: 600,
-                  color: t.text,
-                }}>{k.label}</div>
-                <ToggleW t={t} on={v.skipped}
-                  onChange={(on) => onChange(k.id, { ...v, skipped: on, key: on ? '' : v.key })}
-                  label="Skip"/>
-              </div>
-              <div style={{
-                fontFamily: t.fontBody, fontSize: 12, color: t.textMid,
-                lineHeight: 1.5, marginBottom: SPACE[3],
-              }}>{k.desc}</div>
-              <TextInputW t={t} value={v.key}
-                onChange={(val) => onChange(k.id, { ...v, key: val })}
-                placeholder={k.placeholder} disabled={v.skipped} mono/>
-              {v.skipped && <HelperW t={t}>{k.skippedNote}</HelperW>}
-            </div>
-          );
-        })}
-      </div>
-    </StepShellW>
-  );
-}
-
-function ToggleW({ t, on, onChange, label }) {
-  return (
-    <div onClick={() => onChange(!on)} style={{
-      display: 'inline-flex', alignItems: 'center', gap: 8,
-      cursor: 'pointer', userSelect: 'none',
-    }}>
-      <span style={{
-        fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
-        letterSpacing: 0.2, textTransform: 'uppercase',
-        color: on ? t.text : t.textSoft,
-      }}>{label}</span>
-      <span style={{
-        width: 32, height: 18, borderRadius: 999,
-        background: on ? t.accent : t.borderSoft,
-        position: 'relative', transition: 'background 0.15s',
-      }}>
-        <span style={{
-          position: 'absolute', top: 2, left: on ? 16 : 2,
-          width: 14, height: 14, borderRadius: '50%',
-          background: '#fff', transition: 'left 0.15s',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
-        }}/>
-      </span>
-    </div>
-  );
-}
-
-// ─── Step 3 — TLS for HMI ────────────────────────────────────────────
-function Step3TLS({ t, mode, onMode, certName, keyName, onCert, onKey }) {
-  return (
-    <StepShellW t={t} title="TLS for the HMI"
-      blurb="Choose how operators' browsers will trust this box. Self-signed is fine for initial install; replace from HMI settings later.">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3] }}>
-        <RadioCardW t={t} active={mode === 'selfsigned'}
-          onClick={() => onMode('selfsigned')}
-          title="Generate self-signed certificate"
-          sub="ARCNODE creates a 2048-bit RSA cert valid for 10 years. Operators will get a one-time browser warning, then can trust the cert per machine."
-          badge="Default"/>
-        <RadioCardW t={t} active={mode === 'upload'}
-          onClick={() => onMode('upload')}
-          title="Upload certificate and key"
-          sub="Provide a cert + key issued by your own CA. Written as-is — cert/key parse + match validation is a follow-up, not done yet.">
-          {mode === 'upload' && (
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: SPACE[3],
-              marginTop: SPACE[3],
-              paddingTop: SPACE[3],
-              borderTop: `1px solid ${t.border}`,
-            }}>
-              <FileFieldW t={t} label="Certificate" ext=".crt,.pem" filename={certName}
-                onPick={onCert}/>
-              <FileFieldW t={t} label="Private key" ext=".key,.pem" filename={keyName}
-                onPick={onKey}/>
-            </div>
-          )}
-        </RadioCardW>
-      </div>
-    </StepShellW>
-  );
-}
-function RadioCardW({ t, active, onClick, title, sub, badge, children }) {
-  return (
-    <div onClick={onClick} style={{
-      background: t.panel,
-      border: `1px solid ${active ? t.accent : t.border}`,
-      borderRadius: RADIUS[3],
-      padding: `${SPACE[4]}px`,
-      cursor: 'pointer',
-      boxShadow: active ? `0 0 0 2px ${t.accent}25` : 'none',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: SPACE[3] }}>
-        <span style={{
-          width: 18, height: 18, borderRadius: '50%',
-          border: `1.5px solid ${active ? t.accent : t.borderSoft}`,
-          background: t.bg,
-          flexShrink: 0, marginTop: 2,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {active && <span style={{
-            width: 8, height: 8, borderRadius: '50%', background: t.accent,
-          }}/>}
-        </span>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: SPACE[3] }}>
-            <span style={{
-              fontFamily: t.fontBody, fontSize: 14, fontWeight: 600, color: t.text,
-            }}>{title}</span>
-            {badge && (
-              <span style={{
-                fontFamily: t.fontLabel, fontSize: 9, fontWeight: 700, letterSpacing: 0.22,
-                color: t.statusOk,
-                background: t.statusOk + '18',
-                border: `1px solid ${t.statusOk}40`,
-                padding: '1px 6px', borderRadius: RADIUS[1], textTransform: 'uppercase',
-              }}>{badge}</span>
-            )}
-          </div>
-          <div style={{
-            fontFamily: t.fontBody, fontSize: 12, color: t.textMid,
-            marginTop: 4, lineHeight: 1.5,
-          }}>{sub}</div>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
-function FileFieldW({ t, label, ext, filename, onPick }) {
-  const inputRef = React.useRef(null);
-  const handleFile = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => onPick(file.name, String(reader.result));
-    reader.readAsText(file);
-  };
-  return (
-    <div>
-      <FieldLabelW t={t}>{label}</FieldLabelW>
-      <input ref={inputRef} type="file" accept={ext} style={{ display: 'none' }}
-        onChange={(e) => handleFile(e.target.files && e.target.files[0])}/>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: SPACE[3],
-        height: 40, padding: '0 4px 0 12px',
-        background: t.bg,
-        border: `1px dashed ${t.borderSoft}`,
-        borderRadius: RADIUS[2],
-      }}>
-        <span style={{
-          fontFamily: t.fontLabel, fontSize: 11,
-          color: filename ? t.text : t.textSoft,
-          flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{filename || `drop or browse · ${ext}`}</span>
-        <button onClick={(e) => {
-            e.stopPropagation();
-            if (filename) { onPick(null, null); } else { inputRef.current?.click(); }
-          }} style={{
-          appearance: 'none', cursor: 'pointer',
-          height: 30, padding: '0 12px',
-          background: 'transparent',
-          border: `1px solid ${t.border}`,
-          borderRadius: RADIUS[1],
-          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.18,
-          color: t.text, textTransform: 'uppercase',
-        }}>{filename ? 'Replace' : 'Browse'}</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 4 — HMI operator + viewer logins ────────────────────────────
-// Two fixed roles, not a customizable username — matches device-api's
-// real auth model exactly (AUTH_OPERATOR_PW/AUTH_VIEWER_PW, bcrypt-hashed
-// at boot), not a generic single "admin" account.
-function Step4HumanAuth({ t, values, onChange }) {
-  // One shared visibility map, not per-field local state: a global
-  // "show all" toggle needs somewhere to actually live above both cards.
-  const [visible, setVisible] = useStateW({ operator: false, viewer: false });
-  const allVisible = visible.operator && visible.viewer;
-  const toggleAll = () => {
-    const next = !allVisible;
-    setVisible({ operator: next, viewer: next });
-  };
-  return (
-    <StepShellW t={t} title="Create the operator and viewer logins"
-      blurb="Two fixed HMI roles: operator (dispatch + full access) and viewer (read-only). Separate from the SSH key you already have — these are for the HMI web login only.">
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: SPACE[3] }}>
-        <button type="button" onClick={toggleAll} style={{
-          appearance: 'none', cursor: 'pointer', background: 'transparent', border: 'none',
-          display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0,
-          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.18,
-          color: t.textSoft, textTransform: 'uppercase',
-        }}>
-          {allVisible ? <EyeOffW color={t.textSoft} size={13}/> : <EyeW color={t.textSoft} size={13}/>}
-          {allVisible ? 'Hide all passwords' : 'Show all passwords'}
-        </button>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[4] }}>
-        <PasswordPairCard t={t} title="Operator" roleDesc="Dispatch + full HMI access."
-          password={values.operatorPassword} onPassword={(v) => onChange('operatorPassword', v)}
-          visible={visible.operator} onToggleVisible={() => setVisible(s => ({ ...s, operator: !s.operator }))}/>
-        <PasswordPairCard t={t} title="Viewer" roleDesc="Read-only HMI access."
-          password={values.viewerPassword} onPassword={(v) => onChange('viewerPassword', v)}
-          visible={visible.viewer} onToggleVisible={() => setVisible(s => ({ ...s, viewer: !s.viewer }))}/>
-      </div>
-    </StepShellW>
-  );
-}
-function PasswordPairCard({ t, title, roleDesc, password, onPassword, visible, onToggleVisible }) {
-  const strength = passwordStrength(password);
-  const policyUnmet = password.length > 0 && !passwordMeetsPolicy(password);
-  return (
-    <div style={{
-      background: t.panel, border: `1px solid ${t.border}`,
-      borderRadius: RADIUS[3], padding: SPACE[5],
-      display: 'flex', flexDirection: 'column', gap: SPACE[4],
-    }}>
-      <div>
-        <div style={{ fontFamily: t.fontBody, fontSize: 14, fontWeight: 600, color: t.text }}>{title}</div>
-        <div style={{ fontFamily: t.fontBody, fontSize: 12, color: t.textMid, marginTop: 2 }}>{roleDesc}</div>
-      </div>
-      <div>
-        <FieldLabelW t={t} required>Password</FieldLabelW>
-        <TextInputW t={t} type="password" value={password} onChange={onPassword} placeholder="8+ chars, 1 upper, 1 number, 1 special"
-          error={policyUnmet} visible={visible} onToggleVisible={onToggleVisible}/>
-        <PasswordStrengthW t={t} strength={strength} password={password}/>
-        {policyUnmet && <HelperW t={t} error>Needs {MIN_PASSWORD_LENGTH}+ characters, one uppercase letter, one number, and one special character.</HelperW>}
-      </div>
-    </div>
-  );
-}
-// Must match MIN_HUMAN_PASSWORD_LENGTH + password_meets_complexity in
-// wizard_record.py — the backend is the source of truth, this is just the
-// client-side mirror of it so a non-compliant password never reaches a
-// round trip to find out.
-const MIN_PASSWORD_LENGTH = 8;
-
-function passwordStrength(pw) {
-  if (!pw) return 0;
-  let s = 0;
-  if (pw.length >= 8)  s++;
-  if (pw.length >= 12) s++;
-  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
-  if (/\d/.test(pw))   s++;
-  if (/[^A-Za-z0-9]/.test(pw)) s++;
-  return Math.min(s, 4);
-}
-function passwordMeetsPolicy(pw) {
-  return (
-    pw.length >= MIN_PASSWORD_LENGTH &&
-    /[A-Z]/.test(pw) &&
-    /\d/.test(pw) &&
-    /[^A-Za-z0-9]/.test(pw)
-  );
-}
-function isHumanAuthValid(humanAuth) {
-  return (
-    passwordMeetsPolicy(humanAuth.operatorPassword) &&
-    passwordMeetsPolicy(humanAuth.viewerPassword)
-  );
-}
-function PasswordStrengthW({ t, strength, password }) {
-  const labels = ['Too short', 'Weak', 'Fair', 'Good', 'Strong'];
-  const colors = [t.statusAlarm, t.statusAlarm, t.statusWarn, t.colorBess, t.statusOk];
-  const label = password ? labels[strength] : '';
-  const c = colors[strength];
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {[0,1,2,3].map(i => (
-          <div key={i} style={{
-            flex: 1, height: 4, borderRadius: 2,
-            background: i < strength ? c : t.borderSoft,
-          }}/>
-        ))}
-      </div>
-      <div style={{
-        fontFamily: t.fontLabel, fontSize: 10,
-        color: password ? c : t.textSoft,
-        marginTop: 6, letterSpacing: 0.1, fontWeight: 600,
-      }}>{password ? label : 'Mix length, case, digits, and a symbol.'}</div>
-    </div>
-  );
-}
-
-// ─── Step 5 — Review + apply ─────────────────────────────────────────
-// No fake progress animation — apply() on the backend is a synchronous
-// write of secrets.env + a TLS cert, not a multi-service bringup, so this
-// just shows a spinner then the real response (success or the actual
-// error message), not a scripted log of things that aren't happening.
-function Step5Review({ t, identity, values, applyState, applyError, onApply, onJump }) {
   const isApplying = applyState === 'applying';
   const isDone     = applyState === 'done';
-  const isIdle     = applyState === 'idle';
-  const isError    = applyState === 'error';
+  const canApply   = !isApplying && !isDone && sshKey.trim() !== '';
+  const buttonLabel = isApplying ? 'Verifying'
+    : applyState === 'unverified' ? 'Try again' : 'Install & verify';
+  const blurb = `Bring your own key. Paste the public half of your .pem; you'll log in as ${setup.account}, the account you created during the Debian install. Your private key never leaves your machine.`;
   return (
-    <StepShellW t={t} title={isIdle || isError ? 'Review and apply' : (isDone ? 'Setup complete' : 'Applying…')}
-      blurb={isDone
-        ? 'Done. The /setup URL is now disabled.'
-        : isError
-          ? `Apply failed: ${applyError}`
-          : isApplying
-            ? 'Writing secrets.env and the TLS cert…'
-            : 'Writes secrets.env + TLS cert/key, then disables this /setup URL for good.'}>
-      {(isIdle || isError) && <ReviewSummary t={t} identity={identity} values={values} onJump={onJump}/>}
-      {isApplying && <SpinnerW color={t.accent} size={20}/>}
-      {isDone && <CheckW color={t.statusOk} size={20}/>}
+    <StepShellW t={t} title="SSH access" blurb={blurb}>
+      <div style={{ marginBottom: SPACE[4] }}>
+        <FieldLabelW t={t} required>SSH public key</FieldLabelW>
+        <textarea value={sshKey} onChange={e => onKey(e.target.value)} disabled={isApplying || isDone}
+          placeholder="ssh-rsa AAAA…" rows={4} spellCheck={false} aria-label="SSH public key"
+          style={{
+            width: '100%', boxSizing: 'border-box', padding: SPACE[3],
+            background: t.bg, color: t.text, resize: 'vertical', outline: 'none',
+            border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
+            fontFamily: t.fontLabel, fontSize: 12, lineHeight: 1.5,
+          }}/>
+        <HelperW t={t}>Get it with: ssh-keygen -y -f private-key.pem</HelperW>
+      </div>
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {applyState === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {applyError}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+      {isDone && (
+        <div style={{ marginTop: SPACE[5] }}>
+          <HintW t={t} label="Log in from your machine"
+            command={`ssh -i private-key.pem ${setup.account}@${window.location.hostname}`}/>
+          <HelperW t={t}>
+            Still refused? Run ssh -v -i private-key.pem {setup.account}@{window.location.hostname} on
+            your machine while sudo journalctl -u ssh -f runs on the appliance — it shows why sshd said no.
+          </HelperW>
+        </div>
+      )}
     </StepShellW>
   );
 }
-function ReviewSummary({ t, identity, values, onJump }) {
-  const apiSummary = API_KEYS.map(k => {
-    const v = values.apiKeys[k.id] || { key: '', skipped: false };
-    return {
-      label: k.label,
-      value: v.skipped ? <span style={{ color: t.textSoft }}>skipped</span>
-            : (v.key ? <span style={{ fontFamily: t.fontLabel, color: t.text }}>{maskKey(v.key)}</span>
-                     : <span style={{ color: t.textSoft }}>not provided</span>),
-    };
-  });
-  const tlsSummary = values.tls.mode === 'selfsigned'
-    ? 'Self-signed (auto-generated, 10-year)'
-    : `Uploaded · ${values.tls.cert || '?'} + ${values.tls.key || '?'}`;
+function HintW({ t, label, command }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3] }}>
-      <ReviewCard t={t} title="Install identity" onEdit={() => onJump('identity')}
-        rows={[
-          ['Customer', identity?.customer ?? '?'],
-          ['Site',     identity?.site ?? '?'],
-          ['Market',   identity?.market ?? '?'],
-          ['Order',    identity?.order_id ?? '?'],
-        ]}/>
-      <ReviewCard t={t} title="API keys" onEdit={() => onJump('apikeys')}
-        rows={apiSummary.map(s => [s.label, s.value])}/>
-      <ReviewCard t={t} title="TLS" onEdit={() => onJump('tls')}
-        rows={[ ['Mode', tlsSummary] ]}/>
-      <ReviewCard t={t} title="Operator & viewer" onEdit={() => onJump('humanauth')}
-        rows={[
-          ['Operator password', values.humanAuth.operatorPassword ? '•••••••••• (set)' : 'not set'],
-          ['Viewer password',   values.humanAuth.viewerPassword ? '•••••••••• (set)' : 'not set'],
-        ]}/>
+    <div style={{ marginTop: SPACE[3] }}>
+      <FieldLabelW t={t}>{label}</FieldLabelW>
+      <code style={{
+        display: 'block', userSelect: 'all', padding: `${SPACE[3]}px ${SPACE[4]}px`,
+        background: t.panel, border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
+        fontFamily: t.fontLabel, fontSize: 12, color: t.text, wordBreak: 'break-all',
+      }}>{command}</code>
     </div>
   );
 }
-function maskKey(k) {
-  if (k.length <= 6) return '•'.repeat(k.length);
-  return k.slice(0, 3) + '…' + k.slice(-3);
-}
-function ReviewCard({ t, title, rows, onEdit }) {
+function CheckRowW({ t, check }) {
   return (
-    <div style={{
-      background: t.panel,
-      border: `1px solid ${t.border}`,
-      borderRadius: RADIUS[3],
-      overflow: 'hidden',
+    <div data-check={check.name} data-ok={check.ok} style={{
+      padding: `${SPACE[3]}px ${SPACE[4]}px`, background: t.panel,
+      border: `1px solid ${check.ok ? t.border : t.statusAlarm}`, borderRadius: RADIUS[2],
     }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: `${SPACE[3]}px ${SPACE[4]}px`,
-        background: t.surface,
-        borderBottom: `1px solid ${t.border}`,
-      }}>
-        <span style={{
-          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
-          letterSpacing: 0.22, color: t.textSoft, textTransform: 'uppercase',
-        }}>{title}</span>
-        <button onClick={onEdit} style={{
-          appearance: 'none', cursor: 'pointer',
-          padding: '4px 10px', background: 'transparent',
-          border: `1px solid ${t.border}`, borderRadius: RADIUS[1],
-          fontFamily: t.fontLabel, fontSize: 9, fontWeight: 700, letterSpacing: 0.18,
-          color: t.text, textTransform: 'uppercase',
-        }}>Edit</button>
-      </div>
-      {rows.map((r, i) => (
-        <div key={i} style={{
-          display: 'grid', gridTemplateColumns: '140px 1fr',
-          padding: `${SPACE[2]}px ${SPACE[4]}px`,
-          borderBottom: i < rows.length - 1 ? `1px solid ${t.border}` : 'none',
-          alignItems: 'center',
-        }}>
-          <span style={{
-            fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
-            letterSpacing: 0.18, color: t.textFaint, textTransform: 'uppercase',
-          }}>{r[0]}</span>
-          <span style={{ fontFamily: t.fontBody, fontSize: 12, color: t.text }}>{r[1]}</span>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: SPACE[3] }}>
+        <span style={{ marginTop: 2 }}>
+          {check.ok ? <CheckW color={t.statusOk} size={14}/> : <FailW color={t.statusAlarm} size={14}/>}
+        </span>
+        <div>
+          <div style={{ fontFamily: t.fontBody, fontSize: 13, fontWeight: 600,
+                        color: check.ok ? t.text : t.statusAlarm }}>{check.name}</div>
+          <div style={{ fontFamily: t.fontLabel, fontSize: 12, color: t.textMid, marginTop: 2,
+                        wordBreak: 'break-all' }}>{check.detail}</div>
         </div>
-      ))}
+      </div>
+      {!check.ok && <HintW t={t} label="On the appliance console, run" command={check.hint}/>}
     </div>
   );
 }
-
 
 // ─── Shared step shell (title + blurb + children) ────────────────────
 function StepShellW({ t, title, blurb, children }) {
@@ -827,9 +373,9 @@ function ThemeToggleW({ t, isDark, onToggle }) {
 }
 
 // ─── Top header ─────────────────────────────────────────────────────
-function HeaderW({ t, current, isDark, onToggleTheme }) {
+function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
   const isSov = t.name === 'sovereign';
-  const idx = STEPS.findIndex(s => s.id === current);
+  const idx = steps.findIndex(s => s.id === current);
   const isPreflight = current === 'preflight';
   return (
     <div style={{
@@ -861,13 +407,20 @@ function HeaderW({ t, current, isDark, onToggleTheme }) {
           color: t.textSoft, marginTop: 3, fontWeight: 700,
         }}>First-boot setup</div>
       </div>
+      {deployment && (
+        <span data-deployment={deployment} style={{
+          padding: '4px 10px', border: `1px solid ${t.borderSoft}`, borderRadius: 999,
+          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
+          color: t.textMid, textTransform: 'uppercase',
+        }}>{deployment}</span>
+      )}
       <div style={{
         fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
         color: t.textSoft, textTransform: 'uppercase',
       }}>
         {isPreflight
           ? 'Preflight'
-          : <>Step <span style={{ color: t.text }}>{idx + 1}</span> of {STEPS.length}</>}
+          : steps.length > 0 && <>Step <span style={{ color: t.text }}>{idx + 1}</span> of {steps.length}</>}
       </div>
       {onToggleTheme && (
         <ThemeToggleW t={t} isDark={isDark} onToggle={onToggleTheme}/>
@@ -877,12 +430,11 @@ function HeaderW({ t, current, isDark, onToggleTheme }) {
 }
 
 // ─── Footer (Back / Continue) ───────────────────────────────────────
-function FooterW({ t, current, applyState, hwScenario, canApply, onBack, onNext, onApply }) {
-  const idx = STEPS.findIndex(s => s.id === current);
-  const isLast = current === 'review';
+function FooterW({ t, steps, current, stepVerified, hwScenario, onBack, onNext }) {
+  const idx = steps.findIndex(s => s.id === current);
+  const isLast = idx === steps.length - 1;
   const isPreflight = current === 'preflight';
-  const isApplying = applyState === 'applying';
-  const isDone = applyState === 'done';
+  const isDone = isLast && stepVerified;
 
   const hwData = (typeof HW_SCENARIOS !== 'undefined') ? HW_SCENARIOS[hwScenario] : null;
   const hwStatus = hwData?.overallStatus || 'ok';
@@ -891,10 +443,9 @@ function FooterW({ t, current, applyState, hwScenario, canApply, onBack, onNext,
 
   let nextLabel;
   if (isPreflight)              nextLabel = hwWarn ? 'Continue anyway' : 'Begin setup';
-  else if (current === 'identity') nextLabel = 'Continue';
   else                          nextLabel = 'Continue';
 
-  const backDisabled = isPreflight || idx === 0 || isApplying || isDone;
+  const backDisabled = isPreflight || idx === 0 || isDone;
 
   return (
     <div style={{
@@ -925,31 +476,27 @@ function FooterW({ t, current, applyState, hwScenario, canApply, onBack, onNext,
       <span style={{
         fontFamily: t.fontLabel, fontSize: 10, color: t.textSoft, letterSpacing: 0.1,
       }}>
-        {isApplying  ? 'Do not refresh the page.'
-         : isDone    ? 'Waiting for the HMI to start, then redirecting — can take up to a minute.'
-         : isLast    ? 'Applies all changes in a single transaction.'
+        {isDone      ? 'Setup complete — this page is now turned off.'
+         : !stepVerified ? 'Continue unlocks once every check is green.'
          : isPreflight && hwBlocked
                      ? 'Move the ISO to hardware that meets the minimums.'
          : isPreflight && hwWarn
                      ? 'Below recommended — the system will run but may struggle under load.'
-         : isPreflight ? 'Next · Install identity'
-         : `Next · ${STEPS[idx + 1]?.title}`}
+         : isPreflight ? `Next · ${steps[0].title}`
+         : `Next · ${steps[idx + 1]?.title}`}
       </span>
 
-      {isLast ? (
-        <button onClick={onApply} disabled={isApplying || isDone || !canApply}
-          style={primaryBtnStyle(t, isApplying || isDone || !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
-          {isDone && <CheckW color="#fff" size={13}/>}
-          {isApplying ? 'Applying' : isDone ? 'Complete'
-            : !canApply ? 'Fix passwords to continue' : 'Apply & start ARCNODE'}
+      {isDone ? (
+        <button disabled style={primaryBtnStyle(t, true)}>
+          <CheckW color="#fff" size={13}/>
+          Complete
         </button>
       ) : (
-        <button onClick={hwBlocked ? undefined : onNext}
-          disabled={hwBlocked}
+        <button onClick={hwBlocked || !stepVerified ? undefined : onNext}
+          disabled={hwBlocked || !stepVerified}
           style={hwWarn
             ? secondaryBtnStyle(t, false)
-            : primaryBtnStyle(t, hwBlocked)}>
+            : primaryBtnStyle(t, hwBlocked || !stepVerified)}>
           {nextLabel}
           <ChevronW color={hwWarn ? t.text : '#fff'} size={12}/>
         </button>
@@ -1000,126 +547,55 @@ function primaryBtnStyle(t, disabled) {
 
 // ─── Main wizard body ───────────────────────────────────────────────
 // No hardware-preflight step yet — its source (hardware-check.jsx) isn't
-// built; 'identity' is the real first step. Re-add preflight as its own
-// increment later rather than fake it here.
-function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }) {
-  const [current, setCurrent] = useStateW(initialStep || 'identity');
+// built; 'ssh' is the real first step.
+function SetupWizardBody({ t, isDark, onToggleTheme }) {
+  const [current, setCurrent] = useStateW('ssh');
   const [completed, setCompleted] = useStateW(new Set());
-  const [applyState, setApplyState] = useStateW(initialApply || 'idle');
+  const [applyState, setApplyState] = useStateW('idle');
   const [applyError, setApplyError] = useStateW(null);
-  const [identity, setIdentity] = useStateW(null);
+  // { deployment: 'cloud' | 'on-prem', account } from GET /api/config
+  const [setup, setSetup] = useStateW(null);
+  const [sshKey, setSshKey] = useStateW('');
+  const [result, setResult] = useStateW(null);
 
-  // form values
-  const [values, setValues] = useStateW({
-    apiKeys: {
-      openweathermap: { key: '', skipped: false },
-      gridstatus:     { key: '', skipped: false },
-    },
-    tls: { mode: 'selfsigned', cert: null, certPem: null, key: null, keyPem: null },
-    humanAuth: { operatorPassword: '', viewerPassword: '' },
-  });
-
-  // GET /setup/api/identity once on mount — real data, no mock fallback.
   useEffectW(() => {
-    fetch('/setup/api/identity')
-      .then(r => r.json())
-      .then(setIdentity)
-      .catch(() => setIdentity(null));
+    fetch('/api/config').then(r => r.json()).then(setSetup);
   }, []);
-
-  useEffectW(() => {
-    if (initialStep && initialStep !== current) setCurrent(initialStep);
-  }, [initialStep]);
-  useEffectW(() => {
-    if (initialApply && initialApply !== applyState) {
-      setApplyState(initialApply);
-      if (initialApply !== 'idle') setCurrent('review');
-    }
-  }, [initialApply]);
+  const steps = setup ? ALL_STEPS.filter(s => s.deployments.includes(setup.deployment)) : [];
 
   const advance = (nextId) => {
     setCompleted(s => new Set([...s, current]));
     setCurrent(nextId);
   };
   const onNext = () => {
-    const idx = STEPS.findIndex(s => s.id === current);
-    if (idx < STEPS.length - 1) advance(STEPS[idx + 1].id);
+    const idx = steps.findIndex(s => s.id === current);
+    if (idx < steps.length - 1) advance(steps[idx + 1].id);
   };
   const onBack = () => {
-    const idx = STEPS.findIndex(s => s.id === current);
-    if (idx > 0) setCurrent(STEPS[idx - 1].id);
+    const idx = steps.findIndex(s => s.id === current);
+    if (idx > 0) setCurrent(steps[idx - 1].id);
   };
   const onApply = () => {
     setApplyState('applying');
     setApplyError(null);
-    fetch('/setup/api/apply', {
+    fetch('/api/ssh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_keys: values.apiKeys,
-        tls: { mode: values.tls.mode, cert_pem: values.tls.certPem, key_pem: values.tls.keyPem },
-        human_auth: {
-          // Backend's HumanAuthInput still wants a confirm field — the UI
-          // dropped the second input, so mirror password into confirm
-          // here rather than touch the validator on that model.
-          operator_password: values.humanAuth.operatorPassword,
-          operator_confirm:  values.humanAuth.operatorPassword,
-          viewer_password:   values.humanAuth.viewerPassword,
-          viewer_confirm:    values.humanAuth.viewerPassword,
-        },
-      }),
+      body: JSON.stringify({ ssh_public_key: sshKey }),
     })
       .then(async (r) => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
-        }
-        setApplyState('done');
-        // Real navigation, not fake progress — the footer already promises
-        // this ("Redirecting to HMI…"). A flat setTimeout here was tried
-        // first and was wrong: ems-hmi's container can take up to a
-        // minute to pull + start on first real boot (confirmed on real
-        // hardware), so a fixed delay either redirects too early (dead
-        // page, looks broken) or wastes time waiting longer than needed.
-        // Poll the real target instead of guessing how long it takes.
-        pollForHmiThenRedirect();
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
+        setResult(body);
+        setApplyState(body.verified ? 'done' : 'unverified');
+        if (body.verified) setCompleted(s => new Set([...s, 'ssh']));
       })
       .catch((err) => {
         setApplyError(String(err.message || err));
         setApplyState('error');
       });
   };
-  // ems-hmi's docker image can take up to a minute to pull + start on
-  // first real boot. no-cors: the HMI is on a different port (different
-  // origin), and we don't need to read the response, just confirm the
-  // connection succeeds instead of being refused — that's enough signal
-  // that nginx is up. 60 attempts * 2s = 2 minutes before giving up.
-  const pollForHmiThenRedirect = () => {
-    const target = `${window.location.protocol}//${window.location.hostname}/`;
-    const maxAttempts = 60;
-    let attempt = 0;
-    const tryOnce = () => {
-      attempt += 1;
-      fetch(target, { mode: 'no-cors', cache: 'no-store' })
-        .then(() => { window.location.href = target; })
-        .catch(() => {
-          if (attempt < maxAttempts) {
-            setTimeout(tryOnce, 2000);
-          } else {
-            setApplyError('The HMI did not come up within 2 minutes. Check `docker ps` on the box.');
-            setApplyState('error');
-          }
-        });
-    };
-    setTimeout(tryOnce, 1000);
-  };
   const onJump = (id) => setCurrent(id);
-
-  const setAPIKey      = (id, v) => setValues(s => ({ ...s, apiKeys: { ...s.apiKeys, [id]: v } }));
-  const setTLSMode     = (m)     => setValues(s => ({ ...s, tls: { ...s.tls, mode: m } }));
-  const setCert   = (name, content) => setValues(s => ({ ...s, tls: { ...s.tls, cert: name, certPem: content } }));
-  const setTLSKey = (name, content) => setValues(s => ({ ...s, tls: { ...s.tls, key: name, keyPem: content } }));
-  const setHumanAuth   = (field, v) => setValues(s => ({ ...s, humanAuth: { ...s.humanAuth, [field]: v } }));
 
   return (
     <div style={{
@@ -1128,29 +604,29 @@ function SetupWizardBody({ t, initialStep, initialApply, isDark, onToggleTheme }
       fontFamily: t.fontBody, color: t.text,
       minHeight: '100%',
     }}>
-      <HeaderW t={t} current={current} isDark={isDark} onToggleTheme={onToggleTheme}/>
+      <HeaderW t={t} steps={steps} deployment={setup?.deployment} current={current}
+        isDark={isDark} onToggleTheme={onToggleTheme}/>
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        <StepRailW t={t} current={current} completed={completed} onJump={onJump}/>
+        <StepRailW t={t} steps={steps} current={current} completed={completed} onJump={onJump}/>
         <div style={{
           flex: 1,
           padding: `${SPACE[6]}px ${SPACE[8]}px ${SPACE[6]}px`,
           overflowY: 'auto',
           maxWidth: 820,
         }}>
-          {current === 'identity'  && <Step1Identity   t={t} identity={identity}/>}
-          {current === 'apikeys'   && <Step2APIKeys    t={t} values={values.apiKeys} onChange={setAPIKey}/>}
-          {current === 'tls'       && <Step3TLS        t={t} mode={values.tls.mode} onMode={setTLSMode}
-                                                        certName={values.tls.cert} keyName={values.tls.key}
-                                                        onCert={setCert} onKey={setTLSKey}/>}
-          {current === 'humanauth' && <Step4HumanAuth  t={t} values={values.humanAuth} onChange={setHumanAuth}/>}
-          {current === 'review'    && <Step5Review     t={t} identity={identity} values={values}
-                                                        applyState={applyState} applyError={applyError}
-                                                        onApply={onApply} onJump={onJump}/>}
+          {setup && steps.length === 0 && (
+            <StepShellW t={t} title="Nothing to set up yet"
+              blurb={`This ${setup.deployment} box has no setup steps yet. SSH already works with your EC2 key pair — log in as ${setup.account}.`}/>
+          )}
+          {current === 'ssh' && steps.some(s => s.id === 'ssh') && <StepSsh t={t} setup={setup} sshKey={sshKey} onKey={setSshKey}
+                                   applyState={applyState} applyError={applyError}
+                                   result={result} onApply={onApply}/>}
         </div>
       </div>
-      <FooterW t={t} current={current} applyState={applyState}
-        hwScenario="ok" canApply={isHumanAuthValid(values.humanAuth)}
-        onBack={onBack} onNext={onNext} onApply={onApply}/>
+      {steps.length > 0 && (
+        <FooterW t={t} steps={steps} current={current} stepVerified={applyState === 'done'}
+          hwScenario="ok" onBack={onBack} onNext={onNext}/>
+      )}
     </div>
   );
 }

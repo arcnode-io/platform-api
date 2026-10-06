@@ -60,16 +60,12 @@ commit = "bash -c 'uv run poe checks && uv run poe test && uv run poe review && 
 
 [tool.pytest.ini_options]
 # `e2e` = real-AWS deploy + assert + teardown (~$0.10/run, ~20min).
-# `vagrant` = real local QEMU/KVM VM (src/iso/vagrant/), ~1-3min, needs
-# `vagrant` + the `vagrant-qemu` plugin + /dev/kvm access — not assumed
-# available everywhere yet, so opt-in the same way as `e2e`.
-# Both excluded from the default test run so `uv run pytest` stays fast;
+# Excluded from the default test run so `uv run pytest` stays fast;
 # CI e2e job selects with `-m e2e` on nightly cron + manual.
 markers = [
     "e2e: real-AWS end-to-end deploy + assert + teardown",
-    "vagrant: real local QEMU/KVM VM integration test",
 ]
-addopts = "-m 'not e2e and not vagrant'"
+addopts = "-m 'not e2e'"
 
 [tool.coverage.run]
 omit = ["*/test_*.py", "tests/*"]

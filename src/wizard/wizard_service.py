@@ -1,147 +1,126 @@
-"""WizardService — the first-boot setup wizard's real backend logic.
+"""WizardService — the first-boot setup wizard's backend logic."""
 
-Runs as its own standalone FastAPI app (src/wizard/main.py), baked into
-both the appliance ISO (fetched + started by late_command) and the cloud
-AMI (started by EC2 UserData) — not mounted into platform-api's own
-running service. See src/wizard/README.md for why.
-
-Writes plaintext to secrets.env deliberately — same established pattern
-as auth_secrets.py's AuthOperatorPw/AuthViewerPw (device-api bcrypt-hashes
-at boot; this process never stores a hash itself, it just hands off the
-same plaintext-in-env-file shape device-api already expects).
-"""
-
-import logging
+import os
 import shutil
-import subprocess  # nosec B404 — openssl invocation below, absolute path, no shell
+import subprocess  # nosec B404 — ssh-keygen below, absolute path, no shell
 from pathlib import Path
 from typing import Final
 
-from src.wizard.wizard_record import ApplyRequest, ApplyResult
+from src.wizard.ssh_verify import Probe, verify_ssh
+from src.wizard.wizard_record import (
+    ApplyRequest,
+    ApplyResult,
+    Deployment,
+    SetupInfo,
+    SshAccount,
+)
 
-# env var names — must match COMMON_URL_SLOTS / AUTH_SLOTS in
-# src/cfn/cfn_resources.py exactly, since device-api / analyst-agent read
-# these names regardless of which delivery path (cloud UserData, on-prem
-# late_command+wizard) populated secrets.env.
-_API_KEY_ENV_NAMES: Final[dict[str, str]] = {
-    "openweathermap": "OPENWEATHERMAP_API_KEY",
-    "gridstatus": "GRIDSTATUS_API_KEY",
-}
-_OPENSSL_CERT_DAYS: Final[str] = "3650"
-_OPENSSL_KEY_BITS: Final[str] = "2048"
-
-logger = logging.getLogger(__name__)
+PRIVATE_KEY_HINT: Final[str] = (
+    "That's your private key — keep it on your machine. Paste its public "
+    "half instead; get it with: ssh-keygen -y -f private-key.pem"
+)
 
 
 class WizardAlreadyAppliedError(Exception):
-    """Raised when /api/apply is called a second time.
+    """apply() called a second time — the API refuses it, not just the UI."""
 
-    The wizard runs once; its whole premise (per the mockup: "/setup
-    disappears after apply") is that a second call never happens through
-    the normal UI, but the API itself must refuse it too — not just hide
-    the button.
-    """
+
+class InvalidSshKeyError(Exception):
+    """The pasted text isn't a single OpenSSH public key."""
+
+
+class SshStepNotAvailableError(Exception):
+    """The SSH step doesn't exist in the cloud — EC2 already set up SSH."""
 
 
 class WizardService:
-    """Collects wizard input, writes it to the files the real stack reads.
+    """The on-prem SSH step: authorizes the customer's own public key,
+    verifies SSH, and only then disables the wizard. Doesn't exist in the
+    cloud, where the EC2 launch key pair already works.
 
-    Constructor takes paths, not hardcoded locations — same
-    dependency-injection-for-testability convention as the rest of this
-    repo (e.g. PersistenceService's lambda_runtime/psycopg2_layer_arn_template).
+    ``run_probe`` runs the system checks (systemctl, ssh-keyscan, sshd -T)
+    — injected because they need root and a real sshd.
     """
 
     def __init__(
         self,
         *,
-        secrets_env_path: Path,
-        tls_cert_path: Path,
-        tls_key_path: Path,
+        account: SshAccount,
+        deployment: Deployment,
         applied_marker_path: Path,
+        run_probe: Probe,
     ) -> None:
-        self._secrets_env_path = secrets_env_path
-        self._tls_cert_path = tls_cert_path
-        self._tls_key_path = tls_key_path
+        self._account = account
+        self._deployment = deployment
         self._applied_marker_path = applied_marker_path
+        self._run_probe = run_probe
+
+    def setup_info(self) -> SetupInfo:
+        """Where this box runs and whose login it sets up — for the UI."""
+        return SetupInfo(deployment=self._deployment, account=self._account.name)
 
     def is_applied(self) -> bool:
-        """True once apply() has succeeded — the wizard is done, the
-        /setup route should 404 from here on."""
+        """True once apply() has succeeded — the wizard 404s from then on."""
         return self._applied_marker_path.exists()
 
     def apply(self, request: ApplyRequest) -> ApplyResult:
-        """Write secrets.env + TLS assets, then mark applied.
-
-        Raises WizardAlreadyAppliedError if called a second time —
-        idempotent guard matches the arcnode-hmi-docker.service pattern
-        (docker inspect) used everywhere else in this appliance's
-        provisioning: the guard lives at the point of the irreversible
-        action, not just in the UI.
-        """
+        """Validate + authorize the pasted public key, then verify — the
+        gate: only when every check passes is the wizard marked applied. A
+        failed check leaves it open so the person can fix sshd and retry
+        (re-applying is safe)."""
+        if self._deployment == Deployment.CLOUD:
+            raise SshStepNotAvailableError("no SSH step in the cloud — EC2 set it up")
         if self.is_applied():
-            raise WizardAlreadyAppliedError(
-                "setup has already been applied on this install"
-            )
+            raise WizardAlreadyAppliedError("setup has already been applied")
+        key = request.ssh_public_key.strip()
+        _validate_public_key(key)
+        self._append_authorized_key(key)
+        checks = verify_ssh(self._account, self._run_probe, key)
+        verified = all(check.ok for check in checks)
+        if verified:
+            self._applied_marker_path.parent.mkdir(parents=True, exist_ok=True)
+            self._applied_marker_path.touch()
+        return ApplyResult(verified=verified, account=self._account.name, checks=checks)
 
-        self._write_secrets_env(request)
-        self._write_tls(request)
-        self._applied_marker_path.parent.mkdir(parents=True, exist_ok=True)
-        self._applied_marker_path.touch()
+    def _append_authorized_key(self, key: str) -> None:
+        # Reason: sshd's StrictModes silently ignores authorized_keys when
+        # ~/.ssh or the file is writable by anyone but the owner — the key
+        # would "install" fine and login would still fail.
+        ssh_dir = self._account.home / ".ssh"
+        authorized_keys = ssh_dir / "authorized_keys"
+        ssh_dir.mkdir(exist_ok=True)
+        already = (
+            authorized_keys.is_file()
+            and key in authorized_keys.read_text().splitlines()
+        )
+        if not already:
+            with authorized_keys.open("a") as f:
+                f.write(key + "\n")
+        for path, mode in ((ssh_dir, 0o700), (authorized_keys, 0o600)):
+            path.chmod(mode)
+            os.chown(path, self._account.uid, self._account.gid)
 
-        return ApplyResult(success=True, message="Setup applied.")
 
-    def _write_secrets_env(self, request: ApplyRequest) -> None:
-        lines: list[str] = []
-        for key_id, env_name in _API_KEY_ENV_NAMES.items():
-            value = request.api_keys.get(key_id)
-            if value is not None and not value.skipped and value.key:
-                lines.append(f"{env_name}={value.key}")
-        lines.append(f"AUTH_OPERATOR_PW={request.human_auth.operator_password}")
-        lines.append(f"AUTH_VIEWER_PW={request.human_auth.viewer_password}")
-
-        self._secrets_env_path.parent.mkdir(parents=True, exist_ok=True)
-        self._secrets_env_path.write_text("\n".join(lines) + "\n")
-        self._secrets_env_path.chmod(0o600)
-
-    def _write_tls(self, request: ApplyRequest) -> None:
-        self._tls_cert_path.parent.mkdir(parents=True, exist_ok=True)
-        self._tls_key_path.parent.mkdir(parents=True, exist_ok=True)
-
-        if request.tls.mode == "upload":
-            # Validated non-empty by TlsInput's own model_validator already.
-            assert request.tls.cert_pem is not None
-            assert request.tls.key_pem is not None
-            self._tls_cert_path.write_text(request.tls.cert_pem)
-            self._tls_key_path.write_text(request.tls.key_pem)
-        else:
-            self._generate_selfsigned_cert()
-        self._tls_key_path.chmod(0o600)
-
-    def _generate_selfsigned_cert(self) -> None:
-        """Same openssl shape as cfn_resources.py's der_control_ingress
-        block — one proven pattern, not a new one."""
-        openssl_path = shutil.which("openssl")
-        if openssl_path is None:
-            raise RuntimeError("openssl not found on PATH")
-        # Resolved absolute path, no shell, every other arg is a hardcoded
-        # constant or a Path this process generated itself.
-        subprocess.run(  # noqa: S603  # nosec B603
-            [
-                openssl_path,
-                "req",
-                "-x509",
-                "-newkey",
-                f"rsa:{_OPENSSL_KEY_BITS}",
-                "-nodes",
-                "-keyout",
-                str(self._tls_key_path),
-                "-out",
-                str(self._tls_cert_path),
-                "-days",
-                _OPENSSL_CERT_DAYS,
-                "-subj",
-                "/CN=arcnode-appliance",
-            ],
-            check=True,
+def _validate_public_key(key: str) -> None:
+    """Exactly one OpenSSH public key, checked by ssh-keygen itself."""
+    if "PRIVATE KEY" in key:
+        raise InvalidSshKeyError(PRIVATE_KEY_HINT)
+    if "\n" in key:
+        raise InvalidSshKeyError("Paste exactly one public key (one line).")
+    ssh_keygen = shutil.which("ssh-keygen")
+    if ssh_keygen is None:
+        raise RuntimeError("ssh-keygen not found on PATH")
+    result = (
+        subprocess.run(  # noqa: S603  # nosec B603 — resolved absolute path, fixed args
+            [ssh_keygen, "-l", "-f", "/dev/stdin"],
+            input=key,
             capture_output=True,
+            text=True,
+            check=False,
+        )
+    )
+    if result.returncode != 0:
+        raise InvalidSshKeyError(
+            "That isn't a valid SSH public key. It should be one line starting "
+            "with ssh-rsa or ssh-ed25519 — get it with: ssh-keygen -y -f private-key.pem"
         )

@@ -141,7 +141,7 @@ def test_shows_waiting_placeholder_before_route_then_final_banner_once_ready() -
         )
 
         final_motd = _wait_until(container, lambda c: "http://" in c, timeout=15.0)
-        assert "http://10.0.0.55:8080/setup" in final_motd
+        assert "http://10.0.0.55:8080\n" in final_motd
     finally:
         container.stop()
 
@@ -166,7 +166,7 @@ def test_skips_placeholder_when_route_already_exists() -> None:
         assert exit_code == 0, output
 
         final_motd = _read_motd(container)
-        assert "http://10.0.0.77:8080/setup" in final_motd
+        assert "http://10.0.0.77:8080\n" in final_motd
         assert "waiting for network" not in final_motd
     finally:
         container.stop()

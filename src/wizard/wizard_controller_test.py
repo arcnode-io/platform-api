@@ -1,83 +1,88 @@
 """HTTP-layer tests for the wizard controller — real requests through
-FastAPI's own request validation, not just WizardService called directly.
-
-wizard_service_test.py already covers the business logic; this file covers
-what reaching it over HTTP actually validates/rejects, since that's a
-different layer (pydantic request parsing, status codes) that a direct
-service call bypasses entirely.
-"""
+FastAPI's request validation, not WizardService called directly."""
 
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.wizard.wizard_fixtures import FakeProbe, account, ec2_style_pem
 from src.wizard.wizard_module import WizardModule
-
-VALID_PASSWORD = "Testpass1!"
-# 7 characters — one under the 8-char minimum, otherwise policy-compliant
-# (has upper/digit/special) — isolates the length check specifically.
-TOO_SHORT_PASSWORD = "Tsp1!ab"
+from src.wizard.wizard_record import Deployment
 
 
-def _client(tmp_path: Path) -> TestClient:
+def _client(tmp_path: Path, deployment: Deployment = Deployment.ON_PREM) -> TestClient:
     app = FastAPI()
-    app.include_router(WizardModule(base_dir=tmp_path).router)
+    app.include_router(
+        WizardModule(
+            base_dir=tmp_path,
+            account=account(tmp_path),
+            deployment=deployment,
+            run_probe=FakeProbe(),
+        ).router
+    )
     return TestClient(app)
 
 
-def _payload(*, operator_password: str, viewer_password: str) -> dict:
-    return {
-        "api_keys": {},
-        "tls": {"mode": "selfsigned", "cert_pem": None, "key_pem": None},
-        "human_auth": {
-            "operator_password": operator_password,
-            "operator_confirm": operator_password,
-            "viewer_password": viewer_password,
-            "viewer_confirm": viewer_password,
-        },
-    }
-
-
-def test_apply_accepts_valid_password_length(tmp_path: Path) -> None:
+def test_apply_with_your_public_key_returns_the_account(tmp_path: Path) -> None:
     # Arrange
     client = _client(tmp_path)
-    payload = _payload(operator_password=VALID_PASSWORD, viewer_password=VALID_PASSWORD)
+    _, public_key = ec2_style_pem(tmp_path)
 
     # Act
-    response = client.post("/setup/api/apply", json=payload)
+    response = client.post("/api/ssh", json={"ssh_public_key": public_key})
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"success": True, "message": "Setup applied."}
+    body = response.json()
+    assert (body["verified"], body["account"]) == (True, "joe")
+    assert [check["ok"] for check in body["checks"]] == [True, True, True, True]
 
 
-def test_apply_rejects_password_one_char_under_minimum(tmp_path: Path) -> None:
+def test_apply_with_the_pem_itself_is_400_with_a_hint(tmp_path: Path) -> None:
     # Arrange
     client = _client(tmp_path)
-    payload = _payload(
-        operator_password=TOO_SHORT_PASSWORD, viewer_password=TOO_SHORT_PASSWORD
-    )
+    private_pem, _ = ec2_style_pem(tmp_path)
 
     # Act
-    response = client.post("/setup/api/apply", json=payload)
+    response = client.post("/api/ssh", json={"ssh_public_key": private_pem})
 
     # Assert
-    assert response.status_code == 422
-    errors = response.json()["detail"]
-    rejected_fields = {tuple(err["loc"]) for err in errors}
-    assert ("body", "human_auth", "operator_password") in rejected_fields
-    assert ("body", "human_auth", "viewer_password") in rejected_fields
+    assert response.status_code == 400
+    assert "ssh-keygen -y" in response.json()["detail"]
 
 
-def test_setup_page_404s_after_apply(tmp_path: Path) -> None:
+def test_wizard_page_404s_after_apply(tmp_path: Path) -> None:
     # Arrange
     client = _client(tmp_path)
-    payload = _payload(operator_password=VALID_PASSWORD, viewer_password=VALID_PASSWORD)
-    client.post("/setup/api/apply", json=payload)
+    _, public_key = ec2_style_pem(tmp_path)
+    client.post("/api/ssh", json={"ssh_public_key": public_key})
 
     # Act
-    response = client.get("/setup")
+    response = client.get("/")
+
+    # Assert
+    assert response.status_code == 404
+
+
+def test_config_tells_the_ui_where_it_runs(tmp_path: Path) -> None:
+    # Arrange
+    client = _client(tmp_path, deployment=Deployment.CLOUD)
+
+    # Act
+    response = client.get("/api/config")
+
+    # Assert
+    assert response.status_code == 200
+    assert response.json() == {"deployment": "cloud", "account": "joe"}
+
+
+def test_cloud_has_no_ssh_route(tmp_path: Path) -> None:
+    # Arrange
+    client = _client(tmp_path, deployment=Deployment.CLOUD)
+
+    # Act
+    response = client.post("/api/ssh", json={"ssh_public_key": "ssh-rsa AAAAx"})
 
     # Assert
     assert response.status_code == 404

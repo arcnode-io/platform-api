@@ -2,26 +2,33 @@
 
 from pathlib import Path
 
+from src.wizard.ssh_verify import Probe
 from src.wizard.wizard_controller import WizardController
+from src.wizard.wizard_record import Deployment, SshAccount
 from src.wizard.wizard_service import WizardService
 
 
 class WizardModule:
     """Single point of DI for the wizard feature.
 
-    All paths point under one base dir (``/etc/arcnode`` in production,
-    injectable for tests) — matches this appliance's established
-    convention (secrets.env, cfg.customer.yml, etc. all live there).
+    ``base_dir`` is ``/etc/arcnode`` in production (injectable for tests);
+    ``account`` is whose authorized_keys the SSH key goes into;
+    ``deployment`` comes from wizard-cfg.yml; ``run_probe`` runs the SSH
+    verification commands (a fake in tests).
     """
 
-    def __init__(self, *, base_dir: Path) -> None:
+    def __init__(
+        self,
+        *,
+        base_dir: Path,
+        account: SshAccount,
+        deployment: Deployment,
+        run_probe: Probe,
+    ) -> None:
         self.service = WizardService(
-            secrets_env_path=base_dir / "secrets.env",
-            tls_cert_path=base_dir / "tls" / "cert.pem",
-            tls_key_path=base_dir / "tls" / "key.pem",
+            account=account,
+            deployment=deployment,
             applied_marker_path=base_dir / ".wizard-applied",
+            run_probe=run_probe,
         )
-        self.router = WizardController(
-            service=self.service,
-            install_identity_path=base_dir / "install.json",
-        ).router
+        self.router = WizardController(service=self.service).router
