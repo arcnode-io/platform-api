@@ -1,6 +1,6 @@
 """Integration test for arcnode-motd-ip.sh's network-wait placeholder.
 
-Runs the real script (parsed from src/iso/setup.sh, never a copy) inside
+Runs the real script (parsed from src/iso/phases/motd.sh, never a copy) inside
 a plain Debian container — this logic is pure shell + figlet + `ip route
 get`, no systemd/apt-daemon involvement, so a container is enough; no
 need for the heavier Vagrant/QEMU VM the daemon-layer test uses.
@@ -20,7 +20,7 @@ from pathlib import Path
 from testcontainers.core.container import DockerContainer
 
 REPO_ROOT = Path(__file__).parent.parent
-SETUP_SH_TEXT = (REPO_ROOT / "src" / "iso" / "setup.sh").read_text()
+MOTD_PHASE_TEXT = (REPO_ROOT / "src" / "iso" / "phases" / "motd.sh").read_text()
 
 FAKE_IP_SCRIPT = """#!/bin/sh
 if [ "$1" = "route" ] && [ "$2" = "get" ]; then
@@ -40,12 +40,12 @@ exit 1
 
 def _extract_heredoc(write_target: str) -> str:
     """Pull one `cat > <write_target> <<'EOF' ... EOF` block's body out of
-    the real setup.sh — the single source of truth this test checks
+    the real motd phase — the single source of truth this test checks
     against, never a copy that could silently drift from what ships."""
     marker = f"cat > {write_target} <<'EOF'\n"
-    start = SETUP_SH_TEXT.index(marker) + len(marker)
-    end = SETUP_SH_TEXT.index("\nEOF", start)
-    return SETUP_SH_TEXT[start:end]
+    start = MOTD_PHASE_TEXT.index(marker) + len(marker)
+    end = MOTD_PHASE_TEXT.index("\nEOF", start)
+    return MOTD_PHASE_TEXT[start:end]
 
 
 MOTD_IP_SCRIPT = _extract_heredoc("/usr/local/sbin/arcnode-motd-ip.sh")

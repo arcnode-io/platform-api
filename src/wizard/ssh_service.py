@@ -1,17 +1,17 @@
-"""WizardService — the first-boot setup wizard's backend logic."""
+"""The on-prem SSH page: bring-your-own key, verified."""
 
 import os
 import shutil
 import subprocess  # nosec B404 — ssh-keygen below, absolute path, no shell
-from pathlib import Path
 from typing import Final
 
-from src.wizard.ssh_verify import Probe, verify_ssh
+from src.wizard.ssh_verify import verify_ssh
+from src.wizard.system_runner import Runner
+from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 from src.wizard.wizard_record import (
     ApplyRequest,
     ApplyResult,
     Deployment,
-    SetupInfo,
     SshAccount,
 )
 
@@ -19,10 +19,6 @@ PRIVATE_KEY_HINT: Final[str] = (
     "That's your private key — keep it on your machine. Paste its public "
     "half instead; get it with: ssh-keygen -y -f private-key.pem"
 )
-
-
-class WizardAlreadyAppliedError(Exception):
-    """apply() called a second time — the API refuses it, not just the UI."""
 
 
 class InvalidSshKeyError(Exception):
@@ -33,13 +29,13 @@ class SshStepNotAvailableError(Exception):
     """The SSH step doesn't exist in the cloud — EC2 already set up SSH."""
 
 
-class WizardService:
+class SshService:
     """The on-prem SSH step: authorizes the customer's own public key,
     verifies SSH, and only then disables the wizard. Doesn't exist in the
     cloud, where the EC2 launch key pair already works.
 
-    ``run_probe`` runs the system checks (systemctl, ssh-keyscan, sshd -T)
-    — injected because they need root and a real sshd.
+    ``run`` runs the system checks (systemctl, ssh-keyscan, sshd -T) —
+    injected because they need root and a real sshd.
     """
 
     def __init__(
@@ -47,21 +43,13 @@ class WizardService:
         *,
         account: SshAccount,
         deployment: Deployment,
-        applied_marker_path: Path,
-        run_probe: Probe,
+        tracker: StepTracker,
+        run: Runner,
     ) -> None:
         self._account = account
         self._deployment = deployment
-        self._applied_marker_path = applied_marker_path
-        self._run_probe = run_probe
-
-    def setup_info(self) -> SetupInfo:
-        """Where this box runs and whose login it sets up — for the UI."""
-        return SetupInfo(deployment=self._deployment, account=self._account.name)
-
-    def is_applied(self) -> bool:
-        """True once apply() has succeeded — the wizard 404s from then on."""
-        return self._applied_marker_path.exists()
+        self._tracker = tracker
+        self._run = run
 
     def apply(self, request: ApplyRequest) -> ApplyResult:
         """Validate + authorize the pasted public key, then verify — the
@@ -70,16 +58,15 @@ class WizardService:
         (re-applying is safe)."""
         if self._deployment == Deployment.CLOUD:
             raise SshStepNotAvailableError("no SSH step in the cloud — EC2 set it up")
-        if self.is_applied():
-            raise WizardAlreadyAppliedError("setup has already been applied")
+        if self._tracker.is_done("ssh"):
+            raise StepAlreadyDoneError("SSH is already set up")
         key = request.ssh_public_key.strip()
         _validate_public_key(key)
         self._append_authorized_key(key)
-        checks = verify_ssh(self._account, self._run_probe, key)
+        checks = verify_ssh(self._account, self._run, key)
         verified = all(check.ok for check in checks)
         if verified:
-            self._applied_marker_path.parent.mkdir(parents=True, exist_ok=True)
-            self._applied_marker_path.touch()
+            self._tracker.mark_done("ssh")
         return ApplyResult(verified=verified, account=self._account.name, checks=checks)
 
     def _append_authorized_key(self, key: str) -> None:

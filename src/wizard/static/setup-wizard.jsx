@@ -1,9 +1,9 @@
 // setup-wizard.jsx — ARCNODE first-boot setup wizard.
 // Served by FastAPI at http://<ip>:8080; runs once, then the URL 404s.
 // One page per daemon: its input, apply, and verification rows together —
-// Continue unlocks only when every check is green. SSH first, on-prem only:
-// paste the public half of your own .pem. In the cloud there is no SSH step
-// — EC2 already set it up.
+// Continue unlocks only when every check is green. The hardware check comes
+// first everywhere (preflight-page.jsx). Then SSH, on-prem only: paste the
+// public half of your own .pem. In the cloud EC2 already set SSH up.
 
 const { useState: useStateW, useEffect: useEffectW } = React;
 
@@ -11,7 +11,10 @@ const { useState: useStateW, useEffect: useEffectW } = React;
 // Each step lists the deployments it exists in — the body filters to this
 // box's deployment. SSH is on-prem only: in the cloud EC2 already set it up.
 const ALL_STEPS = [
-  { id: 'ssh', n: 1, title: 'SSH access', sub: 'Add + verify your key', deployments: ['on-prem'] },
+  { id: 'ssh',      n: 1, title: 'SSH access', sub: 'Add + verify your key',    deployments: ['on-prem'] },
+  { id: 'docker',   n: 2, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
+  { id: 'postgres', n: 3, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
+  { id: 'neo4j',    n: 4, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -223,7 +226,8 @@ function HelperW({ t, children, error }) {
 // check failed — retry is safe) | error (the request itself failed)
 const WIZARD_LOG_HINT = 'sudo journalctl -u arcnode-wizard';
 
-function StepSsh({ t, setup, sshKey, onKey, applyState, applyError, result, onApply }) {
+function StepSsh({ t, setup, sshKey, onKey, page, onApply }) {
+  const { state: applyState, error: applyError, result } = page;
   if (!setup) {
     return (
       <StepShellW t={t} title="SSH access" blurb="Loading…">
@@ -430,20 +434,14 @@ function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
 }
 
 // ─── Footer (Back / Continue) ───────────────────────────────────────
-function FooterW({ t, steps, current, stepVerified, hwScenario, onBack, onNext }) {
+function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
   const idx = steps.findIndex(s => s.id === current);
-  const isLast = idx === steps.length - 1;
   const isPreflight = current === 'preflight';
+  // Preflight isn't in `steps` (the rail shows it above the count); with no
+  // steps after it (cloud, today) it's the last page.
+  const isLast = isPreflight ? steps.length === 0 : idx === steps.length - 1;
   const isDone = isLast && stepVerified;
-
-  const hwData = (typeof HW_SCENARIOS !== 'undefined') ? HW_SCENARIOS[hwScenario] : null;
-  const hwStatus = hwData?.overallStatus || 'ok';
-  const hwBlocked = isPreflight && hwStatus === 'fail';
-  const hwWarn    = isPreflight && hwStatus === 'warn';
-
-  let nextLabel;
-  if (isPreflight)              nextLabel = hwWarn ? 'Continue anyway' : 'Begin setup';
-  else                          nextLabel = 'Continue';
+  const nextLabel = isPreflight ? 'Begin setup' : 'Continue';
 
   const backDisabled = isPreflight || idx === 0 || isDone;
 
@@ -477,11 +475,8 @@ function FooterW({ t, steps, current, stepVerified, hwScenario, onBack, onNext }
         fontFamily: t.fontLabel, fontSize: 10, color: t.textSoft, letterSpacing: 0.1,
       }}>
         {isDone      ? 'Setup complete — this page is now turned off.'
+         : isPreflight && !stepVerified ? 'Every hardware minimum is required.'
          : !stepVerified ? 'Continue unlocks once every check is green.'
-         : isPreflight && hwBlocked
-                     ? 'Move the ISO to hardware that meets the minimums.'
-         : isPreflight && hwWarn
-                     ? 'Below recommended — the system will run but may struggle under load.'
          : isPreflight ? `Next · ${steps[0].title}`
          : `Next · ${steps[idx + 1]?.title}`}
       </span>
@@ -492,30 +487,15 @@ function FooterW({ t, steps, current, stepVerified, hwScenario, onBack, onNext }
           Complete
         </button>
       ) : (
-        <button onClick={hwBlocked || !stepVerified ? undefined : onNext}
-          disabled={hwBlocked || !stepVerified}
-          style={hwWarn
-            ? secondaryBtnStyle(t, false)
-            : primaryBtnStyle(t, hwBlocked || !stepVerified)}>
+        <button onClick={!stepVerified ? undefined : onNext}
+          disabled={!stepVerified}
+          style={primaryBtnStyle(t, !stepVerified)}>
           {nextLabel}
-          <ChevronW color={hwWarn ? t.text : '#fff'} size={12}/>
+          <ChevronW color="#fff" size={12}/>
         </button>
       )}
     </div>
   );
-}
-function secondaryBtnStyle(t, disabled) {
-  return {
-    appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-    height: 40, padding: '0 18px',
-    background: 'transparent',
-    border: `1px solid ${t.statusWarn}`,
-    color: t.text,
-    borderRadius: RADIUS[2],
-    display: 'inline-flex', alignItems: 'center', gap: 8,
-    fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.18,
-    textTransform: 'uppercase',
-  };
 }
 // FastAPI's 422 body is {detail: [{loc, msg, ...}, ...]} — a plain string
 // detail (e.g. the 404 "already applied" case) also reaches here, so
@@ -546,54 +526,56 @@ function primaryBtnStyle(t, disabled) {
 }
 
 // ─── Main wizard body ───────────────────────────────────────────────
-// No hardware-preflight step yet — its source (hardware-check.jsx) isn't
-// built; 'ssh' is the real first step.
 function SetupWizardBody({ t, isDark, onToggleTheme }) {
-  const [current, setCurrent] = useStateW('ssh');
-  const [completed, setCompleted] = useStateW(new Set());
-  const [applyState, setApplyState] = useStateW('idle');
-  const [applyError, setApplyError] = useStateW(null);
-  // { deployment: 'cloud' | 'on-prem', account } from GET /api/config
+  // { deployment: 'cloud' | 'on-prem', account, completed } from GET /api/config
   const [setup, setSetup] = useStateW(null);
+  const [current, setCurrent] = useStateW(null);
+  const [completed, setCompleted] = useStateW(new Set());
+  // Per page: { state: idle | applying | done | unverified | error, error, result }
+  const [pages, setPages] = useStateW({});
   const [sshKey, setSshKey] = useStateW('');
-  const [result, setResult] = useStateW(null);
+  const [pgPassword, setPgPassword] = useStateW('');
+  const [neo4jPassword, setNeo4jPassword] = useStateW('');
 
   useEffectW(() => {
     fetch('/api/config').then(r => r.json()).then(setSetup);
   }, []);
   const steps = setup ? ALL_STEPS.filter(s => s.deployments.includes(setup.deployment)) : [];
+  // Page order: the hardware check, then this deployment's steps.
+  const order = ['preflight', ...steps.map(s => s.id)];
+  // Resume where setup left off: done pages from the server, first unfinished page current.
+  useEffectW(() => {
+    if (!setup) return;
+    setCompleted(new Set(setup.completed));
+    setCurrent(order.find(id => !setup.completed.includes(id)) || order[order.length - 1]);
+  }, [setup]);
 
-  const advance = (nextId) => {
-    setCompleted(s => new Set([...s, current]));
-    setCurrent(nextId);
-  };
-  const onNext = () => {
-    const idx = steps.findIndex(s => s.id === current);
-    if (idx < steps.length - 1) advance(steps[idx + 1].id);
-  };
-  const onBack = () => {
-    const idx = steps.findIndex(s => s.id === current);
-    if (idx > 0) setCurrent(steps[idx - 1].id);
-  };
-  const onApply = () => {
-    setApplyState('applying');
-    setApplyError(null);
-    fetch('/api/ssh', {
+  const pageOf = (id) => pages[id] || { state: completed.has(id) ? 'done' : 'idle', error: null, result: null };
+  const setPage = (id, patch) => setPages(p => ({ ...p, [id]: { ...pageOf(id), ...p[id], ...patch } }));
+
+  const applyStep = (id, url, payload) => {
+    setPage(id, { state: 'applying', error: null });
+    fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ssh_public_key: sshKey }),
+      body: JSON.stringify(payload),
     })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
-        setResult(body);
-        setApplyState(body.verified ? 'done' : 'unverified');
-        if (body.verified) setCompleted(s => new Set([...s, 'ssh']));
+        setPage(id, { state: body.verified ? 'done' : 'unverified', result: body });
+        if (body.verified) setCompleted(s => new Set([...s, id]));
       })
-      .catch((err) => {
-        setApplyError(String(err.message || err));
-        setApplyState('error');
-      });
+      .catch((err) => setPage(id, { state: 'error', error: String(err.message || err) }));
+  };
+
+  const onNext = () => {
+    const idx = order.indexOf(current);
+    if (idx < order.length - 1) setCurrent(order[idx + 1]);
+  };
+  const onBack = () => {
+    const idx = order.indexOf(current);
+    if (idx > 0) setCurrent(order[idx - 1]);
   };
   const onJump = (id) => setCurrent(id);
 
@@ -614,18 +596,31 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           overflowY: 'auto',
           maxWidth: 820,
         }}>
-          {setup && steps.length === 0 && (
-            <StepShellW t={t} title="Nothing to set up yet"
-              blurb={`This ${setup.deployment} box has no setup steps yet. SSH already works with your EC2 key pair — log in as ${setup.account}.`}/>
+          {current === 'preflight' && (
+            <StepPreflight t={t} page={pageOf('preflight')}
+              onApply={() => applyStep('preflight', '/api/preflight', {})}/>
           )}
-          {current === 'ssh' && steps.some(s => s.id === 'ssh') && <StepSsh t={t} setup={setup} sshKey={sshKey} onKey={setSshKey}
-                                   applyState={applyState} applyError={applyError}
-                                   result={result} onApply={onApply}/>}
+          {current === 'ssh' && (
+            <StepSsh t={t} setup={setup} sshKey={sshKey} onKey={setSshKey} page={pageOf('ssh')}
+              onApply={() => applyStep('ssh', '/api/ssh', { ssh_public_key: sshKey })}/>
+          )}
+          {current === 'docker' && (
+            <StepDocker t={t} page={pageOf('docker')}
+              onApply={() => applyStep('docker', '/api/docker', {})}/>
+          )}
+          {current === 'postgres' && (
+            <StepPostgres t={t} page={pageOf('postgres')} password={pgPassword} onPassword={setPgPassword}
+              onApply={() => applyStep('postgres', '/api/postgres', { password: pgPassword })}/>
+          )}
+          {current === 'neo4j' && (
+            <StepNeo4j t={t} page={pageOf('neo4j')} password={neo4jPassword} onPassword={setNeo4jPassword}
+              onApply={() => applyStep('neo4j', '/api/neo4j', { password: neo4jPassword })}/>
+          )}
         </div>
       </div>
-      {steps.length > 0 && (
-        <FooterW t={t} steps={steps} current={current} stepVerified={applyState === 'done'}
-          hwScenario="ok" onBack={onBack} onNext={onNext}/>
+      {setup && (
+        <FooterW t={t} steps={steps} current={current} stepVerified={completed.has(current)}
+          onBack={onBack} onNext={onNext}/>
       )}
     </div>
   );

@@ -4,10 +4,11 @@ and the wizard staying open (and retry-safe) when a check fails."""
 from pathlib import Path
 
 from src.wizard.wizard_fixtures import (
-    FakeProbe,
+    FakeRunner,
     ec2_style_pem,
-    make_service,
+    make_ssh_service,
     ssh_keygen,
+    tracker,
 )
 from src.wizard.wizard_record import ApplyRequest, CommandOutput
 
@@ -15,7 +16,7 @@ from src.wizard.wizard_record import ApplyRequest, CommandOutput
 def test_apply_verifies_ssh_and_shows_your_key_fingerprint(tmp_path: Path) -> None:
     # Arrange
     _, public_key = ec2_style_pem(tmp_path)
-    service = make_service(tmp_path)
+    service = make_ssh_service(tmp_path)
     expected_fingerprint = ssh_keygen("-l", "-f", str(tmp_path / "my-key.pem")).split()[
         1
     ]
@@ -33,15 +34,15 @@ def test_apply_verifies_ssh_and_shows_your_key_fingerprint(tmp_path: Path) -> No
     ]
     assert expected_fingerprint in result.checks[3].detail
     assert result.verified
-    assert service.is_applied()
+    assert tracker(tmp_path).is_done("ssh")
 
 
 def test_failed_check_keeps_the_wizard_open(tmp_path: Path) -> None:
     # Arrange
     _, public_key = ec2_style_pem(tmp_path)
-    probe = FakeProbe()
-    probe.outputs["systemctl"] = CommandOutput(returncode=3, stdout="inactive\n")
-    service = make_service(tmp_path, probe=probe)
+    runner = FakeRunner()
+    runner.outputs["systemctl"] = CommandOutput(returncode=3, stdout="inactive\n")
+    service = make_ssh_service(tmp_path, runner=runner)
 
     # Act
     result = service.apply(ApplyRequest(ssh_public_key=public_key))
@@ -50,17 +51,17 @@ def test_failed_check_keeps_the_wizard_open(tmp_path: Path) -> None:
     assert not result.verified
     assert (result.checks[0].ok, result.checks[0].detail) == (False, "inactive")
     assert result.checks[0].hint == "sudo systemctl status ssh && sudo sshd -t"
-    assert not service.is_applied()
+    assert not tracker(tmp_path).is_done("ssh")
 
 
 def test_retry_after_a_failed_check_does_not_add_the_key_twice(tmp_path: Path) -> None:
     # Arrange: first try fails verification, then sshd gets fixed
     _, public_key = ec2_style_pem(tmp_path)
-    probe = FakeProbe()
-    probe.outputs["systemctl"] = CommandOutput(returncode=3, stdout="inactive\n")
-    service = make_service(tmp_path, probe=probe)
+    runner = FakeRunner()
+    runner.outputs["systemctl"] = CommandOutput(returncode=3, stdout="inactive\n")
+    service = make_ssh_service(tmp_path, runner=runner)
     service.apply(ApplyRequest(ssh_public_key=public_key))
-    probe.outputs["systemctl"] = CommandOutput(returncode=0, stdout="active\n")
+    runner.outputs["systemctl"] = CommandOutput(returncode=0, stdout="active\n")
 
     # Act
     result = service.apply(ApplyRequest(ssh_public_key=public_key))
@@ -74,7 +75,7 @@ def test_retry_after_a_failed_check_does_not_add_the_key_twice(tmp_path: Path) -
 def test_every_check_says_what_to_run_when_it_fails(tmp_path: Path) -> None:
     # Arrange
     _, public_key = ec2_style_pem(tmp_path)
-    service = make_service(tmp_path)
+    service = make_ssh_service(tmp_path)
 
     # Act
     result = service.apply(ApplyRequest(ssh_public_key=public_key))

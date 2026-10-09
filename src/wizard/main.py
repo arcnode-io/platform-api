@@ -15,7 +15,7 @@ from typing import Final
 import uvicorn
 from fastapi import FastAPI
 
-from src.wizard.ssh_verify import run_system_probe
+from src.wizard.system_runner import run_system_command
 from src.wizard.wizard_config import load_wizard_config
 from src.wizard.wizard_module import WizardModule
 from src.wizard.wizard_record import SshAccount
@@ -23,6 +23,9 @@ from src.wizard.wizard_record import SshAccount
 BASE_DIR: Final[Path] = Path("/etc/arcnode")
 # Written by the provisioning path: setup.sh on-prem, EC2 UserData in the cloud.
 CONFIG_PATH: Final[Path] = BASE_DIR / "wizard-cfg.yml"
+# What every EMS container loads (src/compose/*/docker-compose.yaml) — the
+# same path the cloud's UserData writes.
+SECRETS_ENV_PATH: Final[Path] = Path("/opt/arcnode/secrets.env")
 PORT: Final[int] = 8080
 # Debian's adduser gives the first account created in the installer
 # FIRST_UID=1000 (/etc/adduser.conf) — that's the customer's login.
@@ -44,9 +47,10 @@ def main() -> None:
     app.include_router(
         WizardModule(
             base_dir=BASE_DIR,
+            secrets_env_path=SECRETS_ENV_PATH,
             account=installer_account(),
-            deployment=config.deployment,
-            run_probe=run_system_probe,
+            config=config,
+            run=run_system_command,
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.

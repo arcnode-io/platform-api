@@ -4,43 +4,26 @@ so the last row shows the installed key's fingerprint to compare against
 ``ssh-keygen -lf private-key.pem`` on their machine."""
 
 import shutil
-import subprocess  # nosec B404 — fixed-arg probes below, resolved paths, no shell
-from collections.abc import Callable
+import subprocess  # nosec B404 — ssh-keygen below, resolved path, no shell
 
-from src.wizard.wizard_record import CommandOutput, SshAccount, VerifyCheck
-
-Probe = Callable[[list[str]], CommandOutput]
-
-
-def run_system_probe(args: list[str]) -> CommandOutput:
-    """Real probe: run a fixed command; a missing binary is a failed check."""
-    binary = shutil.which(args[0])
-    if binary is None:
-        return CommandOutput(returncode=127, stdout=f"{args[0]} not found")
-    result = (
-        subprocess.run(  # noqa: S603  # nosec B603 — resolved absolute path, fixed args
-            [binary, *args[1:]], capture_output=True, text=True, check=False
-        )
-    )
-    return CommandOutput(
-        returncode=result.returncode, stdout=result.stdout or result.stderr
-    )
+from src.wizard.system_runner import Runner
+from src.wizard.wizard_record import Command, SshAccount, VerifyCheck
 
 
 def verify_ssh(
-    account: SshAccount, run_probe: Probe, installed_key: str
+    account: SshAccount, run: Runner, installed_key: str
 ) -> list[VerifyCheck]:
     """sshd running → answering → allowing key login → our key in place."""
     return [
-        _daemon_running(run_probe),
-        _answers_on_port_22(run_probe),
-        _key_login_allowed(account, run_probe),
+        _daemon_running(run),
+        _answers_on_port_22(run),
+        _key_login_allowed(account, run),
         _key_installed(account, installed_key),
     ]
 
 
-def _daemon_running(run_probe: Probe) -> VerifyCheck:
-    out = run_probe(["systemctl", "is-active", "ssh"])
+def _daemon_running(run: Runner) -> VerifyCheck:
+    out = run(Command(args=["systemctl", "is-active", "ssh"]))
     state = out.stdout.strip() or f"exit {out.returncode}"
     return VerifyCheck(
         name="SSH daemon running",
@@ -50,9 +33,9 @@ def _daemon_running(run_probe: Probe) -> VerifyCheck:
     )
 
 
-def _answers_on_port_22(run_probe: Probe) -> VerifyCheck:
+def _answers_on_port_22(run: Runner) -> VerifyCheck:
     # A real SSH handshake (host key returned), not just an open socket.
-    out = run_probe(["ssh-keyscan", "localhost"])
+    out = run(Command(args=["ssh-keyscan", "localhost"]))
     lines = [
         line for line in out.stdout.splitlines() if line and not line.startswith("#")
     ]
@@ -68,10 +51,17 @@ def _answers_on_port_22(run_probe: Probe) -> VerifyCheck:
     )
 
 
-def _key_login_allowed(account: SshAccount, run_probe: Probe) -> VerifyCheck:
+def _key_login_allowed(account: SshAccount, run: Runner) -> VerifyCheck:
     # sshd -T prints the effective config for this connection, Match blocks included.
-    out = run_probe(
-        ["sshd", "-T", "-C", f"user={account.name},host=localhost,addr=127.0.0.1"]
+    out = run(
+        Command(
+            args=[
+                "sshd",
+                "-T",
+                "-C",
+                f"user={account.name},host=localhost,addr=127.0.0.1",
+            ]
+        )
     )
     setting = next(
         (

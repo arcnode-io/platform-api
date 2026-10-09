@@ -25,7 +25,7 @@ checks:
 shell:
   stage: check
   script:
-    - docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable src/iso/build.sh src/iso/setup.sh
+    - docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable src/iso/build.sh src/iso/setup.sh src/iso/phases/*.sh
 
 build:
   stage: publish

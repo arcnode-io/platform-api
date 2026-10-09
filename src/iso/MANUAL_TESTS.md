@@ -27,13 +27,15 @@ Only a full reinstall from the real ISO on the real hardware counts.
 
 - [ ] Install finished with no prompts to click through (a prompt means
       something isn't preseeded — a `preseed.cfg` bug)
-- [ ] `cat /var/log/arcnode-late-command.log` shows every `==> [n/4]` phase
+- [ ] `cat /var/log/arcnode-late-command.log` shows every `==> [n/6]` phase
       and `arcnode setup complete` — check this first on any failure
 - [ ] The tty1 login prompt only appears once the box has an IP (boot shows
       `A start job is running for ArcNode: waiting for a network address…`
       until then); the first login's banner shows `ArcNode EMS` plus
       `Setup: http://<real-ip>:8080`
 - [ ] `systemctl is-active ssh` → `active`
+- [ ] `nvidia-smi` lists the GPU — the driver built and loaded at install
+      (if not: `mokutil --sb-state`; Secure Boot blocks the DKMS module)
 - [ ] Open the setup URL: an `ON-PREM` badge top right, one page — SSH access
 - [ ] Paste the **`.pem` itself** → **Install & verify** → refused, with the
       `ssh-keygen -y -f private-key.pem` hint
@@ -44,6 +46,12 @@ Only a full reinstall from the real ISO on the real hardware counts.
       on your machine; page shows `ssh -i private-key.pem <account>@<ip>`
 - [ ] `ssh -o PasswordAuthentication=no -i private-key.pem <account>@<ip>`
       logs in — proves your key, not the password, let you in
+- [ ] **Continue** → the PostgreSQL page: set a password → **Install &
+      verify** → five green rows: PostgreSQL 17 running, accepts the
+      password you set, TimescaleDB extension, pgvector extension, reachable
+      from Docker only
+- [ ] From your laptop, `psql -h <ip> -U postgres` is **refused** (no
+      pg_hba entry for your LAN) — Docker-only, as designed
 - [ ] `http://<ip>:8080` now returns 404
 
 ## Known gotchas — do not reintroduce
