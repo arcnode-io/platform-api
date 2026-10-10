@@ -12,12 +12,30 @@ from typing import Final
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
+from src.wizard.device_api_service import DeviceApiService, DeviceApiStepNotAvailableError
+from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
+from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
+from src.wizard.industrial_gateway_service import (
+    IndustrialGatewayService,
+    IndustrialGatewayStepNotAvailableError,
+)
 from src.wizard.docker_service import DockerService, DockerStepNotAvailableError
+from src.wizard.hivemq_service import HivemqService, HivemqStepNotAvailableError
 from src.wizard.neo4j_service import Neo4jService, Neo4jStepNotAvailableError
 from src.wizard.ollama_service import OllamaService, OllamaStepNotAvailableError
 from src.wizard.postgres_service import PostgresService, PostgresStepNotAvailableError
+from src.wizard.analyst_model_service import (
+    AnalystModelService,
+    AnalystModelStepNotAvailableError,
+)
+from src.wizard.mlflow_service import MlflowService, MlflowStepNotAvailableError
 from src.wizard.preflight_service import PreflightService
+from src.wizard.prometheus_service import PrometheusService, PrometheusStepNotAvailableError
 from src.wizard.site_service import SiteService, SiteStepNotAvailableError
+from src.wizard.telemetry_writer_service import (
+    TelemetryWriterService,
+    TelemetryWriterStepNotAvailableError,
+)
 from src.wizard.ssh_service import (
     InvalidSshKeyError,
     SshService,
@@ -26,7 +44,9 @@ from src.wizard.ssh_service import (
 from src.wizard.wizard_record import (
     ApplyRequest,
     ApplyResult,
+    BrokerPasswords,
     Deployment,
+    DeviceApiSecrets,
     PasswordRequest,
     SetupInfo,
     SshAccount,
@@ -57,6 +77,15 @@ class WizardController:
         neo4j: Neo4jService,
         ollama: OllamaService,
         site: SiteService,
+        hivemq: HivemqService,
+        telemetry: TelemetryWriterService,
+        prometheus: PrometheusService,
+        mlflow: MlflowService,
+        analyst_model: AnalystModelService,
+        device_api: DeviceApiService,
+        industrial_gateway: IndustrialGatewayService,
+        hmi: HmiService,
+        grafana: GrafanaService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -68,6 +97,15 @@ class WizardController:
         self._neo4j = neo4j
         self._ollama = ollama
         self._site = site
+        self._hivemq = hivemq
+        self._telemetry = telemetry
+        self._prometheus = prometheus
+        self._mlflow = mlflow
+        self._analyst_model = analyst_model
+        self._device_api = device_api
+        self._industrial_gateway = industrial_gateway
+        self._hmi = hmi
+        self._grafana = grafana
         self._tracker = tracker
         self._deployment = deployment
         self._account = account
@@ -85,6 +123,15 @@ class WizardController:
             ("POST", "/api/neo4j", self.neo4j),
             ("POST", "/api/ollama", self.ollama),
             ("POST", "/api/site", self.site),
+            ("POST", "/api/hivemq", self.hivemq),
+            ("POST", "/api/telemetry", self.telemetry),
+            ("POST", "/api/prometheus", self.prometheus),
+            ("POST", "/api/mlflow", self.mlflow),
+            ("POST", "/api/analyst-model", self.analyst_model),
+            ("POST", "/api/device-api", self.device_api),
+            ("POST", "/api/industrial-gateway", self.industrial_gateway),
+            ("POST", "/api/hmi", self.hmi),
+            ("POST", "/api/grafana", self.grafana),
         ]
         for method, path, handler in routes:
             self.router.add_api_route(path, handler, methods=[method])
@@ -170,6 +217,69 @@ class WizardController:
         try:
             return self._site.apply()
         except (StepAlreadyDoneError, SiteStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def hivemq(self, request: BrokerPasswords) -> StepResult:
+        """The on-prem HiveMQ page — see HivemqService.apply."""
+        try:
+            return self._hivemq.apply(request)
+        except (StepAlreadyDoneError, HivemqStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def telemetry(self) -> StepResult:
+        """The on-prem Telemetry writer page — see TelemetryWriterService.apply."""
+        try:
+            return self._telemetry.apply()
+        except (StepAlreadyDoneError, TelemetryWriterStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def prometheus(self) -> StepResult:
+        """The on-prem Prometheus page — see PrometheusService.apply."""
+        try:
+            return self._prometheus.apply()
+        except (StepAlreadyDoneError, PrometheusStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def mlflow(self) -> StepResult:
+        """The on-prem MLflow page — see MlflowService.apply."""
+        try:
+            return self._mlflow.apply()
+        except (StepAlreadyDoneError, MlflowStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def analyst_model(self) -> StepResult:
+        """The on-prem analyst model page — see AnalystModelService.apply."""
+        try:
+            return self._analyst_model.apply()
+        except (StepAlreadyDoneError, AnalystModelStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def device_api(self, request: DeviceApiSecrets) -> StepResult:
+        """The on-prem Device API page — see DeviceApiService.apply."""
+        try:
+            return self._device_api.apply(request)
+        except (StepAlreadyDoneError, DeviceApiStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def industrial_gateway(self) -> StepResult:
+        """The on-prem Industrial gateway page — see IndustrialGatewayService.apply."""
+        try:
+            return self._industrial_gateway.apply()
+        except (StepAlreadyDoneError, IndustrialGatewayStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def hmi(self) -> StepResult:
+        """The on-prem HMI page — see HmiService.apply."""
+        try:
+            return self._hmi.apply()
+        except (StepAlreadyDoneError, HmiStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def grafana(self, request: PasswordRequest) -> StepResult:
+        """The on-prem Grafana page — see GrafanaService.apply."""
+        try:
+            return self._grafana.apply(request)
+        except (StepAlreadyDoneError, GrafanaStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def _refuse_if_applied(self) -> None:

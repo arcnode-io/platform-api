@@ -17,6 +17,15 @@ const ALL_STEPS = [
   { id: 'neo4j',    n: 4, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
   { id: 'ollama',   n: 5, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
   { id: 'site',     n: 6, title: 'Site',       sub: 'From your order',           deployments: ['on-prem'] },
+  { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts',           deployments: ['on-prem'] },
+  { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements', deployments: ['on-prem'] },
+  { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology', deployments: ['on-prem'] },
+  { id: 'industrial_gateway', n: 10, title: 'Industrial gateway', sub: 'Device bridge', deployments: ['on-prem'] },
+  { id: 'hmi',      n: 11, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
+  { id: 'mlflow',   n: 12, title: 'MLflow',     sub: 'Experiment tracking',       deployments: ['on-prem'] },
+  { id: 'analyst_model', n: 13, title: 'Analyst model', sub: 'Daily forecast',    deployments: ['on-prem'] },
+  { id: 'prometheus', n: 14, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
+  { id: 'grafana',  n: 15, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -538,6 +547,11 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [sshKey, setSshKey] = useStateW('');
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
+  const [grafanaPassword, setGrafanaPassword] = useStateW('');
+  // One password per MQTT broker account, keyed as the API expects.
+  const [brokerPasswords, setBrokerPasswords] = useStateW({});
+  // The Device API's signing key and login passwords.
+  const [deviceApiSecrets, setDeviceApiSecrets] = useStateW({});
   // { [model]: latest download progress } while the Ollama page streams
   const [downloads, setDownloads] = useStateW({});
 
@@ -557,6 +571,12 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const pageOf = (id) => pages[id] || { state: completed.has(id) ? 'done' : 'idle', error: null, result: null };
   const setPage = (id, patch) => setPages(p => ({ ...p, [id]: { ...pageOf(id), ...p[id], ...patch } }));
 
+  // Re-read which pages the server has done, so a stale browser copy catches up.
+  const syncCompleted = () => fetch('/api/config').then(r => r.json()).then(s => {
+    setCompleted(new Set(s.completed));
+    return s.completed;
+  });
+
   const applyStep = (id, url, payload) => {
     setPage(id, { state: 'applying', error: null });
     fetch(url, {
@@ -566,6 +586,13 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     })
       .then(async (r) => {
         const body = await r.json().catch(() => ({}));
+        // Reason: a 404 on an apply means the server already has this page done
+        // ("X is already set up"). Only the server's list can confirm it, so
+        // check that before calling the page done.
+        if (r.status === 404 && (await syncCompleted()).includes(id)) {
+          setPage(id, { state: 'done', error: null });
+          return;
+        }
         if (!r.ok) throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
         setPage(id, { state: body.verified ? 'done' : 'unverified', result: body });
         if (body.verified) setCompleted(s => new Set([...s, id]));
@@ -639,6 +666,43 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'site' && (
             <StepSite t={t} page={pageOf('site')}
               onApply={() => applyStep('site', '/api/site', {})}/>
+          )}
+          {current === 'prometheus' && (
+            <StepPrometheus t={t} page={pageOf('prometheus')}
+              onApply={() => applyStep('prometheus', '/api/prometheus', {})}/>
+          )}
+          {current === 'industrial_gateway' && (
+            <StepIndustrialGateway t={t} page={pageOf('industrial_gateway')}
+              onApply={() => applyStep('industrial_gateway', '/api/industrial-gateway', {})}/>
+          )}
+          {current === 'grafana' && (
+            <StepGrafana t={t} page={pageOf('grafana')} password={grafanaPassword} onPassword={setGrafanaPassword}
+              onApply={() => applyStep('grafana', '/api/grafana', { password: grafanaPassword })}/>
+          )}
+          {current === 'hmi' && (
+            <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
+          )}
+          {current === 'device_api' && (
+            <StepDeviceApi t={t} page={pageOf('device_api')} secrets={deviceApiSecrets}
+              onSecret={(key, value) => setDeviceApiSecrets(p => ({ ...p, [key]: value }))}
+              onApply={() => applyStep('device_api', '/api/device-api', deviceApiSecrets)}/>
+          )}
+          {current === 'mlflow' && (
+            <StepMlflow t={t} page={pageOf('mlflow')}
+              onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
+          )}
+          {current === 'analyst_model' && (
+            <StepAnalystModel t={t} page={pageOf('analyst_model')}
+              onApply={() => applyStep('analyst_model', '/api/analyst-model', {})}/>
+          )}
+          {current === 'telemetry' && (
+            <StepTelemetry t={t} page={pageOf('telemetry')}
+              onApply={() => applyStep('telemetry', '/api/telemetry', {})}/>
+          )}
+          {current === 'hivemq' && (
+            <StepHivemq t={t} page={pageOf('hivemq')} passwords={brokerPasswords}
+              onPassword={(key, value) => setBrokerPasswords(p => ({ ...p, [key]: value }))}
+              onApply={() => applyStep('hivemq', '/api/hivemq', brokerPasswords)}/>
           )}
         </div>
       </div>

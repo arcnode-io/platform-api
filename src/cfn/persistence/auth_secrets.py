@@ -109,6 +109,9 @@ def auth_human_secrets() -> dict[str, dict]:
         "AuthViewerPwSecret": _param_secret(
             "auth-viewer-pw", "AuthViewerPw", "Viewer login password (plaintext)."
         ),
+        "GrafanaAdminPwSecret": _param_secret(
+            "grafana-admin-pw", "GrafanaAdminPw", "Grafana admin password (plaintext)."
+        ),
     }
 
 
@@ -191,5 +194,11 @@ def auth_human_parameters() -> dict[str, dict]:
             "NoEcho": True,
             "MinLength": 1,
             "Description": "Viewer login password (HMI read-only role).",
+        },
+        "GrafanaAdminPw": {
+            "Type": "String",
+            "NoEcho": True,
+            "MinLength": 1,
+            "Description": "Grafana admin password (observability dashboards).",
         },
     }

@@ -107,6 +107,17 @@ class SetupInfo(BaseModel):
     completed: list[str]
 
 
+def check_complexity(value: str) -> str:
+    """The daemon password policy: an uppercase letter, a number, a special character."""
+    if not re.search(r"[A-Z]", value):
+        raise ValueError("must contain at least one uppercase letter")
+    if not re.search(r"\d", value):
+        raise ValueError("must contain at least one number")
+    if not re.search(r"[^A-Za-z0-9]", value):
+        raise ValueError("must contain at least one special character")
+    return value
+
+
 class PasswordRequest(BaseModel):
     """POST /api/postgres, /api/neo4j body — the daemon's admin password.
 
@@ -120,13 +131,7 @@ class PasswordRequest(BaseModel):
     @classmethod
     def password_meets_complexity(cls, value: str) -> str:
         """Length is already enforced by the Field constraint above."""
-        if not re.search(r"[A-Z]", value):
-            raise ValueError("must contain at least one uppercase letter")
-        if not re.search(r"\d", value):
-            raise ValueError("must contain at least one number")
-        if not re.search(r"[^A-Za-z0-9]", value):
-            raise ValueError("must contain at least one special character")
-        return value
+        return check_complexity(value)
 
 
 class StepResult(BaseModel):
@@ -142,3 +147,34 @@ class DockerNetwork(BaseModel):
 
     subnet: IPv4Network
     gateway: IPv4Address
+
+
+class BrokerPasswords(BaseModel):
+    """POST /api/hivemq body — the customer's three broker passwords. The four
+    service accounts share `service`; operator and viewer are people. Nothing
+    is generated (customer-sets-all-secrets)."""
+
+    service: str = Field(min_length=8)
+    operator: str = Field(min_length=8)
+    viewer: str = Field(min_length=8)
+
+    @field_validator("service", "operator", "viewer")
+    @classmethod
+    def password_meets_complexity(cls, value: str) -> str:
+        """Same policy as the daemon passwords."""
+        return check_complexity(value)
+
+
+class DeviceApiSecrets(BaseModel):
+    """POST /api/device-api body — the auth secrets the Device API signs and
+    checks logins with. The customer sets all three."""
+
+    jwt_secret: str = Field(min_length=32)
+    operator_password: str = Field(min_length=8)
+    viewer_password: str = Field(min_length=8)
+
+    @field_validator("operator_password", "viewer_password")
+    @classmethod
+    def password_meets_complexity(cls, value: str) -> str:
+        """Same policy as the daemon passwords."""
+        return check_complexity(value)

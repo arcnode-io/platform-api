@@ -148,6 +148,15 @@ services:
     image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
     restart: unless-stopped
     <<: *env-files
+    environment:
+      ENV: beta
+      # Same overlay pattern as analyst-server: UserData writes the file with
+      # the MLflow address and site_id; the loader merges it over cfg.yml.
+      CFG_CUSTOMER_PATH: /app/cfg.customer.yml
+    volumes:
+      - /opt/arcnode/analyst-model-cfg.customer.yml:/app/cfg.customer.yml:ro
+    # Long-running daemon: runs the pipeline daily at schedule_time.
+    command: ["uv", "run", "-m", "src.main", "--mode", "schedule"]
 
   # Observability + ML tracking — added across cloud + ISO so every
   # deployment ships with the same on-box telemetry surface. Cloud
@@ -167,8 +176,6 @@ services:
     image: grafana/grafana:latest
     restart: unless-stopped
     <<: *env-files
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-arcnode}
     volumes:
       - /opt/arcnode/observability/grafana-data:/var/lib/grafana
       - /opt/arcnode/observability/grafana-provisioning:/etc/grafana/provisioning:ro

@@ -10,6 +10,17 @@ from src.wizard.controller_fixtures import wizard_client
 from src.wizard.wizard_fixtures import FakeRunner, ec2_style_pem, ok
 from src.wizard.wizard_record import Deployment
 
+DEVICE_API_SECRETS: dict[str, str] = {
+    "jwt_secret": "x" * 40,
+    "operator_password": "Operator-pw-1!",
+    "viewer_password": "Viewer-pw-1!",
+}
+BROKER_PASSWORDS: dict[str, str] = {
+    "service": "Service-pw-1!",
+    "operator": "Operator-pw-1!",
+    "viewer": "Viewer-pw-1!",
+}
+
 
 def test_hardware_check_returns_every_row_with_its_debug_command(
     tmp_path: Path,
@@ -87,8 +98,17 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     # Ollama streams NDJSON — progress lines, then the result
     ollama = client.post("/api/ollama")
 
-    # Act: the last page
     site = client.post("/api/site")
+    # Act: the last page
+    hivemq = client.post("/api/hivemq", json=BROKER_PASSWORDS)
+    telemetry = client.post("/api/telemetry")
+    prometheus = client.post("/api/prometheus")
+    mlflow = client.post("/api/mlflow")
+    analyst_model = client.post("/api/analyst-model")
+    device_api = client.post("/api/device-api", json=DEVICE_API_SECRETS)
+    gateway = client.post("/api/industrial-gateway")
+    hmi = client.post("/api/hmi")
+    grafana = client.post("/api/grafana", json={"password": "Grafana-pw-1!"})
 
     # Assert
     lines = [json.loads(line) for line in ollama.text.splitlines()]
@@ -96,6 +116,15 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert lines[0]["progress"]["model"] == "gemma4:26b"
     assert lines[-1]["result"]["verified"] is True
     assert site.json()["verified"] is True
+    assert hivemq.json()["verified"] is True
+    assert telemetry.json()["verified"] is True
+    assert prometheus.json()["verified"] is True
+    assert mlflow.json()["verified"] is True
+    assert analyst_model.json()["verified"] is True
+    assert device_api.json()["verified"] is True
+    assert gateway.json()["verified"] is True
+    assert hmi.json()["verified"] is True
+    assert grafana.json()["verified"] is True
     assert client.get("/").status_code == 404
 
 
@@ -109,6 +138,16 @@ def test_docker_page_reports_the_range_docker_picked(tmp_path: Path) -> None:
     # Assert
     assert response.status_code == 200
     assert response.json()["checks"][1]["detail"] == "172.23.0.0/16, gateway 172.23.0.1"
+
+
+def test_cloud_has_no_hivemq_route(tmp_path: Path) -> None:
+    # Arrange: UserData starts the broker in the cloud
+    client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
+    # Act
+    response = client.post("/api/hivemq", json=BROKER_PASSWORDS)
+
+    # Assert
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(

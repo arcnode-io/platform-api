@@ -13,6 +13,7 @@ from src.wizard.wizard_record import Command, CommandOutput, Deployment, SshAcco
 from src.wizard.wizard_steps import StepTracker
 
 SSH_KEYGEN = shutil.which("ssh-keygen")
+TEST_ORDER_DTM = Path(__file__).parent.parent / "iso" / "phases" / "test-order" / "dtm.json"
 
 
 def ssh_keygen(*args: str) -> str:
@@ -66,12 +67,39 @@ class FakeRunner:
             "findmnt": ok("/dev/nvme1n1p1 1000202273280\n"),
             "lsblk": ok("part \ndisk nvme\n"),
             "tee": ok(""),
+            "curl": ok(""),
             "mkdir": ok(""),
             "sed": ok(""),
             # Neo4j's bolt port, on the arcnode gateway only (java's v4-mapped socket)
             "ss": ok("LISTEN 0      4096   [::ffff:172.23.0.1]:7687 *:*\n"),
         }
         self.queries: dict[str, CommandOutput] = {
+            # Device API: its answers, the operator login, topology, and the broker log.
+            "device-api:3000/auth/login": ok('{"token":"eyJhbGciOiJIUzI1NiJ9.e30.sig"}'),
+            # The test order's topology: what the Site page wrote, and what the API serves back.
+            "device-api:3000/topology": ok(TEST_ORDER_DTM.read_text()),
+            "device-api:3000/": ok("ok"),
+            "logs device-api": ok("mqtt connected mqtt://hivemq:1883\n"),
+            # HiveMQ: compose's status + readiness log, and the broker probes.
+            # These sit above "run --rm", which would otherwise catch the probes.
+            "--status running": ok("3f1c2a9e0b7d\n"),
+            "logs hivemq": ok("Started HiveMQ in 5496ms\n"),
+            "1883 -t": CommandOutput(
+                returncode=4, stdout="Connection Refused: bad user name or password\n"
+            ),
+            "-u arcnode_": ok(""),
+            "logs telemetry-writer": ok("measurements bootstrap done\nsubscribed to sites/+/devices/+/measurements/# (reason_code=Success)\n"),
+            "logs prometheus": ok("level=INFO msg=\"Server is ready to receive web requests.\"\n"),
+            "logs mlflow": ok("Listening at: http://0.0.0.0:5000\n"),
+            "mlflow:5000/health": ok("OK"),
+            "logs analyst-model": ok("✅ MLflow healthy at http://mlflow:5000\nScheduler started. Will run daily at 14:00\n"),
+            "logs industrial-gateway": ok("initial spec fetched\nMQTT subscriptions established\n"),
+            "logs hmi": ok("start worker processes\n"),
+            "curlimages/curl -fsS -o": ok("200"),
+            "logs grafana": ok("logger=http.server msg=\"HTTP Server Listen\"\n"),
+            "grafana:3000/api/health": ok('{"database":"ok","version":"12.0.0"}'),
+            "api/user": ok("200"),
+            "compose -f": ok(""),
             # Before "run --rm" and "/api/embed": the ollama probe container.
             "curlimages/curl": ok(
                 '{"model":"qwen3-embedding:4b-ctx8192","embeddings":[[0.1,0.2,0.3]]}'

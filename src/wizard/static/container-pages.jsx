@@ -37,3 +37,317 @@ function StepSite({ t, page, onApply }) {
 }
 
 window.StepSite = StepSite;
+
+// ─── HiveMQ ──────────────────────────────────────────────────────────
+// One password per broker account. The EMS services log in with these, so
+// the page takes all six before it starts the broker.
+// The four EMS services share one service password; operator and viewer are people.
+const BROKER_ACCOUNTS = [
+  { key: 'service',  label: 'Service password (gateway, Device API, telemetry, DER control)' },
+  { key: 'operator', label: 'Operator' },
+  { key: 'viewer',   label: 'Viewer' },
+];
+
+function StepHivemq({ t, page, passwords, onPassword, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const allFilled  = BROKER_ACCOUNTS.every(a => passwords[a.key]);
+  const anyProblem = BROKER_ACCOUNTS.some(a => passwords[a.key] && passwordProblem(passwords[a.key]));
+  const canApply   = !isApplying && !isDone && allFilled && !anyProblem;
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Install & verify';
+  return (
+    <StepShellW t={t} title="HiveMQ"
+      blurb="Set one password for each account that connects to the MQTT broker. The EMS services log in with these, and each account can only do what its job needs.">
+      {BROKER_ACCOUNTS.map(a => {
+        const value   = passwords[a.key] || '';
+        const problem = value ? passwordProblem(value) : null;
+        return (
+          <div key={a.key} style={{ marginBottom: SPACE[4] }}>
+            <FieldLabelW t={t} required>{a.label}</FieldLabelW>
+            <PasswordInputW t={t} label={a.label} value={value}
+              onChange={v => onPassword(a.key, v)}
+              disabled={isApplying || isDone} error={!!problem}/>
+            {problem && <HelperW t={t} error>{problem}</HelperW>}
+          </div>
+        );
+      })}
+      <HelperW t={t}>At least 8 characters with an uppercase letter, a number, and a special character.</HelperW>
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+
+// ─── Telemetry writer ────────────────────────────────────────────────
+// No input: it reuses the broker password and the database URL the earlier pages saved.
+function StepTelemetry({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="Telemetry writer"
+      blurb="Starts the service that saves every measurement from the broker into the timeseries database. It needs the HiveMQ and PostgreSQL pages finished first.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+
+// ─── Prometheus ─────────────────────────────────────────────────────────
+// No input: it fetches the same scrape config as the cloud, then starts Prometheus.
+function StepPrometheus({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="Prometheus"
+      blurb="it fetches the same scrape config as the cloud, then starts Prometheus.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+// ─── MLflow ─────────────────────────────────────────────────────────
+// No input: it starts the experiment tracker the analyst model logs its forecasts to.
+function StepMlflow({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="MLflow"
+      blurb="it starts the experiment tracker the analyst model logs its forecasts to.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+
+// ─── Device API ──────────────────────────────────────────────────────
+// The signing key and the two login passwords the Device API checks against.
+function StepDeviceApi({ t, page, secrets, onSecret, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const jwtOk      = secrets.jwt_secret && secrets.jwt_secret.length >= 32;
+  const opProblem  = secrets.operator_password ? passwordProblem(secrets.operator_password) : null;
+  const viProblem  = secrets.viewer_password ? passwordProblem(secrets.viewer_password) : null;
+  const canApply   = !isApplying && !isDone && jwtOk && secrets.operator_password && secrets.viewer_password && !opProblem && !viProblem;
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Install & verify';
+  return (
+    <StepShellW t={t} title="Device API"
+      blurb="The signing key that logs people in to the HMI, plus the operator and viewer passwords. The Device API serves your site's topology and checks these logins.">
+      <div style={{ marginBottom: SPACE[4] }}>
+        <FieldLabelW t={t} required>JWT signing key</FieldLabelW>
+        <PasswordInputW t={t} label="JWT signing key" value={secrets.jwt_secret || ''}
+          onChange={v => onSecret('jwt_secret', v)} disabled={isApplying || isDone}
+          error={!!secrets.jwt_secret && !jwtOk}/>
+        <HelperW t={t} error={!!secrets.jwt_secret && !jwtOk}>At least 32 characters.</HelperW>
+      </div>
+      <div style={{ marginBottom: SPACE[4] }}>
+        <FieldLabelW t={t} required>Operator password</FieldLabelW>
+        <PasswordInputW t={t} label="Operator password" value={secrets.operator_password || ''}
+          onChange={v => onSecret('operator_password', v)} disabled={isApplying || isDone} error={!!opProblem}/>
+        {opProblem && <HelperW t={t} error>{opProblem}</HelperW>}
+      </div>
+      <div style={{ marginBottom: SPACE[4] }}>
+        <FieldLabelW t={t} required>Viewer password</FieldLabelW>
+        <PasswordInputW t={t} label="Viewer password" value={secrets.viewer_password || ''}
+          onChange={v => onSecret('viewer_password', v)} disabled={isApplying || isDone} error={!!viProblem}/>
+        {viProblem && <HelperW t={t} error>{viProblem}</HelperW>}
+      </div>
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+window.StepHivemq = StepHivemq;
+window.StepTelemetry = StepTelemetry;
+window.StepPrometheus = StepPrometheus;
+window.StepMlflow = StepMlflow;
+// ─── Analyst model ──────────────────────────────────────────────────────────────
+// No input: it starts the model that trains and publishes the daily price forecast to MLflow.
+function StepAnalystModel({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="Analyst model"
+      blurb="it starts the model that trains and publishes the daily price forecast to MLflow.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+window.StepAnalystModel = StepAnalystModel;
+window.StepDeviceApi = StepDeviceApi;
+
+// ─── Industrial gateway ─────────────────────────────────────────────────────────
+// No input: it starts the gateway that bridges your devices onto the broker. It fetches the device spec and subscribes to the broker.
+function StepIndustrialGateway({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="Industrial gateway" blurb="it starts the gateway that bridges your devices onto the broker. It fetches the device spec and subscribes to the broker.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+// ─── HMI ─────────────────────────────────────────────────────────
+// No input: it starts the operator screen on port 80, served to the browsers on this box.
+function StepHmi({ t, page, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="HMI" blurb="it starts the operator screen on port 80, served to the browsers on this box.">
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+
+window.StepIndustrialGateway = StepIndustrialGateway;
+window.StepHmi = StepHmi;

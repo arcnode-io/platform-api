@@ -2,12 +2,21 @@
 
 from pathlib import Path
 
+from src.wizard.device_api_service import DeviceApiService
 from src.wizard.docker_service import DockerService
+from src.wizard.grafana_service import GrafanaService
+from src.wizard.hmi_service import HmiService
+from src.wizard.industrial_gateway_service import IndustrialGatewayService
+from src.wizard.hivemq_service import HivemqService
 from src.wizard.neo4j_service import Neo4jService
 from src.wizard.ollama_service import OllamaService
 from src.wizard.postgres_service import PostgresService
+from src.wizard.analyst_model_service import AnalystModelService
+from src.wizard.mlflow_service import MlflowService
 from src.wizard.preflight_service import PreflightService
+from src.wizard.prometheus_service import PrometheusService
 from src.wizard.site_service import SiteService
+from src.wizard.telemetry_writer_service import TelemetryWriterService
 from src.wizard.ssh_service import SshService
 from src.wizard.system_runner import LineStream, Runner
 from src.wizard.wizard_controller import WizardController
@@ -78,6 +87,53 @@ class WizardModule:
             ems_dir=ems_dir,
             analyst_cfg_path=analyst_cfg_path,
         )
+        self.hivemq = HivemqService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
+        self.telemetry = TelemetryWriterService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
+        self.prometheus = PrometheusService(
+            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
+        )
+        self.mlflow = MlflowService(deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run)
+        self.analyst_model = AnalystModelService(
+            deployment=deployment,
+            tracker=tracker,
+            order_dir=base_dir / "order",
+            ems_dir=ems_dir,
+            run=run,
+        )
+        self.device_api = DeviceApiService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
+        self.industrial_gateway = IndustrialGatewayService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
+        self.hmi = HmiService(deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run)
+        self.grafana = GrafanaService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
         self.router = WizardController(
             preflight=self.preflight,
             ssh=self.ssh,
@@ -86,6 +142,15 @@ class WizardModule:
             neo4j=self.neo4j,
             ollama=self.ollama,
             site=self.site,
+            hivemq=self.hivemq,
+            telemetry=self.telemetry,
+            prometheus=self.prometheus,
+            mlflow=self.mlflow,
+            analyst_model=self.analyst_model,
+            device_api=self.device_api,
+            industrial_gateway=self.industrial_gateway,
+            hmi=self.hmi,
+            grafana=self.grafana,
             tracker=tracker,
             deployment=deployment,
             account=account,

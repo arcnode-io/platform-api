@@ -45,6 +45,7 @@ def test_commercial_build_declares_required_parameters() -> None:
         "GridstatusApiKey",
         "AuthOperatorPw",
         "AuthViewerPw",
+        "GrafanaAdminPw",
     }
 
 
@@ -76,6 +77,7 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "AuthJwtSecret",
         "AuthOperatorPwSecret",
         "AuthViewerPwSecret",
+        "GrafanaAdminPwSecret",
     }
 
 
@@ -120,6 +122,7 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
         "GridstatusApiKey",
         "AuthOperatorPw",
         "AuthViewerPw",
+        "GrafanaAdminPw",
     }
 
 
@@ -153,6 +156,7 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
         "AuthJwtSecret",
         "AuthOperatorPwSecret",
         "AuthViewerPwSecret",
+        "GrafanaAdminPwSecret",
     }
 
 

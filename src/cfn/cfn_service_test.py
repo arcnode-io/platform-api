@@ -409,58 +409,36 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
             "AuthJwtSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
+            "GrafanaAdminPwSecret",
         ):
             assert logical in rendered, f"{logical} missing in {ctx}"
         # NoEcho params the customer pastes
         assert "AuthOperatorPw" in rendered
         assert "AuthViewerPw" in rendered
+        assert "GrafanaAdminPw" in rendered
 
 
 def test_userdata_writes_broker_credentials_xml() -> None:
-    """UserData writes /opt/arcnode/credentials.xml (bind-mounted into the
-    File RBAC extension) with every broker password + role identity."""
+    """UserData fetches the shared credentials template and fills its six
+    password placeholders, writing /opt/arcnode/credentials.xml (bind-mounted
+    into the File RBAC extension)."""
     # Arrange + Act
     rendered = _render()
 
-    # Assert — file path + every File-RBAC username in the heredoc
+    # Assert — the template comes from arcnode-public, the file lands where
+    # compose mounts it, and every placeholder gets its password
+    assert "/compose/credentials.template.xml" in rendered
     assert "/opt/arcnode/credentials.xml" in rendered
-    for user in (
-        "arcnode_gateway",
-        "arcnode_operator",
-        "arcnode_viewer",
-        "arcnode_device_api",
-        "arcnode_telemetry_writer",
-        "arcnode_der_control_api",
+    for placeholder in (
+        "__GATEWAY_PASSWORD__",
+        "__OPERATOR_PASSWORD__",
+        "__VIEWER_PASSWORD__",
+        "__DEVICE_API_PASSWORD__",
+        "__TELEMETRY_WRITER_PASSWORD__",
+        "__DER_CONTROL_API_PASSWORD__",
     ):
-        assert user in rendered, f"{user} missing from credentials.xml"
-    # The gateway subscribes system/topology_changed (hot topology reload) and
-    # device-api publishes it — both need the system/# ACL or the gateway
-    # fail-louds on the denied subscribe. Regression guard.
-    assert "<topic>system/#</topic>" in rendered
-    assert "MQTT_DEVICE_API_PASSWORD" in rendered
-    # der-control-api publishes DERControl setpoints as measurements on the
-    # der_dispatch singleton device, and envelope-mode limits on the
-    # operating_envelope singleton. It also subscribes der_dispatch's own
-    # measurements (reads back its own target_active_power/event_active
-    # publishes, plus actual_active_power) and der_dispatch commands
-    # (operator approve/reject) — a denied SUBSCRIBE fails silently, unlike
-    # a denied PUBLISH, so this is a regression guard for exactly that.
+        assert placeholder in rendered, f"{placeholder} not filled"
     assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
-    assert (
-        rendered.count("<topic>sites/+/devices/der_dispatch/measurements/#</topic>")
-        >= 2
-    ), "expected both a PUBLISH and a SUBSCRIBE grant on der_dispatch measurements"
-    assert "<topic>sites/+/devices/der_dispatch/commands/#</topic>" in rendered
-    assert (
-        "<topic>sites/+/devices/operating_envelope/measurements/#</topic>" in rendered
-    )
-    # mock_derms is a separate trust domain (ems/readme.md's deployment
-    # diagram) — it gets no broker identity in the product's own ACL.
-    assert "mock_derms_dispatch_api" not in rendered
-    assert "arcnode_mock_derms_dispatch_api" not in rendered
-    # Dispatch lifecycle: gateway publishes events/dispatch_state; HMI roles
-    # subscribe it. Without these grants dispatch acks are silently denied.
-    assert rendered.count("<topic>sites/+/devices/+/events/#</topic>") >= 3
 
 
 def test_userdata_fetches_auth_slots_into_secrets_env() -> None:
@@ -565,3 +543,17 @@ def test_stack_exposes_gateway_bootstrap_contract() -> None:
     assert "ws://${EmsEip}/mqtt" in rendered
     assert "http://${EmsEip}/api" in rendered
     assert f"SiteId:\n    Value: {SITE_ID}" in rendered or SITE_ID in rendered
+
+
+def test_commercial_userdata_writes_analyst_model_cfg_with_mlflow_address() -> None:
+    """Commercial UserData writes analyst-model-cfg.customer.yml pointing the
+    model at the compose-network MLflow, not the dev box in cfg.yml."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert — written by the same heredoc pattern as the other overlays
+    assert "cat > /opt/arcnode/analyst-model-cfg.customer.yml <<YML" in rendered
+    model_block = rendered.split("analyst-model-cfg.customer.yml <<YML")[1]
+    heredoc_body = model_block.split("YML\n")[0]
+    assert "mlflow_tracking_uri: http://mlflow:5000" in heredoc_body
+    assert "site_id:" in heredoc_body

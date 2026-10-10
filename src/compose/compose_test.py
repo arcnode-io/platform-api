@@ -208,3 +208,24 @@ def test_all_services_consume_split_env_files(variant_path: Path) -> None:
         assert (
             "/opt/arcnode/secrets.env" in env_files
         ), f"{variant_path.name}: {name} missing secrets.env"
+
+
+def test_analyst_model_runs_beta_stage_as_a_daily_daemon() -> None:
+    """analyst-model reads its beta stage + the box's customer overlay, and
+    runs --mode schedule so the container stays up for the daily job.
+
+    Reason: the image defaults to --mode schedule now, but compose passes it
+    anyway so a future default flip can't turn this into a run-once-and-exit loop.
+    """
+    # Arrange + Act
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["analyst-model"]
+
+    # Assert
+    assert service["environment"] == {
+        "ENV": "beta",
+        "CFG_CUSTOMER_PATH": "/app/cfg.customer.yml",
+    }
+    assert service["volumes"] == [
+        "/opt/arcnode/analyst-model-cfg.customer.yml:/app/cfg.customer.yml:ro"
+    ]
+    assert service["command"] == ["uv", "run", "-m", "src.main", "--mode", "schedule"]

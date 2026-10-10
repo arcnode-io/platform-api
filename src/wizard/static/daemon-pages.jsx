@@ -146,5 +146,11 @@ function StepNeo4j(props) {
     blurb="Set the password for the neo4j admin account. ArcNode's services use it to reach the knowledge graph, which only listens on the network shared with its Docker containers. Neo4j gets a fixed 4 GB heap + 4 GB page cache."/>;
 }
 
+function StepGrafana(props) {
+  return <StepPassword {...props} title="Grafana" label="Grafana admin password"
+    blurb="Set the admin password for the dashboards. You sign in with the username admin and this password. It is saved for Grafana only; nothing else uses it."/>;
+}
+
 window.StepPostgres = StepPostgres;
 window.StepNeo4j = StepNeo4j;
+window.StepGrafana = StepGrafana;

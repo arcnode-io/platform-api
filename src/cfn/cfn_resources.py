@@ -60,6 +60,7 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
+    ("grafana-admin-pw", "GF_SECURITY_ADMIN_PASSWORD"),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
@@ -593,88 +594,14 @@ def build_userdata(
         "DCA_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-der-control-api-password "
         "--query SecretString --output text)\n"
-        "cat > /opt/arcnode/credentials.xml <<XML\n"
-        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-        "<file-rbac>\n"
-        "  <users>\n"
-        "    <user><name>arcnode_gateway</name><password>$GW_PW</password>"
-        "<roles><id>gateway</id></roles></user>\n"
-        "    <user><name>arcnode_operator</name><password>$OP_PW</password>"
-        "<roles><id>operator</id></roles></user>\n"
-        "    <user><name>arcnode_viewer</name><password>$VW_PW</password>"
-        "<roles><id>viewer</id></roles></user>\n"
-        "    <user><name>arcnode_device_api</name><password>$DA_PW</password>"
-        "<roles><id>device_api</id></roles></user>\n"
-        "    <user><name>arcnode_telemetry_writer</name><password>$TW_PW</password>"
-        "<roles><id>telemetry_writer</id></roles></user>\n"
-        "    <user><name>arcnode_der_control_api</name><password>$DCA_PW</password>"
-        "<roles><id>der_control_api</id></roles></user>\n"
-        "  </users>\n"
-        "  <roles>\n"
-        # gateway: pub telemetry up, sub commands down, sub system control
-        # plane (it subscribes system/topology_changed to hot-reload topology).
-        "    <role><id>gateway</id><permissions>"
-        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        # synthetic derivations read their inputs off the bus — the gateway
-        # subscribes measurements too (first exercised by bess_module headroom).
-        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>sites/+/devices/+/commands/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>system/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        # dispatch lifecycle: gateway acks commands on events/dispatch_state.
-        "<permission><topic>sites/+/devices/+/events/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        "</permissions></role>\n"
-        # device_api: publishes system/topology_changed when topology mutates.
-        "    <role><id>device_api</id><permissions>"
-        "<permission><topic>system/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        "</permissions></role>\n"
-        # telemetry_writer: subscribes all measurements → persists to timeseries.
-        "    <role><id>telemetry_writer</id><permissions>"
-        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "</permissions></role>\n"
-        # der_control_api: publishes DERControl setpoints as measurements on the
-        # der_dispatch singleton device, plus envelope-mode limits on the
-        # operating_envelope singleton (DispatchPublisher.java) when a
-        # DERControlBase payload carries them. Also subscribes der_dispatch's
-        # own measurements (DeliveryShortfallMonitor, ActualActivePowerSubscriber
-        # — includes reading back its own target_active_power/event_active
-        # publishes) and der_dispatch commands (DispatchCommandSubscriber,
-        # operator approve/reject). A denied SUBSCRIBE fails silently (SUBACK
-        # reason codes discarded) rather than throwing like a denied PUBLISH
-        # does — so this grant matters even though it's easy to miss.
-        "    <role><id>der_control_api</id><permissions>"
-        "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        "<permission><topic>sites/+/devices/operating_envelope/measurements/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        "<permission><topic>sites/+/devices/der_dispatch/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>sites/+/devices/der_dispatch/commands/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "</permissions></role>\n"
-        "    <role><id>operator</id><permissions>"
-        "<permission><topic>sites/+/devices/+/commands/#</topic>"
-        "<activity>PUBLISH</activity></permission>"
-        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>sites/+/devices/+/events/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "</permissions></role>\n"
-        "    <role><id>viewer</id><permissions>"
-        "<permission><topic>sites/+/devices/+/measurements/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "<permission><topic>sites/+/devices/+/events/#</topic>"
-        "<activity>SUBSCRIBE</activity></permission>"
-        "</permissions></role>\n"
-        "  </roles>\n"
-        "</file-rbac>\n"
-        "XML\n"
+        # Same template the on-prem wizard fills (src/wizard/hivemq_credentials.py).
+        # Cloud passwords exclude / & and \\, so they're safe as sed replacements.
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/credentials.template.xml "
+        "-o /opt/arcnode/credentials.xml\n"
+        "sed -i -e \"s/__GATEWAY_PASSWORD__/$GW_PW/\" -e \"s/__OPERATOR_PASSWORD__/$OP_PW/\" "
+        "-e \"s/__VIEWER_PASSWORD__/$VW_PW/\" -e \"s/__DEVICE_API_PASSWORD__/$DA_PW/\" "
+        "-e \"s/__TELEMETRY_WRITER_PASSWORD__/$TW_PW/\" -e \"s/__DER_CONTROL_API_PASSWORD__/$DCA_PW/\" "
+        "/opt/arcnode/credentials.xml\n"
         "chmod 600 /opt/arcnode/credentials.xml\n"
     )
     # Defense graph block — fetch SSM params into shell vars, append to
@@ -793,6 +720,12 @@ def build_userdata(
         # gateway's cfg.customer.yml — only site_id today.
         "cat > /opt/arcnode/gateway-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
+        "YML\n"
+        # analyst-model's overlay. MLflow is the compose-network service, so the
+        # cfg.yml dev-box address never reaches a deployed box.
+        "cat > /opt/arcnode/analyst-model-cfg.customer.yml <<YML\n"
+        f"site_id: {site_id}\n"
+        "mlflow_tracking_uri: http://mlflow:5000\n"
         "YML\n"
         # HMI runtime-config overlay. Unlike gateway/analyst (env-merged via
         # CFG_CUSTOMER_PATH), the HMI is a static SPA — its container's nginx

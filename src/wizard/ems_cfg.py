@@ -10,12 +10,21 @@ from pydantic.alias_generators import to_camel
 
 GATEWAY_CFG_FILE: Final[str] = "gateway-cfg.customer.yml"
 HMI_CFG_FILE: Final[str] = "hmi-cfg.customer.yml"
+ANALYST_MODEL_CFG_FILE: Final[str] = "analyst-model-cfg.customer.yml"
 
 
 class GatewayCfg(BaseModel):
     """industrial-gateway's overlay — only site_id today."""
 
     site_id: str
+
+
+class AnalystModelCfg(BaseModel):
+    """analyst-model's overlay: where its MLflow is and which site it serves.
+    The cloud's UserData writes the same keys."""
+
+    site_id: str
+    mlflow_tracking_uri: str
 
 
 class HmiCfg(BaseModel):
