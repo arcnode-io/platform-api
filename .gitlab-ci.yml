@@ -87,14 +87,15 @@ publish_compose:
     - main
 
 # Base AMI: Packer bakes the wizard and Docker into one image, the cloud's
-# equivalent of the ISO. Manual so a release is a deliberate build; it updates
+# equivalent of the ISO. Runs on every push to main after checks pass; it updates
 # the SSM parameter the stack reads, then keeps only the newest three AMIs.
 build_base_ami:
   stage: publish
   image:
     name: hashicorp/packer:1.16.0
     entrypoint: [""]
-  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
   variables:
     AWS_DEFAULT_REGION: us-east-1
   before_script:

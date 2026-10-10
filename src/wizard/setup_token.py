@@ -16,3 +16,11 @@ def read_or_create_token(path: Path) -> str:
         path.touch(mode=0o600)
         path.write_text(secrets.token_urlsafe(32))
     return path.read_text().strip()
+
+
+def setup_token_from_env_file(path: Path) -> str | None:
+    """The SETUP_TOKEN line in secrets.env, or None when UserData didn't write one."""
+    for line in path.read_text().splitlines():
+        if line.startswith("SETUP_TOKEN="):
+            return line.removeprefix("SETUP_TOKEN=")
+    return None

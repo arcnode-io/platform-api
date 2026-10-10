@@ -40,3 +40,16 @@ def test_writes_a_manifest_so_ci_can_read_the_new_ami_id() -> None:
 
     # Assert
     assert 'post-processor "manifest"' in text
+
+
+def test_installs_the_wizard_python_dependencies_into_the_image() -> None:
+    """The wizard runs on the box with the same libraries the ISO installs."""
+    # Arrange
+    text = TEMPLATE.read_text()
+
+    # Assert
+    assert "python3 -m pip install" in text
+    assert "fastapi" in text
+    assert "uvicorn" in text
+    assert "pydantic" in text
+    assert "pyyaml" in text

@@ -4,7 +4,7 @@ change until the stack owner's token is sent, and the page itself still loads.""
 from pathlib import Path
 
 from src.wizard.controller_fixtures import wizard_client
-from src.wizard.setup_token import TOKEN_HEADER, read_or_create_token
+from src.wizard.setup_token import TOKEN_HEADER, read_or_create_token, setup_token_from_env_file
 from src.wizard.wizard_record import Deployment
 
 TOKEN = "stack-owner-token"
@@ -55,3 +55,27 @@ def test_page_loads_without_token(tmp_path: Path) -> None:
 
     # Assert — the browser has to read the page before it can send the token
     assert response.status_code == 200
+
+
+def test_token_is_read_from_secrets_env(tmp_path: Path) -> None:
+    # Arrange — the file UserData writes, with other secrets around it
+    env_file = tmp_path / "secrets.env"
+    env_file.write_text("AUTH_JWT_SECRET=abc\nSETUP_TOKEN=stack-owner-token\nGRAFANA=x\n")
+
+    # Act
+    token = setup_token_from_env_file(env_file)
+
+    # Assert
+    assert token == "stack-owner-token"
+
+
+def test_missing_token_line_is_none(tmp_path: Path) -> None:
+    # Arrange
+    env_file = tmp_path / "secrets.env"
+    env_file.write_text("AUTH_JWT_SECRET=abc\n")
+
+    # Act
+    token = setup_token_from_env_file(env_file)
+
+    # Assert
+    assert token is None
