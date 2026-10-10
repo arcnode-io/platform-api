@@ -7,7 +7,7 @@ from pathlib import Path
 from src.wizard.hivemq_fixtures import TEMPLATE_TEXT
 from src.wizard.hivemq_service import HivemqService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import BrokerPasswords, CommandOutput, Deployment
+from src.wizard.wizard_record import BrokerPasswords, Deployment
 
 PASSWORDS = BrokerPasswords(
     service="Service-pw-1!",

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Final
 
 from src.wizard.containers_compose import compose_command, wait_for_log
-from src.wizard.secrets_env import saved_check
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Deployment, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker

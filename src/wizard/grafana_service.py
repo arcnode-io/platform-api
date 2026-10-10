@@ -14,7 +14,8 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 GRAFANA_SERVICE: Final[str] = "grafana"
 # Grafana's own variable, read from the env file; the cloud sets the same name.
-PASSWORD_NAME: Final[str] = "GF_SECURITY_ADMIN_PASSWORD"
+# Reason: an env var name, not a secret value.
+PASSWORD_NAME: Final[str] = "GF_SECURITY_ADMIN_PASSWORD"  # noqa: S105
 LISTEN_LINE: Final[str] = "HTTP Server Listen"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 GRAFANA_URL: Final[str] = "http://grafana:3000"

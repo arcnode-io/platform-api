@@ -23,7 +23,8 @@ def test_render_escapes_xml_characters_in_passwords() -> None:
     rendered = render_credentials(TEMPLATE.read_text(), passwords)
 
     # Assert
-    root = ET.fromstring(rendered)
+    # Reason: parsing our own rendered template, not untrusted input.
+    root = ET.fromstring(rendered)  # noqa: S314
     gateway = root.find("users/user[name='arcnode_gateway']/password")
     assert gateway is not None
     assert gateway.text == "a&b<c>\"d'e"

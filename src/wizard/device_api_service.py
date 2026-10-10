@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Final
 
 from src.wizard.containers_compose import compose_command, wait_for_log
-from src.wizard.device_api_verify import DEVICE_API_SERVICE, DTM_FILE, verify_device_api
+from src.wizard.device_api_verify import DEVICE_API_SERVICE, verify_device_api
 from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Deployment, DeviceApiSecrets, StepResult
