@@ -43,3 +43,18 @@ def test_dispatch_lifecycle_events_are_granted() -> None:
 
     # Assert — without these, dispatch acks are silently denied
     assert template.count("<topic>sites/+/devices/+/events/#</topic>") >= 3
+
+
+def test_operator_and_viewer_may_subscribe_the_system_plane() -> None:
+    # Arrange
+    template = TEMPLATE.read_text()
+
+    # Act
+    operator_role = template.split('<role><id>operator</id>')[1].split('</role>')[0]
+    viewer_role = template.split('<role><id>viewer</id>')[1].split('</role>')[0]
+
+    # Assert — the HMI hears system/loto_changed and system/topology_changed; a
+    # denied SUBSCRIBE fails silently (SUBACK discarded), so the test guards it.
+    system_subscribe = "<topic>system/#</topic><activity>SUBSCRIBE</activity>"
+    assert system_subscribe in operator_role
+    assert system_subscribe in viewer_role

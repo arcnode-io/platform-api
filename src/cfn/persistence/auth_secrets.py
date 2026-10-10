@@ -130,6 +130,31 @@ aG2CdyvgqqKrQ5A=
 """
 
 
+def der_control_lfdi_allowlist_secret() -> dict[str, dict]:
+    """LFDIs allowed to POST DERControls, one list per deployment.
+
+    Placeholder is 40 zeros: a valid LFDI shape no real cert produces, so the
+    allowlist stays closed until ops PutSecretValue's the real list. Secrets
+    Manager rejects an empty SecretString, and an unset one fails the UserData read.
+    """
+    return {
+        "DerControlLfdiAllowlistSecret": {
+            "Type": "AWS::SecretsManager::Secret",
+            "Properties": {
+                "Name": {
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist"
+                },
+                "Description": (
+                    "LFDIs allowed to POST DERControls (40 hex each, comma or "
+                    "whitespace separated). Placeholder never matches a real cert. "
+                    "Ops overwrites via PutSecretValue, then restarts der-control-api."
+                ),
+                "SecretString": "0" * 40,
+            },
+        },
+    }
+
+
 def der_control_truststore_secret() -> dict[str, dict]:
     """Placeholder Secrets Manager slot for der-control-ingress's mTLS
     truststore (the DERMS utility's CA bundle, PEM).

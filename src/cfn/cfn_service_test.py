@@ -559,3 +559,16 @@ def test_commercial_userdata_writes_analyst_model_cfg_with_mlflow_address() -> N
     heredoc_body = model_block.split("YML\n")[0]
     assert "mlflow_tracking_uri: http://mlflow:5000" in heredoc_body
     assert "site_id:" in heredoc_body
+
+
+def test_userdata_writes_lfdi_allowlist_on_one_line() -> None:
+    """The LFDI allowlist is written into secrets.env as one line, newlines
+    turned into spaces, so der-control-api reads it at boot. An empty or
+    placeholder value fails closed."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist" in rendered
+    assert "DER_CONTROL_LFDI_ALLOWLIST=$(" in rendered
+    assert "--output text | tr " in rendered

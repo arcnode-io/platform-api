@@ -561,6 +561,13 @@ def build_userdata(
         f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
     )
+    # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
+    # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.
+    lfdi_allowlist_line = (
+        "echo \"DER_CONTROL_LFDI_ALLOWLIST=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist "
+        "--query SecretString --output text | tr '\\n' ' ')\" >> /opt/arcnode/secrets.env\n"
+    )
     # Broker File RBAC store. The 3 random machine pws (also in secrets.env)
     # are fetched into shell vars and written into credentials.xml, which the
     # hivemq image bind-mounts into the File RBAC extension. Topic ACL is
@@ -732,6 +739,7 @@ def build_userdata(
         "# secrets.env — credential-bearing connection URLs from Secrets Manager.\n"
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
+        f"{lfdi_allowlist_line}"
         "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
         f"{credentials_block}"
         "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"

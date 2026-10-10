@@ -42,6 +42,7 @@ from src.cfn.persistence.auth_secrets import (
     auth_human_parameters,
     auth_human_secrets,
     auth_machine_secrets,
+    der_control_lfdi_allowlist_secret,
     der_control_truststore_secret,
 )
 from src.orders.configurator_payload import DeploymentContext
@@ -118,6 +119,7 @@ class PersistenceService:
             **auth_machine_secrets(),
             **auth_human_secrets(),
             **der_control_truststore_secret(),
+            **der_control_lfdi_allowlist_secret(),
         }
         if not e2e:
             resources.update(
@@ -136,6 +138,7 @@ class PersistenceService:
             *auth_machine_secrets(),
             *auth_human_secrets(),
             *der_control_truststore_secret(),
+            *der_control_lfdi_allowlist_secret(),
         ]
         if not e2e:
             depends_on.append("CustomerUrlPreflightCustomResource")
@@ -165,6 +168,7 @@ class PersistenceService:
                 **auth_machine_secrets(),
                 **auth_human_secrets(),
                 **der_control_truststore_secret(),
+                **der_control_lfdi_allowlist_secret(),
                 **neptune_resources(),
                 **aoss_resources(short=short),
             },
@@ -185,5 +189,6 @@ class PersistenceService:
                 *auth_machine_secrets(),
                 *auth_human_secrets(),
                 *der_control_truststore_secret(),
+                *der_control_lfdi_allowlist_secret(),
             ],
         )
