@@ -607,3 +607,25 @@ def test_cloud_instance_is_m7i_2xlarge() -> None:
 
     # Assert
     assert "InstanceType: m7i.2xlarge" in rendered
+
+
+def test_stack_output_tells_the_owner_where_the_setup_token_is() -> None:
+    """The setup token is a generated secret; the stack Outputs show the exact
+    command to read it and where to paste it. CFN can't show a generated value."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "SetupToken:" in rendered
+    assert "aws secretsmanager get-secret-value" in rendered
+    assert "arcnode-ems-${AWS::StackName}/setup-token" in rendered
+
+
+def test_userdata_writes_the_setup_token_for_the_wizard() -> None:
+    """The wizard reads the token from secrets.env, the same way the services
+    read their own secrets."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "SETUP_TOKEN=$(" in rendered

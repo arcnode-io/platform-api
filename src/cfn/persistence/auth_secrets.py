@@ -67,6 +67,10 @@ def auth_machine_secrets() -> dict[str, dict]:
         "MqttViewerPasswordSecret": _generated_secret(
             "mqtt-viewer-password", "Broker File-RBAC password for arcnode_viewer."
         ),
+        # Gates the cloud setup wizard. Read back with the command in the stack Outputs.
+        "SetupTokenSecret": _generated_secret(
+            "setup-token", "Setup wizard token. Paste into the setup page; the wizard refuses changes without it.",
+        ),
         "AuthJwtSecret": _generated_secret(
             "auth-jwt-secret", "device-api HS256 session-token signing key."
         ),

@@ -174,6 +174,18 @@ class CfnService:
                     "Value": {"Ref": "EmsEip"},
                     "Description": "EMS HMI is reachable on http://<PublicIp>/",
                 },
+                "SetupToken": {
+                    "Value": {
+                        "Fn::Sub": (
+                            "aws secretsmanager get-secret-value --secret-id "
+                            "arcnode-ems-${AWS::StackName}/setup-token --query SecretString --output text"
+                        ),
+                    },
+                    "Description": (
+                        "Setup token. Run the command shown in this output, then paste the value "
+                        "into the setup page at https://<site-id>.arcnode.io/ before you configure anything."
+                    ),
+                },
                 "SiteId": {
                     "Value": site_id,
                     "Description": "MQTT topic scope: sites/<SiteId>/...",

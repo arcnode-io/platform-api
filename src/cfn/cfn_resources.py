@@ -63,6 +63,7 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     (OPERATOR_LOGIN.slot, OPERATOR_LOGIN.env_name),
     (VIEWER_LOGIN.slot, VIEWER_LOGIN.env_name),
     (GRAFANA_ADMIN.slot, GRAFANA_ADMIN.env_name),
+    ("setup-token", "SETUP_TOKEN"),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
