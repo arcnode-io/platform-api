@@ -27,6 +27,7 @@ def verify_device_api(
     """Answers → operator login → topology matches the order → broker connected → saved."""
     return [
         _answers(run),
+        _spec_served(run),
         _operator_login(run, secrets),
         _topology(run, ems_dir),
         _broker_connected(run, ems_dir),
@@ -49,6 +50,19 @@ def _answers(run: Runner) -> VerifyCheck:
         name="Device API answers",
         ok=ok,
         detail="ok" if ok else (out.stdout.strip() or f"exit {out.returncode}"),
+        hint=LOG_HINT,
+    )
+
+
+def _spec_served(run: Runner) -> VerifyCheck:
+    """The industrial gateway and HMI both fetch /asyncapi at boot. A 503 here means
+    the topology can't build a spec, so it shows on this page instead of the gateway's."""
+    out = run(_probe(["-fsS", "-o", "/dev/null", f"{BASE_URL}/asyncapi"]))
+    ok = out.returncode == 0
+    return VerifyCheck(
+        name="Serves its message spec",
+        ok=ok,
+        detail="/asyncapi answers 200" if ok else f"/asyncapi failed (curl exit {out.returncode})",
         hint=LOG_HINT,
     )
 

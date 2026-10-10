@@ -78,6 +78,7 @@ class FakeRunner:
             "device-api:3000/auth/login": ok('{"token":"eyJhbGciOiJIUzI1NiJ9.e30.sig"}'),
             # The test order's topology: what the Site page wrote, and what the API serves back.
             "device-api:3000/topology": ok(TEST_ORDER_DTM.read_text()),
+            "device-api:3000/asyncapi": ok(""),
             "device-api:3000/": ok("ok"),
             "logs device-api": ok("mqtt connected mqtt://hivemq:1883\n"),
             # HiveMQ: compose's status + readiness log, and the broker probes.

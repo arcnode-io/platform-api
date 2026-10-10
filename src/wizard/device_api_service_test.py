@@ -47,6 +47,7 @@ def test_apply_saves_secrets_and_every_check_passes(tmp_path: Path) -> None:
     actual_rows = [(check.name, check.ok) for check in result.checks]
     assert actual_rows == [
         ("Device API answers", True),
+        ("Serves its message spec", True),
         ("Operator can log in", True),
         ("Topology loaded", True),
         ("Connected to the broker", True),
