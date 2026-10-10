@@ -7,9 +7,10 @@ package.
 """
 
 from pathlib import Path
-from typing import Final
+from collections.abc import Callable
+from typing import Annotated, Final
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from src.wizard.device_api_service import DeviceApiService, DeviceApiStepNotAvailableError
@@ -46,6 +47,7 @@ from src.wizard.ssh_service import (
     SshService,
     SshStepNotAvailableError,
 )
+from src.wizard.setup_token import TOKEN_HEADER
 from src.wizard.wizard_record import (
     DerControlRequest,
     AnalystServerKeys,
@@ -67,6 +69,16 @@ _STATIC_DIR: Final[Path] = Path(__file__).parent / "static"
 # no-cache still caches, but revalidates against the ETag on every load.
 _NO_CACHE: Final[dict[str, str]] = {"Cache-Control": "no-cache"}
 
+
+
+def _require_setup_token(expected: str) -> Callable[[str | None], None]:
+    """A dependency that refuses any change whose X-Setup-Token header isn't the stack owner's."""
+
+    def check(setup_token: Annotated[str | None, Header(alias=TOKEN_HEADER)] = None) -> None:
+        if setup_token != expected:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="setup token missing or wrong")
+
+    return check
 
 class WizardController:
     """GET / (+ its static assets), GET /api/config, and one POST per page:
@@ -98,6 +110,7 @@ class WizardController:
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
+        setup_token: str | None = None,
     ) -> None:
         self._preflight = preflight
         self._ssh = ssh
@@ -121,6 +134,7 @@ class WizardController:
         self._deployment = deployment
         self._account = account
         self.router = APIRouter()
+        token_deps = [Depends(_require_setup_token(setup_token))] if setup_token else []
         # Reason: FastAPI takes each route's response model from the handler's
         # return annotation and its description from the docstring.
         routes = [
@@ -147,7 +161,10 @@ class WizardController:
             ("POST", "/api/grafana", self.grafana),
         ]
         for method, path, handler in routes:
-            self.router.add_api_route(path, handler, methods=[method])
+            self.router.add_api_route(
+                path, handler, methods=[method],
+                dependencies=token_deps if method == "POST" else [],
+            )
 
     def index(self) -> HTMLResponse:
         """Entry point the person's browser loads."""

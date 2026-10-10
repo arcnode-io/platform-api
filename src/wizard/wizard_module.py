@@ -50,6 +50,7 @@ class WizardModule:
         config: WizardConfig,
         run: Runner,
         stream: LineStream,
+        setup_token: str | None = None,
     ) -> None:
         deployment = config.deployment
         tracker = StepTracker(steps_dir=base_dir / "steps", deployment=deployment)
@@ -172,4 +173,5 @@ class WizardModule:
             tracker=tracker,
             deployment=deployment,
             account=account,
+            setup_token=setup_token,
         ).router

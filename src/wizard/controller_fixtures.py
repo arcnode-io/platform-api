@@ -19,6 +19,7 @@ def wizard_client(
     tmp_path: Path,
     deployment: Deployment = Deployment.ON_PREM,
     runner: FakeRunner | None = None,
+    setup_token: str | None = None,
 ) -> TestClient:
     """The real app, fake commands; the box was installed from an ISO
     carrying the test order."""
@@ -38,6 +39,7 @@ def wizard_client(
             config=PRODUCTION.model_copy(update={"deployment": deployment}),
             run=runner or FakeRunner(),
             stream=FakeStream(),
+            setup_token=setup_token,
         ).router
     )
     return TestClient(app)
