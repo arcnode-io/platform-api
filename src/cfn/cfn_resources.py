@@ -210,15 +210,6 @@ def network_resources() -> dict[str, object]:
                         "ToPort": 80,
                         "CidrIp": "0.0.0.0/0",
                     },
-                    # analyst-server health + chat (defense compose binds
-                    # 8000:8000). e2e probes /health to prove mcp-server
-                    # seed completed.
-                    {
-                        "IpProtocol": "tcp",
-                        "FromPort": 8000,
-                        "ToPort": 8000,
-                        "CidrIp": "0.0.0.0/0",
-                    },
                     # der-control-ingress — mTLS terminator for the utility/
                     # aggregator-facing IEEE 2030.5 DERControl intake. Open to
                     # the world same as the others: the mTLS handshake itself
