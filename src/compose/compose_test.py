@@ -270,3 +270,14 @@ def test_hmi_is_only_reached_through_the_https_ingress() -> None:
     # Assert
     assert "ports" not in services["hmi"]
     assert services["https-ingress"]["ports"] == ["80:80", "443:443"]
+
+
+def test_der_control_api_reads_its_customer_config() -> None:
+    """der-control-api merges its per-deployment keys (siteId, utilityMirrorUrl,
+    publicBaseUrl) over its ENV block from a file mounted read-only."""
+    # Arrange + Act
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["der-control-api"]
+
+    # Assert
+    assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
+    assert "/opt/arcnode/der-control-cfg.customer.yml:/app/cfg.customer.yml:ro" in service["volumes"]

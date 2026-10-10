@@ -718,6 +718,12 @@ def build_userdata(
         f"site_id: {site_id}\n"
         "mlflow_tracking_uri: http://mlflow:5000\n"
         "YML\n"
+        # der-control-api's per-site overlay. publicBaseUrl is the ingress the
+        # utility reaches, on the Elastic IP. utilityMirrorUrl is left out until the order carries one.
+        "cat > /opt/arcnode/der-control-cfg.customer.yml <<YML\n"
+        f"siteId: {site_id}\n"
+        "publicBaseUrl: https://${EmsEip}:8443\n"
+        "YML\n"
         # HMI runtime-config overlay. Unlike gateway/analyst (env-merged via
         # CFG_CUSTOMER_PATH), the HMI is a static SPA — its container's nginx
         # serves this at /cfg.customer.yml and the SPA fetches it at boot.

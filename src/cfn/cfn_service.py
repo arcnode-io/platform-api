@@ -113,7 +113,7 @@ class CfnService:
                         },
                     },
                     "Properties": {
-                        "InstanceType": "t3.medium",
+                        "InstanceType": "m7i.2xlarge",
                         "ImageId": AMI_SSM_PARAMETER,
                         "IamInstanceProfile": {"Ref": "EmsInstanceProfile"},
                         "SubnetId": {"Ref": "EmsSubnet"},
@@ -149,10 +149,17 @@ class CfnService:
                 # Stable address — the on-prem gateway dials this; an
                 # instance-attached public IP changes on stop/start, an EIP
                 # doesn't. Ref returns the address itself.
+                # Allocated on its own, attached by the association below. Keeping
+                # InstanceId off the EIP means the instance's UserData can read
+                # its public IP without a circular dependency.
                 "EmsEip": {
                     "Type": "AWS::EC2::EIP",
+                    "Properties": {"Domain": "vpc"},
+                },
+                "EmsEipAssociation": {
+                    "Type": "AWS::EC2::EIPAssociation",
                     "Properties": {
-                        "Domain": "vpc",
+                        "AllocationId": {"Fn::GetAtt": ["EmsEip", "AllocationId"]},
                         "InstanceId": {"Ref": "EmsInstance"},
                     },
                 },

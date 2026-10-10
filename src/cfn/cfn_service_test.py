@@ -583,3 +583,27 @@ def test_userdata_hmi_overlay_has_der_control_uri() -> None:
     # Assert
     assert "derControlUri:" in rendered
     assert "/der-control" in rendered
+
+
+def test_commercial_userdata_writes_der_control_cfg() -> None:
+    """Cloud UserData writes der-control-api's per-site keys: the order's siteId,
+    and publicBaseUrl at the ingress on the stack's Elastic IP. No DERMS URL yet."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "cat > /opt/arcnode/der-control-cfg.customer.yml <<YML" in rendered
+    block = rendered.split("der-control-cfg.customer.yml <<YML")[1].split("YML\n")[0]
+    assert "publicBaseUrl: https://${EmsEip}:8443" in block
+    assert "siteId:" in block
+    assert "utilityMirrorUrl" not in block
+
+
+def test_cloud_instance_is_m7i_2xlarge() -> None:
+    """Cloud runs the container stack on CPU only; LLMs are Bedrock on demand.
+    8 vCPU matches the on-prem spec; no GPU needed."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "InstanceType: m7i.2xlarge" in rendered
