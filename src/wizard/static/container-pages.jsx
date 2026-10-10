@@ -399,3 +399,48 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
   );
 }
 window.StepAnalystServer = StepAnalystServer;
+
+// ─── DER control API ────────────────────────────────────────────────────────────
+// Optional: the DERMS base URL the utility gives. Blank means the utility isn't connected yet.
+function StepDerControl({ t, page, url, onUrl, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const badUrl     = url !== '' && !url.startsWith('https://');
+  const canApply   = !isApplying && !isDone && !badUrl;
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Save & verify';
+  return (
+    <StepShellW t={t} title="DER control API"
+      blurb="it receives the utility's DER controls. Give the utility's base URL if you have it; you can leave it blank and add it later.">
+      <FieldLabelW t={t}>UTILITY BASE URL</FieldLabelW>
+      <input type="text" value={url} disabled={isApplying || isDone} placeholder="https://derms.utility.example"
+        onChange={e => onUrl(e.target.value)} aria-label="Utility base URL"
+        style={{
+          width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box',
+          background: t.bg, color: t.text, outline: 'none',
+          border: `1px solid ${badUrl ? t.statusAlarm : t.border}`, borderRadius: RADIUS[2],
+          fontFamily: t.fontLabel, fontSize: 13,
+        }}/>
+      {badUrl && <HelperW t={t} error>Must start with https://</HelperW>}
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={{ ...primaryBtnStyle(t, !canApply), marginTop: SPACE[4] }}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+window.StepDerControl = StepDerControl;

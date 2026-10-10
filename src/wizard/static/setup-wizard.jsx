@@ -20,13 +20,14 @@ const ALL_STEPS = [
   { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts',           deployments: ['on-prem'] },
   { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements', deployments: ['on-prem'] },
   { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology', deployments: ['on-prem'] },
-  { id: 'industrial_gateway', n: 10, title: 'Industrial gateway', sub: 'Device bridge', deployments: ['on-prem'] },
-  { id: 'hmi',      n: 11, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
-  { id: 'mlflow',   n: 12, title: 'MLflow',     sub: 'Experiment tracking',       deployments: ['on-prem'] },
-  { id: 'analyst_model', n: 13, title: 'Analyst model', sub: 'Daily forecast',    deployments: ['on-prem'] },
-  { id: 'analyst_server', n: 14, title: 'Analyst server', sub: 'Chat + weather keys', deployments: ['on-prem'] },
-  { id: 'prometheus', n: 15, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
-  { id: 'grafana',  n: 16, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
+  { id: 'der_control_api', n: 10, title: 'DER control API', sub: 'Utility link', deployments: ['on-prem'] },
+  { id: 'industrial_gateway', n: 11, title: 'Industrial gateway', sub: 'Device bridge', deployments: ['on-prem'] },
+  { id: 'hmi',      n: 12, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
+  { id: 'mlflow',   n: 13, title: 'MLflow',     sub: 'Experiment tracking',       deployments: ['on-prem'] },
+  { id: 'analyst_model', n: 14, title: 'Analyst model', sub: 'Daily forecast',    deployments: ['on-prem'] },
+  { id: 'analyst_server', n: 15, title: 'Analyst server', sub: 'Chat + weather keys', deployments: ['on-prem'] },
+  { id: 'prometheus', n: 16, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
+  { id: 'grafana',  n: 17, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -555,6 +556,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [deviceApiSecrets, setDeviceApiSecrets] = useStateW({});
   // The analyst server's weather and market API keys.
   const [analystServerKeys, setAnalystServerKeys] = useStateW({});
+  // The utility's DERMS base URL, optional.
+  const [derControlUrl, setDerControlUrl] = useStateW('');
   // { [model]: latest download progress } while the Ollama page streams
   const [downloads, setDownloads] = useStateW({});
 
@@ -697,6 +700,11 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'mlflow' && (
             <StepMlflow t={t} page={pageOf('mlflow')}
               onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
+          )}
+          {current === 'der_control_api' && (
+            <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}
+              onUrl={setDerControlUrl}
+              onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null })}/>
           )}
           {current === 'analyst_server' && (
             <StepAnalystServer t={t} page={pageOf('analyst_server')} keys={analystServerKeys}
