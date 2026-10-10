@@ -137,7 +137,7 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
     assert "EmsSubnet" in rendered
     assert "EmsSecurityGroup" in rendered
     # SSM resolve syntax — CFN looks up the latest AL2023 AMI in --region
-    assert "resolve:ssm:/aws/service/ami-amazon-linux-latest" in rendered
+    assert "resolve:ssm:/arcnode/ems/base-ami-id" in rendered
     # No stale top-level Mappings table (anchor to start-of-line so this
     # doesn't false-positive on BlockDeviceMappings: in the EmsInstance).
     assert "\nMappings:" not in rendered
@@ -629,3 +629,13 @@ def test_userdata_writes_the_setup_token_for_the_wizard() -> None:
 
     # Assert
     assert "SETUP_TOKEN=$(" in rendered
+
+
+def test_cloud_instance_uses_the_base_ami_from_ssm() -> None:
+    """The stack reads the base AMI id the build job publishes, not the stock
+    Amazon Linux image, so the cloud box boots the same baked image as on-prem."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "/arcnode/ems/base-ami-id" in rendered

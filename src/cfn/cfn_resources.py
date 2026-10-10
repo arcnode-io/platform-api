@@ -75,9 +75,7 @@ ARCNODE_PUBLIC_BASE_URL: Final[str] = (
 # Latest Amazon Linux 2023 x86_64 AMI in any region. CFN resolves this SSM
 # parameter against `--region` at deploy time, so the template is region-portable
 # without a Mappings table that would go stale every AMI revision.
-AMI_SSM_PARAMETER: Final[str] = (
-    "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
-)
+AMI_SSM_PARAMETER: Final[str] = "{{resolve:ssm:/arcnode/ems/base-ami-id}}"
 EMS_SERVICES: Final[tuple[str, ...]] = (
     "ems-device-api",
     "ems-hmi",
