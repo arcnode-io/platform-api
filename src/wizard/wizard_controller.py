@@ -28,6 +28,7 @@ from src.wizard.analyst_server_service import (
     AnalystServerService,
     AnalystServerStepNotAvailableError,
 )
+from src.wizard.der_control_service import DerControlService, DerControlStepNotAvailableError
 from src.wizard.analyst_model_service import (
     AnalystModelService,
     AnalystModelStepNotAvailableError,
@@ -46,6 +47,7 @@ from src.wizard.ssh_service import (
     SshStepNotAvailableError,
 )
 from src.wizard.wizard_record import (
+    DerControlRequest,
     AnalystServerKeys,
     ApplyRequest,
     ApplyResult,
@@ -88,6 +90,7 @@ class WizardController:
         mlflow: MlflowService,
         analyst_model: AnalystModelService,
         analyst_server: AnalystServerService,
+        der_control: DerControlService,
         device_api: DeviceApiService,
         industrial_gateway: IndustrialGatewayService,
         hmi: HmiService,
@@ -109,6 +112,7 @@ class WizardController:
         self._mlflow = mlflow
         self._analyst_model = analyst_model
         self._analyst_server = analyst_server
+        self._der_control = der_control
         self._device_api = device_api
         self._industrial_gateway = industrial_gateway
         self._hmi = hmi
@@ -136,6 +140,7 @@ class WizardController:
             ("POST", "/api/mlflow", self.mlflow),
             ("POST", "/api/analyst-model", self.analyst_model),
             ("POST", "/api/analyst-server", self.analyst_server),
+            ("POST", "/api/der-control", self.der_control),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
             ("POST", "/api/hmi", self.hmi),
@@ -144,12 +149,12 @@ class WizardController:
         for method, path, handler in routes:
             self.router.add_api_route(path, handler, methods=[method])
 
-    async def index(self) -> HTMLResponse:
+    def index(self) -> HTMLResponse:
         """Entry point the person's browser loads."""
         self._refuse_if_applied()
         return HTMLResponse((_STATIC_DIR / "index.html").read_text(), headers=_NO_CACHE)
 
-    async def static_asset(self, filename: str) -> FileResponse:
+    def static_asset(self, filename: str) -> FileResponse:
         """tokens.jsx / setup-wizard.jsx — whatever index.html's script tags need.
 
         FastAPI path params can't contain "/", so this only ever matches
@@ -161,7 +166,7 @@ class WizardController:
             raise HTTPException(status.HTTP_404_NOT_FOUND)
         return FileResponse(path, headers=_NO_CACHE)
 
-    async def config(self) -> SetupInfo:
+    def config(self) -> SetupInfo:
         """Deployment, login account, and which pages are already done —
         so a reload resumes at the first unfinished page."""
         self._refuse_if_applied()
@@ -171,14 +176,14 @@ class WizardController:
             completed=self._tracker.completed(),
         )
 
-    async def preflight(self) -> StepResult:
+    def preflight(self) -> StepResult:
         """The hardware check page — see PreflightService.apply."""
         try:
             return self._preflight.apply()
         except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def ssh(self, request: ApplyRequest) -> ApplyResult:
+    def ssh(self, request: ApplyRequest) -> ApplyResult:
         """The on-prem SSH page — see SshService.apply."""
         try:
             return self._ssh.apply(request)
@@ -187,28 +192,28 @@ class WizardController:
         except InvalidSshKeyError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    async def docker(self) -> StepResult:
+    def docker(self) -> StepResult:
         """The on-prem Docker page — see DockerService.apply."""
         try:
             return self._docker.apply()
         except (StepAlreadyDoneError, DockerStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def postgres(self, request: PasswordRequest) -> StepResult:
+    def postgres(self, request: PasswordRequest) -> StepResult:
         """The on-prem PostgreSQL page — see PostgresService.apply."""
         try:
             return self._postgres.apply(request)
         except (StepAlreadyDoneError, PostgresStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def neo4j(self, request: PasswordRequest) -> StepResult:
+    def neo4j(self, request: PasswordRequest) -> StepResult:
         """The on-prem Neo4j page — see Neo4jService.apply."""
         try:
             return self._neo4j.apply(request)
         except (StepAlreadyDoneError, Neo4jStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def ollama(self) -> StreamingResponse:
+    def ollama(self) -> StreamingResponse:
         """The on-prem Ollama page — see OllamaService.apply. NDJSON: model
         downloads take minutes to hours, so progress streams as it happens."""
         try:
@@ -220,77 +225,84 @@ class WizardController:
         lines = (event.model_dump_json(exclude_none=True) + "\n" for event in events)
         return StreamingResponse(lines, media_type="application/x-ndjson")
 
-    async def site(self) -> StepResult:
+    def site(self) -> StepResult:
         """The on-prem Site page — see SiteService.apply."""
         try:
             return self._site.apply()
         except (StepAlreadyDoneError, SiteStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def hivemq(self, request: BrokerPasswords) -> StepResult:
+    def hivemq(self, request: BrokerPasswords) -> StepResult:
         """The on-prem HiveMQ page — see HivemqService.apply."""
         try:
             return self._hivemq.apply(request)
         except (StepAlreadyDoneError, HivemqStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def telemetry(self) -> StepResult:
+    def telemetry(self) -> StepResult:
         """The on-prem Telemetry writer page — see TelemetryWriterService.apply."""
         try:
             return self._telemetry.apply()
         except (StepAlreadyDoneError, TelemetryWriterStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def prometheus(self) -> StepResult:
+    def prometheus(self) -> StepResult:
         """The on-prem Prometheus page — see PrometheusService.apply."""
         try:
             return self._prometheus.apply()
         except (StepAlreadyDoneError, PrometheusStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def mlflow(self) -> StepResult:
+    def mlflow(self) -> StepResult:
         """The on-prem MLflow page — see MlflowService.apply."""
         try:
             return self._mlflow.apply()
         except (StepAlreadyDoneError, MlflowStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def analyst_model(self) -> StepResult:
+    def analyst_model(self) -> StepResult:
         """The on-prem analyst model page — see AnalystModelService.apply."""
         try:
             return self._analyst_model.apply()
         except (StepAlreadyDoneError, AnalystModelStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def analyst_server(self, request: AnalystServerKeys) -> StepResult:
+    def analyst_server(self, request: AnalystServerKeys) -> StepResult:
         """The on-prem analyst server page — see AnalystServerService.apply."""
         try:
             return self._analyst_server.apply(request)
         except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def device_api(self, request: DeviceApiSecrets) -> StepResult:
+    def der_control(self, request: DerControlRequest) -> StepResult:
+        """The on-prem DER control API page — see DerControlService.apply."""
+        try:
+            return self._der_control.apply(request)
+        except (StepAlreadyDoneError, DerControlStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def device_api(self, request: DeviceApiSecrets) -> StepResult:
         """The on-prem Device API page — see DeviceApiService.apply."""
         try:
             return self._device_api.apply(request)
         except (StepAlreadyDoneError, DeviceApiStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def industrial_gateway(self) -> StepResult:
+    def industrial_gateway(self) -> StepResult:
         """The on-prem Industrial gateway page — see IndustrialGatewayService.apply."""
         try:
             return self._industrial_gateway.apply()
         except (StepAlreadyDoneError, IndustrialGatewayStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def hmi(self) -> StepResult:
+    def hmi(self) -> StepResult:
         """The on-prem HMI page — see HmiService.apply."""
         try:
             return self._hmi.apply()
         except (StepAlreadyDoneError, HmiStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    async def grafana(self, request: PasswordRequest) -> StepResult:
+    def grafana(self, request: PasswordRequest) -> StepResult:
         """The on-prem Grafana page — see GrafanaService.apply."""
         try:
             return self._grafana.apply(request)

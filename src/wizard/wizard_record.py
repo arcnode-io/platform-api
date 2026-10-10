@@ -165,6 +165,21 @@ class BrokerPasswords(BaseModel):
         return check_complexity(value)
 
 
+class DerControlRequest(BaseModel):
+    """POST /api/der-control body — the DERMS base URL the customer's utility
+    gives. Optional: blank means the utility isn't connected yet."""
+
+    utility_mirror_url: str | None = None
+
+    @field_validator("utility_mirror_url")
+    @classmethod
+    def must_be_https(cls, value: str | None) -> str | None:
+        """The utility's endpoint is reached over TLS, same as the ingress."""
+        if value is not None and not value.startswith("https://"):
+            raise ValueError("must be an https:// URL")
+        return value
+
+
 class AnalystServerKeys(BaseModel):
     """POST /api/analyst-server body — the two API keys the analyst's weather
     and market tools call out with. The customer sets both."""

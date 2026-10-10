@@ -39,6 +39,8 @@ def test_on_prem_closes_only_after_every_page_is_done(tmp_path: Path) -> None:
     assert not tracker.all_done()
     tracker.mark_done("device_api")
     assert not tracker.all_done()
+    tracker.mark_done("der_control_api")
+    assert not tracker.all_done()
     tracker.mark_done("industrial_gateway")
     assert not tracker.all_done()
     tracker.mark_done("hmi")

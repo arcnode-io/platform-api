@@ -111,6 +111,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     analyst_model = client.post("/api/analyst-model")
     analyst_server = client.post("/api/analyst-server", json=ANALYST_SERVER_KEYS)
     device_api = client.post("/api/device-api", json=DEVICE_API_SECRETS)
+    der_control = client.post("/api/der-control", json={"utility_mirror_url": None})
     gateway = client.post("/api/industrial-gateway")
     hmi = client.post("/api/hmi")
     grafana = client.post("/api/grafana", json={"password": "Grafana-pw-1!"})
@@ -128,6 +129,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert analyst_model.json()["verified"] is True
     assert analyst_server.json()["verified"] is True
     assert device_api.json()["verified"] is True
+    assert der_control.json()["verified"] is True
     assert gateway.json()["verified"] is True
     assert hmi.json()["verified"] is True
     assert grafana.json()["verified"] is True

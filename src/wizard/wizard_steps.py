@@ -24,6 +24,7 @@ STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
         "hivemq",
         "telemetry",
         "device_api",
+        "der_control_api",
         "industrial_gateway",
         "hmi",
         "mlflow",

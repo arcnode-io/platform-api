@@ -11,12 +11,24 @@ from pydantic.alias_generators import to_camel
 GATEWAY_CFG_FILE: Final[str] = "gateway-cfg.customer.yml"
 HMI_CFG_FILE: Final[str] = "hmi-cfg.customer.yml"
 ANALYST_MODEL_CFG_FILE: Final[str] = "analyst-model-cfg.customer.yml"
+DER_CONTROL_CFG_FILE: Final[str] = "der-control-cfg.customer.yml"
 
 
 class GatewayCfg(BaseModel):
     """industrial-gateway's overlay — only site_id today."""
 
     site_id: str
+
+
+class DerControlCfg(BaseModel):
+    """der-control-api's per-site overlay; camelCase keys, as its cfg.yml uses.
+    utilityMirrorUrl is left out until the customer gives the DERMS URL."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+    site_id: str
+    public_base_url: str
+    utility_mirror_url: str | None = None
 
 
 class AnalystModelCfg(BaseModel):
