@@ -30,6 +30,9 @@ SECRETS_ENV_PATH: Final[Path] = EMS_DIR / "secrets.env"
 # ems-analyst's overlay — two pages write it (Ollama, Site).
 ANALYST_CFG_PATH: Final[Path] = EMS_DIR / "analyst-cfg.customer.yml"
 PORT: Final[int] = 8080
+# Idle browser connections stay open this long, so a step clicked after reading
+# a page doesn't hit a connection uvicorn already closed (its default is 5s).
+KEEP_ALIVE_SECONDS: Final[int] = 75
 # Debian's adduser gives the first account created in the installer
 # FIRST_UID=1000 (/etc/adduser.conf) — that's the customer's login.
 INSTALLER_ACCOUNT_UID: Final[int] = 1000
@@ -60,7 +63,7 @@ def main() -> None:
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.
-    uvicorn.run(app, host="0.0.0.0", port=PORT)  # noqa: S104  # nosec B104
+    uvicorn.run(app, host="0.0.0.0", port=PORT, timeout_keep_alive=KEEP_ALIVE_SECONDS)  # noqa: S104  # nosec B104
 
 
 if __name__ == "__main__":
