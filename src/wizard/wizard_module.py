@@ -7,6 +7,7 @@ from src.wizard.neo4j_service import Neo4jService
 from src.wizard.ollama_service import OllamaService
 from src.wizard.postgres_service import PostgresService
 from src.wizard.preflight_service import PreflightService
+from src.wizard.site_service import SiteService
 from src.wizard.ssh_service import SshService
 from src.wizard.system_runner import LineStream, Runner
 from src.wizard.wizard_controller import WizardController
@@ -21,7 +22,8 @@ class WizardModule:
     ``secrets_env_path`` is the env file the EMS containers load (the same
     ``/opt/arcnode/secrets.env`` as the cloud);
     ``analyst_cfg_path`` is ems-analyst's cfg.customer.yml (same path as the
-    cloud's); ``account`` is whose authorized_keys the SSH key goes into;
+    cloud's); ``ems_dir`` is where every other file the containers mount
+    goes (``/opt/arcnode``, as in the cloud); ``account`` is whose authorized_keys the SSH key goes into;
     ``config`` is wizard-cfg.yml (deployment + hardware minimums); ``run`` runs the install and
     verification commands and ``stream`` the long downloads (fakes in tests).
     """
@@ -32,6 +34,7 @@ class WizardModule:
         base_dir: Path,
         secrets_env_path: Path,
         analyst_cfg_path: Path,
+        ems_dir: Path,
         account: SshAccount,
         config: WizardConfig,
         run: Runner,
@@ -67,6 +70,14 @@ class WizardModule:
             run=run,
             stream=stream,
         )
+        # The per-order ISO's /order, copied there at install.
+        self.site = SiteService(
+            deployment=deployment,
+            tracker=tracker,
+            order_dir=base_dir / "order",
+            ems_dir=ems_dir,
+            analyst_cfg_path=analyst_cfg_path,
+        )
         self.router = WizardController(
             preflight=self.preflight,
             ssh=self.ssh,
@@ -74,6 +85,7 @@ class WizardModule:
             postgres=self.postgres,
             neo4j=self.neo4j,
             ollama=self.ollama,
+            site=self.site,
             tracker=tracker,
             deployment=deployment,
             account=account,

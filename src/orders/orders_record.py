@@ -35,18 +35,15 @@ def derive_delivery_path(partition: AwsPartition) -> DeliveryPath:
 class OrderEmsDelivery(BaseModel):
     """Platform-api's per-order delivery shape.
 
-    Path derived from `aws_partition`. Platform-api renders a per-order CFN
-    template (CFN paths) and exposes its S3 URL as `template_url`. ISO path
-    leaves `template_url=None` until the v1 ISO build lands.
+    Path derived from `aws_partition`. CFN paths: a per-order CFN template at
+    `template_url`. ISO path: the appliance installer with the order baked
+    in (src/iso/iso_service.py) at `iso_url`, a 7-day presigned link.
     """
 
     path: DeliveryPath
     template_url: Optional[str] = None
-    # ISO path only: no per-order build pipeline exists yet (the prior
-    # live-build-based design was abandoned — see platform-ems-iso, which
-    # is being rebuilt from scratch on a different mechanism). Field stays
-    # for when per-order ISO delivery is designed against that new build.
-    iso_overlay_url: Optional[str] = None
+    iso_url: Optional[str] = None
+    iso_size_bytes: Optional[int] = None  # for the portal's chip
 
 
 class PostOrderResponse(BaseModel):

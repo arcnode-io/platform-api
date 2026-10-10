@@ -10,9 +10,9 @@ from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import Final
 
-import yaml
 
 from src.wizard.docker_verify import missing_network_check, read_network
+from src.wizard.ems_cfg import update_analyst_cfg
 from src.wizard.ollama_record import OllamaPageEvent, PullLine, PullProgress
 from src.wizard.ollama_api import (
     EMBED_CONTEXT,
@@ -160,11 +160,8 @@ class OllamaService:
             "keep_alive": -1,
         }
         self._run(api(network, "/api/embed", warm))
-        cfg = yaml.safe_dump(
-            analyst_cfg(network, settings).model_dump(), sort_keys=False
-        )
-        self._analyst_cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        self._analyst_cfg_path.write_text(cfg)
+        # Reason: merge — the Site page writes the same file's other keys.
+        update_analyst_cfg(self._analyst_cfg_path, analyst_cfg(network, settings))
 
 
 def _progress(progress: PullProgress) -> OllamaPageEvent:

@@ -32,6 +32,11 @@ sed -i \
   -e 's/^  embedding_model: .*/  embedding_model: qwen3-embedding:0.6b/' \
   -e 's/^  context_length: .*/  context_length: 8192/' \
   /etc/arcnode/wizard-cfg.yml
+# A box from the generic base ISO has no order (a per-order ISO carries
+# one) — give it the test site's: 1 compute module + 1 BESS module.
+if [ ! -d /etc/arcnode/order ]; then
+  cp -r /usr/local/share/arcnode/test-order /etc/arcnode/order
+fi
 systemctl restart arcnode-wizard
 
-echo "Test mode on: lowered the hardware minimums, tiny Ollama models. Reload the setup page and check hardware again."
+echo "Test mode on: lowered the hardware minimums, tiny Ollama models, the test site if there was no order. Reload the setup page and check hardware again."

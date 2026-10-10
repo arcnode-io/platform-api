@@ -1,6 +1,6 @@
 """Orchestrator module — DI assembly.
 
-Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `PortalModule`, and
+Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `IsoModule`, `PortalModule`, and
 `ManifestModule` and wires their services into `OrchestratorService`.
 `OrdersModule` consumes `module.service`.
 """
@@ -8,6 +8,7 @@ Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `PortalModule`, and
 from src.aws.aws_module import AwsModule
 from src.cfn.cfn_module import CfnModule
 from src.edp_client.edp_client_module import EdpClientModule
+from src.iso.iso_module import IsoModule
 from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_service import OrchestratorService
 from src.portal.portal_module import PortalModule
@@ -22,6 +23,7 @@ class OrchestratorModule:
         edp: EdpClientModule,
         aws: AwsModule,
         cfn: CfnModule,
+        iso: IsoModule,
         portal: PortalModule,
         manifest: ManifestModule,
         ems_hmi_apk_url: str,
@@ -32,6 +34,7 @@ class OrchestratorModule:
             s3=aws.s3,
             ses=aws.ses,
             cfn=cfn.service,
+            iso=iso.service,
             portal=portal.service,
             manifest=manifest.service,
             ems_hmi_apk_url=ems_hmi_apk_url,

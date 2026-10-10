@@ -17,6 +17,7 @@ from src.wizard.neo4j_service import Neo4jService, Neo4jStepNotAvailableError
 from src.wizard.ollama_service import OllamaService, OllamaStepNotAvailableError
 from src.wizard.postgres_service import PostgresService, PostgresStepNotAvailableError
 from src.wizard.preflight_service import PreflightService
+from src.wizard.site_service import SiteService, SiteStepNotAvailableError
 from src.wizard.ssh_service import (
     InvalidSshKeyError,
     SshService,
@@ -43,7 +44,7 @@ _NO_CACHE: Final[dict[str, str]] = {"Cache-Control": "no-cache"}
 class WizardController:
     """GET / (+ its static assets), GET /api/config, and one POST per page:
     /api/preflight (everywhere), /api/ssh, /api/docker, /api/postgres,
-    /api/neo4j, /api/ollama (on-prem only). The wizard has its own
+    /api/neo4j, /api/ollama, /api/site (on-prem only). The wizard has its own
     port (8080), so it lives at the root — no path prefix."""
 
     def __init__(
@@ -55,6 +56,7 @@ class WizardController:
         postgres: PostgresService,
         neo4j: Neo4jService,
         ollama: OllamaService,
+        site: SiteService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -65,6 +67,7 @@ class WizardController:
         self._postgres = postgres
         self._neo4j = neo4j
         self._ollama = ollama
+        self._site = site
         self._tracker = tracker
         self._deployment = deployment
         self._account = account
@@ -81,6 +84,7 @@ class WizardController:
             ("POST", "/api/postgres", self.postgres),
             ("POST", "/api/neo4j", self.neo4j),
             ("POST", "/api/ollama", self.ollama),
+            ("POST", "/api/site", self.site),
         ]
         for method, path, handler in routes:
             self.router.add_api_route(path, handler, methods=[method])
@@ -160,6 +164,13 @@ class WizardController:
         # the blocking curl reads don't stall the event loop.
         lines = (event.model_dump_json(exclude_none=True) + "\n" for event in events)
         return StreamingResponse(lines, media_type="application/x-ndjson")
+
+    async def site(self) -> StepResult:
+        """The on-prem Site page — see SiteService.apply."""
+        try:
+            return self._site.apply()
+        except (StepAlreadyDoneError, SiteStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def _refuse_if_applied(self) -> None:
         if self._tracker.all_done():

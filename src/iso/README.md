@@ -7,10 +7,27 @@
 ## Scope right now
 
 `setup.sh` installs SSH, the NVIDIA driver, Docker, PostgreSQL 17
-(+ TimescaleDB, pgvector) and Neo4j, then the first-boot wizard finishes
-each one on its own page, in dependency order: hardware check → SSH key →
-Docker network → PostgreSQL → Neo4j. Ollama, the EMS containers and the
-SSH password lock-down come next.
+(+ TimescaleDB, pgvector), Neo4j and Ollama, then the first-boot wizard
+finishes each one on its own page, in dependency order: hardware check →
+SSH key → Docker network → PostgreSQL → Neo4j → Ollama → Site (the order's
+site + devices). The EMS containers, one page each, and the SSH password
+lock-down come next.
+
+## Per-order ISO
+
+CI publishes the generic base ISO to `s3://arcnode-public/iso/`. For each
+on-prem order, platform-api's orchestrator bakes the order into it
+(`iso_service.py`): `/order/site.yml` (site id, market, settlement point)
+and `/order/dtm.json` (edp-api's device topology), added with the same
+`xorriso -boot_image any replay` — seconds per order, no Debian rebuild.
+The portal links it (presigned, 7 days). At install, `late_command` copies
+`/order` to the box and the wizard's Site page hands it to the EMS
+containers.
+
+A box from the base ISO has no order, and the Site page says where to get
+one. `sudo test-mode.sh` gives it the test site in `phases/test-order/`
+instead: edp-api's real generator output for 1 compute module, plus 1 BESS
+module and rack from edp-api's templates.
 
 ## History
 
@@ -24,8 +41,9 @@ preseeded Debian netinst, proven in small increments on real hardware.
 ## Architecture
 
 - **`preseed.cfg`** — only the `late_command` hook; the installer asks
-  every routine question itself. The hook copies `setup.sh`, `phases/` and
-  the wizard source onto the target and runs `setup.sh` in the chroot.
+  every routine question itself. The hook copies `setup.sh`, `phases/`,
+  the wizard source and (per-order ISO only) `/order` onto the target and
+  runs `setup.sh` in the chroot.
 - **`setup.sh`** — the provisioning itself, one logged `==> [n/N]` phase at
   a time (each daemon's install lives in `phases/`): apt fix-up, OpenSSH,
   NVIDIA, Docker, PostgreSQL, Neo4j, the wizard (native, apt-installed FastAPI —

@@ -14,6 +14,8 @@ local:
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
   # CI overwrites this tarball on each ems-industrial-gateway release.
   ems_industrial_gateway_tarball_url: 'https://arcnode-public.s3.amazonaws.com/gateway/ems-industrial-gateway-latest.tar.gz'
+  # CI's publish_iso overwrites this on every main push.
+  base_iso_url: 'https://arcnode-public.s3.amazonaws.com/iso/arcnode-ems-amd64.iso'
   cors_origins:
     - '*'  # local dev — any origin
 
@@ -33,6 +35,8 @@ beta:
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
   # CI overwrites this tarball on each ems-industrial-gateway release.
   ems_industrial_gateway_tarball_url: 'https://arcnode-public.s3.amazonaws.com/gateway/ems-industrial-gateway-latest.tar.gz'
+  # CI's publish_iso overwrites this on every main push.
+  base_iso_url: 'https://arcnode-public.s3.amazonaws.com/iso/arcnode-ems-amd64.iso'
   cors_origins:
     - 'https://arcnode.io'
     - 'https://www.arcnode.io'

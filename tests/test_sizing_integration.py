@@ -46,6 +46,7 @@ def _client(edp_api_url: str) -> TestClient:
         ses_sender_email="noreply@arcnode.test",
         ems_hmi_apk_url=APK_URL,
         ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
+        base_iso_url="https://arcnode-public.example/iso/arcnode-ems-amd64.iso",
         cors_origins=["*"],
     )
     module = AppModule(config=cfg)

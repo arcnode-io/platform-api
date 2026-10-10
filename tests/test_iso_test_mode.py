@@ -15,6 +15,7 @@ from testcontainers.core.container import DockerContainer
 
 REPO_ROOT = Path(__file__).parent.parent
 TEST_MODE_SCRIPT = REPO_ROOT / "src" / "iso" / "phases" / "test-mode.sh"
+TEST_ORDER = REPO_ROOT / "src" / "iso" / "phases" / "test-order"
 SETUP_TEXT = (REPO_ROOT / "src" / "iso" / "setup.sh").read_text()
 FAKE_SYSTEMCTL = '#!/bin/sh\necho "$@" >> /root/systemctl.log\n'
 
@@ -28,12 +29,16 @@ def _production_cfg() -> str:
 
 @pytest.fixture(scope="module")
 def box() -> Iterator[DockerContainer]:
-    """A Debian box with the script where setup.sh installs it, the
-    production wizard-cfg.yml, and an ordinary login account."""
+    """A Debian box from the generic base ISO (no order): the script and the
+    test order where setup.sh installs them, the production wizard-cfg.yml,
+    and an ordinary login account."""
     container = (
         DockerContainer("debian:trixie")
         .with_command("sleep infinity")
         .with_volume_mapping(str(TEST_MODE_SCRIPT), "/src/test-mode.sh", "ro")
+        .with_volume_mapping(
+            str(TEST_ORDER), "/usr/local/share/arcnode/test-order", "ro"
+        )
     )
     with container:
         container.exec(
@@ -97,3 +102,27 @@ def test_as_root_lowers_the_minimums_and_restarts_the_wizard(
     assert exit_code == 0, output
     assert actual == expected
     assert restarts == "restart arcnode-wizard\n"
+
+
+def test_gives_a_box_with_no_order_the_test_sites(box: DockerContainer) -> None:
+    # Arrange — the previous test ran test-mode.sh on an order-less box
+    expected = (TEST_ORDER / "site.yml").read_text()
+
+    # Act
+    actual = box.exec(["cat", "/etc/arcnode/order/site.yml"]).output.decode()
+
+    # Assert
+    assert actual == expected
+
+
+def test_keeps_a_real_order(box: DockerContainer) -> None:
+    # Arrange — a box installed from a per-order ISO
+    box.exec(["sh", "-c", "echo 'site_id: real_site' > /etc/arcnode/order/site.yml"])
+
+    # Act
+    exit_code, output = box.exec(["test-mode.sh"])
+
+    # Assert
+    actual = box.exec(["cat", "/etc/arcnode/order/site.yml"]).output.decode()
+    assert exit_code == 0, output
+    assert actual == "site_id: real_site\n"

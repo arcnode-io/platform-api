@@ -12,7 +12,16 @@ from src.wizard.wizard_record import Deployment
 
 STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
     # The hardware check is the root of the dependency graph — first everywhere.
-    Deployment.ON_PREM: ("preflight", "ssh", "docker", "postgres", "neo4j", "ollama"),
+    # Then the order's site, which every EMS container reads.
+    Deployment.ON_PREM: (
+        "preflight",
+        "ssh",
+        "docker",
+        "postgres",
+        "neo4j",
+        "ollama",
+        "site",
+    ),
     # EC2 set SSH + Docker up; databases are managed services in the cloud,
     # the LLM is Bedrock.
     Deployment.CLOUD: ("preflight",),

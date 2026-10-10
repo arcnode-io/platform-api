@@ -1,0 +1,8 @@
+# test-mode.sh's order: what a baked per-order ISO carries in /order, for a
+# box installed from the generic base ISO. dtm.json is edp-api's real
+# generator output for 1 compute container (no grid) plus 1 BESS module
+# and 1 rack from edp-api's own templates; validated against ems-device-api's
+# Dtm schema.
+site_id: test_site
+market_region: ercot
+settlement_point: HB_HOUSTON

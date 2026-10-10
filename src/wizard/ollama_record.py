@@ -1,8 +1,6 @@
 """Pydantic DTOs for the Ollama page: what Ollama's API answers, and the
 NDJSON events the page streams to the browser while models download."""
 
-from typing import Literal
-
 from pydantic import BaseModel
 
 from src.wizard.wizard_record import StepResult
@@ -74,20 +72,3 @@ class Generated(BaseModel):
     """POST /api/generate, stream false — eval_count is tokens produced."""
 
     eval_count: int = 0
-
-
-class AnalystOllamaSettings(BaseModel):
-    """ems-analyst's ``settings:`` block for Ollama (its OllamaSettings,
-    discriminated on llm_provider)."""
-
-    llm_provider: Literal["ollama"] = "ollama"
-    ollama_base_url: str
-    ollama_chat_model: str
-    ollama_embedding_model: str
-
-
-class AnalystCfg(BaseModel):
-    """/opt/arcnode/analyst-cfg.customer.yml — merged over the analyst's
-    defaults via CFG_CUSTOMER_PATH, same file the cloud's UserData writes."""
-
-    settings: AnalystOllamaSettings

@@ -16,6 +16,7 @@ const ALL_STEPS = [
   { id: 'postgres', n: 3, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
   { id: 'neo4j',    n: 4, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
   { id: 'ollama',   n: 5, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
+  { id: 'site',     n: 6, title: 'Site',       sub: 'From your order',           deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -634,6 +635,10 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {current === 'ollama' && (
             <StepOllama t={t} page={pageOf('ollama')} downloads={downloads} onApply={applyOllama}/>
+          )}
+          {current === 'site' && (
+            <StepSite t={t} page={pageOf('site')}
+              onApply={() => applyStep('site', '/api/site', {})}/>
           )}
         </div>
       </div>

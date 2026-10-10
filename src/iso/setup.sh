@@ -21,6 +21,11 @@ exec > /var/log/arcnode-late-command.log 2>&1
 
 echo "==> arcnode setup starting"
 mkdir -p /etc/arcnode
+# The order a per-order ISO carries (late_command copied /cdrom/order). The
+# generic base ISO has none; the wizard's Site page says where to get one.
+if [ -d /root/arcnode-order ]; then
+  cp -r /root/arcnode-order /etc/arcnode/order
+fi
 
 echo "==> [1/9] Preparing apt (cdrom fix) and updating"
 apt-get install -y figlet
@@ -112,6 +117,8 @@ EOF
 systemctl enable arcnode-wizard.service
 # One command for testing on an under-spec box: sudo test-mode.sh
 install -m 0755 /root/arcnode-phases/test-mode.sh /usr/local/sbin/test-mode.sh
+mkdir -p /usr/local/share/arcnode
+cp -r /root/arcnode-phases/test-order /usr/local/share/arcnode/test-order
 
 echo "==> [9/9] Writing MOTD"
 sh /root/arcnode-phases/motd.sh

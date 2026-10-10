@@ -6,7 +6,7 @@ from typing import Final
 
 from pydantic import BaseModel, ValidationError
 
-from src.wizard.ollama_record import AnalystCfg, AnalystOllamaSettings
+from src.wizard.ems_cfg import AnalystCfg, AnalystOllamaSettings
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Command, DockerNetwork, OllamaSettings
 

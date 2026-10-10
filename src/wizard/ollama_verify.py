@@ -5,8 +5,6 @@ import json
 from pathlib import Path
 from typing import Final
 
-import yaml
-
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.ollama_api import (
     EMBED_CONTEXT,
@@ -19,8 +17,8 @@ from src.wizard.ollama_api import (
     listeners,
     parse,
 )
+from src.wizard.ems_cfg import AnalystCfg, read_analyst_cfg
 from src.wizard.ollama_record import (
-    AnalystCfg,
     Embeddings,
     Generated,
     LoadedModel,
@@ -181,8 +179,7 @@ def _container_embeds(
 
 
 def _analyst_cfg_saved(path: Path, expected: AnalystCfg) -> VerifyCheck:
-    actual = yaml.safe_load(path.read_text()) if path.exists() else None
-    ok = actual == expected.model_dump()
+    ok = read_analyst_cfg(path).settings == expected.settings
     return VerifyCheck(
         name="Saved for the EMS analyst",
         ok=ok,

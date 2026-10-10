@@ -37,6 +37,8 @@ class Config(BaseModel):  # noqa: D101
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
     # S3 URL of the on-prem industrial-gateway docker-save tarball (cloud orders)
     ems_industrial_gateway_tarball_url: str
+    # The generic appliance ISO CI publishes; on-prem orders get baked into it.
+    base_iso_url: str
     cors_origins: list[str]  # Allowed origins for browser fetches (e.g. arcnode.io)
 
 

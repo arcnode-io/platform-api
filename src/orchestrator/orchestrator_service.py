@@ -21,6 +21,7 @@ from src.edp_client.edp_artifacts import (
     JobResult,
 )
 from src.edp_client.edp_client_service import EdpClientService
+from src.iso.iso_service import IsoService
 from src.manifest.artifact_metadata import MOCK_SYSTEM_IMAGE_TEMPLATES
 from src.manifest.manifest_record import ManifestArtifact, ManifestFile
 from src.manifest.manifest_service import ManifestService
@@ -32,6 +33,7 @@ from src.orders.orders_record import (
     derive_delivery_path,
 )
 from src.portal.portal_service import PortalService
+from src.wizard.order_record import OrderSite
 
 
 @dataclass(frozen=True)
@@ -54,6 +56,7 @@ class OrchestratorService:
         s3: S3Service,
         ses: SesService,
         cfn: CfnService,
+        iso: IsoService,
         portal: PortalService,
         manifest: ManifestService,
         ems_hmi_apk_url: str,
@@ -63,6 +66,7 @@ class OrchestratorService:
         self._s3 = s3
         self._ses = ses
         self._cfn = cfn
+        self._iso = iso
         self._portal = portal
         self._manifest = manifest
         self._ems_hmi_apk_url = ems_hmi_apk_url
@@ -149,29 +153,26 @@ class OrchestratorService:
     ) -> OrderEmsDelivery:
         """Render + upload per-order delivery artifacts; expose their S3 URLs.
 
-        ISO path: no per-order build pipeline yet — see
-        orders_record.OrderEmsDelivery.iso_overlay_url for current state.
-
+        ISO path: the base ISO with the order's site + DTM baked into /order.
         CFN paths: yaml + presigned DTM URL — operator runs from their partition.
+        Both get the site from `_order_site`, so they can't disagree.
         """
         path = derive_delivery_path(payload.aws_partition)
-        if path == DeliveryPath.ISO:
-            return OrderEmsDelivery(path=path)
+        site = _order_site(payload)
         self._find_dtm_url(archived)  # validate it exists
+        if path == DeliveryPath.ISO:
+            baked = await self._iso.bake(order_id=order_id, site=site)
+            return OrderEmsDelivery(
+                path=path, iso_url=baked.url, iso_size_bytes=baked.size_bytes
+            )
         dtm_key = f"orders/{order_id}/dtm.json"
         dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
         template = self._cfn.render_template(
             deployment_uuid=order_id,
             dtm_url=dtm_presigned_url,
-            site_id=_slugify_site_id(payload.deployment_site_name),
-            # None when the grid path has no settlement point (off-grid,
-            # or a market_region not yet pinned to one).
-            market_region=(
-                payload.grid.market_region.value
-                if payload.grid.market_region is not None
-                else None
-            ),
-            settlement_point=payload.grid.settlement_point,
+            site_id=site.site_id,
+            market_region=site.market_region,
+            settlement_point=site.settlement_point,
             deployment_context=payload.deployment_context,
         )
         template_url = await self._s3.upload_yaml(
@@ -208,11 +209,26 @@ class OrchestratorService:
     async def _build_system_artifacts(
         self, delivery: OrderEmsDelivery
     ) -> list[ManifestArtifact]:
-        """Compose the System Images section: APK from cfg.yml + per-order CFN yaml.
-
-        Future: ISO from the on-prem build pipeline lands here too as A1.
-        """
+        """Compose the System Images section: APK from cfg.yml + per-order
+        CFN yaml (cloud) or per-order appliance ISO (on-prem)."""
         artifacts: list[ManifestArtifact] = []
+
+        if delivery.iso_url:
+            iso_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["appliance_iso"]
+            artifacts.append(
+                ManifestArtifact(
+                    code="",
+                    name=iso_meta.name,
+                    subtitle=iso_meta.subtitle,
+                    files=[
+                        ManifestFile(
+                            format="ISO",
+                            size_bytes=delivery.iso_size_bytes or 0,
+                            url=delivery.iso_url,
+                        )
+                    ],
+                )
+            )
 
         apk_meta = MOCK_SYSTEM_IMAGE_TEMPLATES["ems_field_client"]
         apk_size = await self._s3.head_size(self._ems_hmi_apk_url)
@@ -339,6 +355,21 @@ class OrchestratorService:
 
 
 _SITE_ID_RX = re.compile(r"[^a-z0-9]+")
+
+
+def _order_site(payload: ConfiguratorPayload) -> OrderSite:
+    """The order's site as every EMS delivery bakes it in — CFN template or
+    ISO. market_region is None when the grid path has no settlement point
+    (off-grid, or a market_region not yet pinned to one)."""
+    return OrderSite(
+        site_id=_slugify_site_id(payload.deployment_site_name),
+        market_region=(
+            payload.grid.market_region.value
+            if payload.grid.market_region is not None
+            else None
+        ),
+        settlement_point=payload.grid.settlement_point,
+    )
 
 
 def _slugify_site_id(name: str) -> str:

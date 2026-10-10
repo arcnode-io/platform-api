@@ -6,6 +6,7 @@ S3 bucket. Returns the new platform-api S3 URL. Same code in production
 """
 
 import logging
+from pathlib import Path
 from typing import Final
 
 import aioboto3
@@ -102,6 +103,21 @@ class S3Service:
     async def upload_yaml(self, key: str, body: str) -> str:
         """Upload a YAML body under `key`, return the S3 URL."""
         return await self._upload_text(key, body, "application/yaml")
+
+    async def upload_file(self, key: str, path: Path, content_type: str) -> int:
+        """Upload a file from disk under `key` (multipart, so an 800 MB ISO
+        never sits in memory). Returns its size in bytes."""
+        async with self._client() as s3:
+            await s3.upload_file(
+                str(path), self._bucket, key, ExtraArgs={"ContentType": content_type}
+            )
+        size = path.stat().st_size
+        logging.info("uploaded %d bytes %s → %s", size, path, key)
+        return size
+
+    async def get_bytes(self, key: str) -> bytes:
+        """GetObject from our own bucket."""
+        return await self._fetch_s3(f"s3://{self._bucket}/{key}")
 
     async def generate_presigned_url(
         self, key: str, expiration_seconds: int = 86400

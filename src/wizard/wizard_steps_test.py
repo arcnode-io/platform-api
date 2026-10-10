@@ -22,6 +22,8 @@ def test_on_prem_closes_only_after_every_page_is_done(tmp_path: Path) -> None:
     tracker.mark_done("neo4j")
     assert not tracker.all_done()
     tracker.mark_done("ollama")
+    assert not tracker.all_done()
+    tracker.mark_done("site")
     assert tracker.all_done()
 
 

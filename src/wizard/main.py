@@ -23,11 +23,12 @@ from src.wizard.wizard_record import SshAccount
 BASE_DIR: Final[Path] = Path("/etc/arcnode")
 # Written by the provisioning path: setup.sh on-prem, EC2 UserData in the cloud.
 CONFIG_PATH: Final[Path] = BASE_DIR / "wizard-cfg.yml"
-# What every EMS container loads (src/compose/*/docker-compose.yaml) — the
-# same path the cloud's UserData writes.
-SECRETS_ENV_PATH: Final[Path] = Path("/opt/arcnode/secrets.env")
-# ems-analyst's overlay — the compose files mount it; the cloud writes it too.
-ANALYST_CFG_PATH: Final[Path] = Path("/opt/arcnode/analyst-cfg.customer.yml")
+# What the EMS containers load and mount (src/compose/*/docker-compose.yaml)
+# — the same paths the cloud's UserData writes.
+EMS_DIR: Final[Path] = Path("/opt/arcnode")
+SECRETS_ENV_PATH: Final[Path] = EMS_DIR / "secrets.env"
+# ems-analyst's overlay — two pages write it (Ollama, Site).
+ANALYST_CFG_PATH: Final[Path] = EMS_DIR / "analyst-cfg.customer.yml"
 PORT: Final[int] = 8080
 # Debian's adduser gives the first account created in the installer
 # FIRST_UID=1000 (/etc/adduser.conf) — that's the customer's login.
@@ -51,6 +52,7 @@ def main() -> None:
             base_dir=BASE_DIR,
             secrets_env_path=SECRETS_ENV_PATH,
             analyst_cfg_path=ANALYST_CFG_PATH,
+            ems_dir=EMS_DIR,
             account=installer_account(),
             config=config,
             run=run_system_command,

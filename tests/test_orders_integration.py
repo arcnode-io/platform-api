@@ -31,6 +31,7 @@ from pathlib import Path
 import boto3
 import httpx
 import pytest
+import yaml
 from fastapi.testclient import TestClient
 from testcontainers.core.network import Network
 
@@ -38,6 +39,7 @@ from src.app_module import AppModule
 from src.config import Config, LogLevel
 from src.edp_client.edp_artifacts import ArtifactKind
 from src.orders.orders_record import GetOrderResponse
+from tests.fixtures.iso import extract, seed_base_iso
 from tests.fixtures.containers import (
     seed_edp_manifest,
     start_edp_api,
@@ -120,6 +122,21 @@ def _poll_until_complete(client: TestClient, order_id: str) -> GetOrderResponse:
     )
 
 
+def _assert_order_baked_into_iso(final: GetOrderResponse, work: Path) -> None:
+    """On-prem: the installer carries the order's site + its archived DTM."""
+    assert final.ems_delivery is not None
+    assert final.ems_delivery.iso_url is not None
+    assert final.ems_delivery.template_url is None
+    iso = work / "arcnode-ems.iso"
+    work.mkdir()
+    iso.write_bytes(httpx.get(final.ems_delivery.iso_url).raise_for_status().content)
+    extract(iso, work, "/order")
+    dtm = next(a for a in final.edp_artifacts if a.kind == ArtifactKind.DTM)
+    actual_site = yaml.safe_load((work / "order" / "site.yml").read_text())
+    assert actual_site["site_id"] == "site_commercial_ac_coupled"
+    assert (work / "order" / "dtm.json").read_bytes() == httpx.get(dtm.url).content
+
+
 def _extract_portal_url(email_body: str) -> str:
     """Pull the portal URL out of the plain-text email body."""
     for line in email_body.splitlines():
@@ -128,7 +145,7 @@ def _extract_portal_url(email_body: str) -> str:
     pytest.fail(f"no Portal: line in email body: {email_body!r}")
 
 
-def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
+def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) -> None:
     """POST → poll → assert portal HTML lists artifacts + launch link + APK.
 
     Network topology: LocalStack + edp-api share a Docker network so edp-api's
@@ -142,6 +159,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
         start_localstack(network=net, network_alias="localstack") as ls,
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
@@ -162,6 +180,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link() -> None:
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
+                base_iso_url=base_iso_url,
                 cors_origins=["*"],
             )
             module = AppModule(config=cfg)
@@ -262,10 +281,11 @@ PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
     ("sovereign_government", "none", "govcloud", "cfn_govcloud"),
     ("sovereign_government", "ac_coupled", "govcloud", "cfn_govcloud"),
     ("sovereign_government", "dc_external_pcs", "govcloud", "cfn_govcloud"),
+    ("commercial", "ac_coupled", "none", "iso"),
 ]
 
 
-def test_all_profile_combinations_reach_complete() -> None:
+def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
     """Smoke-test every supported profile against one shared container stack.
 
     One Network + Postgres + LocalStack + edp-api lifecycle, then submit one
@@ -280,6 +300,7 @@ def test_all_profile_combinations_reach_complete() -> None:
         start_localstack(network=net, network_alias="localstack") as ls,
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
@@ -300,6 +321,7 @@ def test_all_profile_combinations_reach_complete() -> None:
                 ses_sender_email=SENDER_EMAIL,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
+                base_iso_url=base_iso_url,
                 cors_origins=["*"],
             )
             module = AppModule(config=cfg)
@@ -336,19 +358,22 @@ def test_all_profile_combinations_reach_complete() -> None:
                     assert ArtifactKind.BOM in kinds, label
                     assert ArtifactKind.DTM in kinds, label
 
+                    if expected_path == "iso":
+                        _assert_order_baked_into_iso(final, tmp_path / order_id)
+                        continue
                     # Variant-specific YAML content asserts.
                     assert final.ems_delivery.template_url is not None, label
-                    yaml = httpx.get(final.ems_delivery.template_url).text
+                    template_body = httpx.get(final.ems_delivery.template_url).text
                     if ctx == "commercial":
                         # Commercial: 2 vendor-URL params + CFN-native secrets,
                         # no Neptune / AOSS resources.
-                        assert "TimeseriesConnectionUrl:" in yaml, label
-                        assert "GraphConnectionUrl:" in yaml, label
-                        assert "AWS::Neptune::DBCluster" not in yaml, label
-                        assert "AWS::OpenSearchServerless" not in yaml, label
+                        assert "TimeseriesConnectionUrl:" in template_body, label
+                        assert "GraphConnectionUrl:" in template_body, label
+                        assert "AWS::Neptune::DBCluster" not in template_body, label
+                        assert "AWS::OpenSearchServerless" not in template_body, label
                     else:
                         # Defense / sovereign: SMOKE-LEAN — Neptune + AOSS
                         # commented out in PersistenceService for the
                         # gateway-publish smoke. Just verify no vendor params.
-                        assert "TimeseriesConnectionUrl:" not in yaml, label
-                        assert "GraphConnectionUrl:" not in yaml, label
+                        assert "TimeseriesConnectionUrl:" not in template_body, label
+                        assert "GraphConnectionUrl:" not in template_body, label

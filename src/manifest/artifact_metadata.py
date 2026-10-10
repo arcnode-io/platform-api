@@ -102,6 +102,16 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
         name="EMS Field Client",
         subtitle="MOCK Android · arm64-v8a · minSdk 30",
     ),
+    # On-prem: the generic installer with this order's site + devices baked
+    # in (src/iso/iso_service.py). Presigned, so the link expires.
+    "appliance_iso": ArtifactMetadata(
+        section=ManifestSection.SYSTEM_IMAGES,
+        name="Appliance Installer",
+        subtitle=(
+            "Debian 13 USB installer · x86-64 · carries your site's devices · "
+            "link valid 7 days"
+        ),
+    ),
     # Copy per delivery-portal-cloud.jsx (C2).
     "aws_deployment": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
