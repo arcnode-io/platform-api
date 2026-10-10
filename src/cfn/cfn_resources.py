@@ -51,12 +51,13 @@ DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
 # in every deployment) → fetched into secrets.env on both. The mqtt-* pws also
 # feed credentials.xml (the broker's auth store). See auth_secrets.py.
 AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
-    ("mqtt-gateway-password", "MQTT_GATEWAY_PASSWORD"),
+    # The four service accounts share one secret; each service still reads its own env name.
+    ("mqtt-service-password", "MQTT_GATEWAY_PASSWORD"),
     ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
     ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
-    ("mqtt-device-api-password", "MQTT_DEVICE_API_PASSWORD"),
-    ("mqtt-telemetry-writer-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
-    ("mqtt-der-control-api-password", "MQTT_DER_CONTROL_API_PASSWORD"),
+    ("mqtt-service-password", "MQTT_DEVICE_API_PASSWORD"),
+    ("mqtt-service-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
+    ("mqtt-service-password", "MQTT_DER_CONTROL_API_PASSWORD"),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
     ("auth-operator-pw", "AUTH_OPERATOR_PW"),
     ("auth-viewer-pw", "AUTH_VIEWER_PW"),
@@ -576,8 +577,8 @@ def build_userdata(
     # ${{AWS::StackName}} is CFN-substituted; $GW_PW/$OP_PW/$VW_PW are bash
     # vars (no braces → Fn::Sub leaves them for the unquoted heredoc to expand).
     credentials_block = (
-        "GW_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-gateway-password "
+        "SVC_PW=$(aws secretsmanager get-secret-value "
+        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-service-password "
         "--query SecretString --output text)\n"
         "OP_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-operator-password "
@@ -585,22 +586,13 @@ def build_userdata(
         "VW_PW=$(aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/mqtt-viewer-password "
         "--query SecretString --output text)\n"
-        "DA_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-device-api-password "
-        "--query SecretString --output text)\n"
-        "TW_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-telemetry-writer-password "
-        "--query SecretString --output text)\n"
-        "DCA_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-der-control-api-password "
-        "--query SecretString --output text)\n"
         # Same template the on-prem wizard fills (src/wizard/hivemq_credentials.py).
         # Cloud passwords exclude / & and \\, so they're safe as sed replacements.
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/credentials.template.xml "
         "-o /opt/arcnode/credentials.xml\n"
-        "sed -i -e \"s/__GATEWAY_PASSWORD__/$GW_PW/\" -e \"s/__OPERATOR_PASSWORD__/$OP_PW/\" "
-        "-e \"s/__VIEWER_PASSWORD__/$VW_PW/\" -e \"s/__DEVICE_API_PASSWORD__/$DA_PW/\" "
-        "-e \"s/__TELEMETRY_WRITER_PASSWORD__/$TW_PW/\" -e \"s/__DER_CONTROL_API_PASSWORD__/$DCA_PW/\" "
+        "sed -i -e \"s/__GATEWAY_PASSWORD__/$SVC_PW/\" -e \"s/__OPERATOR_PASSWORD__/$OP_PW/\" "
+        "-e \"s/__VIEWER_PASSWORD__/$VW_PW/\" -e \"s/__DEVICE_API_PASSWORD__/$SVC_PW/\" "
+        "-e \"s/__TELEMETRY_WRITER_PASSWORD__/$SVC_PW/\" -e \"s/__DER_CONTROL_API_PASSWORD__/$SVC_PW/\" "
         "/opt/arcnode/credentials.xml\n"
         "chmod 600 /opt/arcnode/credentials.xml\n"
     )

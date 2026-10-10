@@ -402,10 +402,9 @@ def test_auth_secrets_and_params_in_both_variants() -> None:
 
         # Assert — four generated + two param-sourced secrets
         for logical in (
-            "MqttGatewayPasswordSecret",
+            "MqttServicePasswordSecret",
             "MqttOperatorPasswordSecret",
             "MqttViewerPasswordSecret",
-            "MqttDerControlApiPasswordSecret",
             "AuthJwtSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
@@ -439,6 +438,9 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     ):
         assert placeholder in rendered, f"{placeholder} not filled"
     assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
+    # Reason: the four service accounts share one generated secret, fetched once.
+    assert "arcnode-ems-${AWS::StackName}/mqtt-service-password" in rendered
+    assert "mqtt-gateway-password" not in rendered
 
 
 def test_userdata_fetches_auth_slots_into_secrets_env() -> None:

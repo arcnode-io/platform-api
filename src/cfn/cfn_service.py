@@ -188,7 +188,7 @@ class CfnService:
                 "GatewaySecretName": {
                     "Value": {
                         "Fn::Sub": (
-                            "arcnode-ems-${AWS::StackName}/mqtt-gateway-password"
+                            "arcnode-ems-${AWS::StackName}/mqtt-service-password"
                         ),
                     },
                     "Description": (
