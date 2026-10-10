@@ -36,6 +36,8 @@ class HmiCfg(BaseModel):
     site_id: str
     deployment_name: str
     device_api_uri: str = "/api"
+    # Same-origin reads of der-control-api (the HMI nginx proxies this path).
+    der_control_uri: str = "/der-control"
     chat_api_uri: str = ""
     mqtt_uri: str = ""  # empty → the SPA derives ws(s)://<host>/mqtt
 

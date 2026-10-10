@@ -33,6 +33,7 @@ def test_saves_the_orders_site_for_every_ems_container(tmp_path: Path) -> None:
         "siteId": "test_site",
         "deploymentName": "test_site",
         "deviceApiUri": "/api",
+        "derControlUri": "/der-control",
         "chatApiUri": "",
         "mqttUri": "",
     }

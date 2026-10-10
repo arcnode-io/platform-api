@@ -572,3 +572,14 @@ def test_userdata_writes_lfdi_allowlist_on_one_line() -> None:
     assert "arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist" in rendered
     assert "DER_CONTROL_LFDI_ALLOWLIST=$(" in rendered
     assert "--output text | tr " in rendered
+
+
+def test_userdata_hmi_overlay_has_der_control_uri() -> None:
+    """The HMI refuses to boot without derControlUri in its overlay. It routes
+    same-origin through the HMI's nginx to der-control-api's events read."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "derControlUri:" in rendered
+    assert "/der-control" in rendered

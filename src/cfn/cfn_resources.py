@@ -731,6 +731,8 @@ def build_userdata(
         # bare /auth/*, /topology/*). chatApiUri empty → HMI posts /analyst/chat
         # which nginx passes through un-stripped (analyst route IS /analyst/chat).
         "deviceApiUri: /api\n"
+        # derControlUri: same-origin reads of der-control-api's events history.
+        'derControlUri: "/der-control"\n'
         'chatApiUri: ""\n'
         'mqttUri: ""\n'
         f"{e2e_line}"
