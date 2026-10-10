@@ -32,6 +32,7 @@ xorriso -indev "$SOURCE_ISO" \
   -map "$ISO_DIR/setup.sh" /setup.sh \
   -map "$ISO_DIR/phases" /phases \
   -map "$REPO_ROOT/src/compose/credentials.template.xml" /phases/credentials.template.xml \
+  -map "$REPO_ROOT/src/compose/commercial/docker-compose.yaml" /phases/docker-compose.yaml \
   -map "$ISO_DIR/grub.cfg" /boot/grub/grub.cfg \
   -map "$ISO_DIR/gtk.cfg" /isolinux/gtk.cfg \
   -map "$ISO_DIR/txt.cfg" /isolinux/txt.cfg \
@@ -49,9 +50,10 @@ xorriso -osirrox on -indev "$OUTPUT_ISO" \
   -extract /wizard-src/src/wizard/main.py "$CHECK_DIR/main.py"
 diff "$CHECK_DIR/preseed.cfg" "$ISO_DIR/preseed.cfg"
 diff "$CHECK_DIR/setup.sh" "$ISO_DIR/setup.sh"
-diff -r -x credentials.template.xml "$CHECK_DIR/phases" "$ISO_DIR/phases"
-# Reason: the template is mapped in from src/compose, not from the phases dir.
+diff -r -x credentials.template.xml -x docker-compose.yaml "$CHECK_DIR/phases" "$ISO_DIR/phases"
+# Reason: the template and compose are mapped in from src/compose, not from the phases dir.
 diff "$CHECK_DIR/phases/credentials.template.xml" "$REPO_ROOT/src/compose/credentials.template.xml"
+diff "$CHECK_DIR/phases/docker-compose.yaml" "$REPO_ROOT/src/compose/commercial/docker-compose.yaml"
 diff "$CHECK_DIR/main.py" "$REPO_ROOT/src/wizard/main.py"
 rm -rf "$CHECK_DIR"
 

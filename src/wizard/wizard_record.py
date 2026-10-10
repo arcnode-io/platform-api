@@ -165,6 +165,14 @@ class BrokerPasswords(BaseModel):
         return check_complexity(value)
 
 
+class AnalystServerKeys(BaseModel):
+    """POST /api/analyst-server body — the two API keys the analyst's weather
+    and market tools call out with. The customer sets both."""
+
+    openweathermap_api_key: str = Field(min_length=8)
+    gridstatus_api_key: str = Field(min_length=8)
+
+
 class DeviceApiSecrets(BaseModel):
     """POST /api/device-api body — the auth secrets the Device API signs and
     checks logins with. The customer sets all three."""

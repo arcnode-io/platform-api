@@ -351,3 +351,51 @@ function StepHmi({ t, page, onApply }) {
 
 window.StepIndustrialGateway = StepIndustrialGateway;
 window.StepHmi = StepHmi;
+
+// ─── Analyst server ─────────────────────────────────────────────────────────────
+// Two API keys, then it starts the server the analyst chat talks to.
+const ANALYST_SERVER_FIELDS = [
+  { key: 'openweathermap_api_key', label: 'OpenWeatherMap API key' },
+  { key: 'gridstatus_api_key', label: 'GridStatus API key' },
+];
+
+function StepAnalystServer({ t, page, keys, onKey, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const allFilled  = ANALYST_SERVER_FIELDS.every(f => (keys[f.key] || '').length >= 8);
+  const canApply   = !isApplying && !isDone && allFilled;
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : 'Start & verify';
+  return (
+    <StepShellW t={t} title="Analyst server"
+      blurb="it starts the server the analyst chat talks to. It needs two API keys: one for weather, one for market prices.">
+      {ANALYST_SERVER_FIELDS.map(f => (
+        <div key={f.key} style={{ marginBottom: SPACE[4] }}>
+          <FieldLabelW t={t} required>{f.label}</FieldLabelW>
+          <PasswordInputW t={t} label={f.label} value={keys[f.key] || ''}
+            onChange={v => onKey(f.key, v)} disabled={isApplying || isDone}/>
+        </div>
+      ))}
+      <HelperW t={t}>At least 8 characters.</HelperW>
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+window.StepAnalystServer = StepAnalystServer;

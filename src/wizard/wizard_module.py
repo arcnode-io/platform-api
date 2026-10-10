@@ -12,6 +12,7 @@ from src.wizard.neo4j_service import Neo4jService
 from src.wizard.ollama_service import OllamaService
 from src.wizard.postgres_service import PostgresService
 from src.wizard.analyst_model_service import AnalystModelService
+from src.wizard.analyst_server_service import AnalystServerService
 from src.wizard.mlflow_service import MlflowService
 from src.wizard.preflight_service import PreflightService
 from src.wizard.prometheus_service import PrometheusService
@@ -134,6 +135,13 @@ class WizardModule:
             secrets_env_path=secrets_env_path,
             run=run,
         )
+        self.analyst_server = AnalystServerService(
+            deployment=deployment,
+            tracker=tracker,
+            ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
+            run=run,
+        )
         self.router = WizardController(
             preflight=self.preflight,
             ssh=self.ssh,
@@ -147,6 +155,7 @@ class WizardModule:
             prometheus=self.prometheus,
             mlflow=self.mlflow,
             analyst_model=self.analyst_model,
+            analyst_server=self.analyst_server,
             device_api=self.device_api,
             industrial_gateway=self.industrial_gateway,
             hmi=self.hmi,

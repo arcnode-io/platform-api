@@ -24,8 +24,9 @@ const ALL_STEPS = [
   { id: 'hmi',      n: 11, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
   { id: 'mlflow',   n: 12, title: 'MLflow',     sub: 'Experiment tracking',       deployments: ['on-prem'] },
   { id: 'analyst_model', n: 13, title: 'Analyst model', sub: 'Daily forecast',    deployments: ['on-prem'] },
-  { id: 'prometheus', n: 14, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
-  { id: 'grafana',  n: 15, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
+  { id: 'analyst_server', n: 14, title: 'Analyst server', sub: 'Chat + weather keys', deployments: ['on-prem'] },
+  { id: 'prometheus', n: 15, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
+  { id: 'grafana',  n: 16, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -552,6 +553,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [brokerPasswords, setBrokerPasswords] = useStateW({});
   // The Device API's signing key and login passwords.
   const [deviceApiSecrets, setDeviceApiSecrets] = useStateW({});
+  // The analyst server's weather and market API keys.
+  const [analystServerKeys, setAnalystServerKeys] = useStateW({});
   // { [model]: latest download progress } while the Ollama page streams
   const [downloads, setDownloads] = useStateW({});
 
@@ -690,6 +693,11 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'mlflow' && (
             <StepMlflow t={t} page={pageOf('mlflow')}
               onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
+          )}
+          {current === 'analyst_server' && (
+            <StepAnalystServer t={t} page={pageOf('analyst_server')} keys={analystServerKeys}
+              onKey={(k, v) => setAnalystServerKeys(s => ({ ...s, [k]: v }))}
+              onApply={() => applyStep('analyst_server', '/api/analyst-server', analystServerKeys)}/>
           )}
           {current === 'analyst_model' && (
             <StepAnalystModel t={t} page={pageOf('analyst_model')}

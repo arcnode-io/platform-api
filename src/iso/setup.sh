@@ -120,6 +120,7 @@ install -m 0755 /root/arcnode-phases/test-mode.sh /usr/local/sbin/test-mode.sh
 # The broker rulebook is the same for every customer, so it ships in the ISO.
 mkdir -p /opt/arcnode
 install -m 0644 /root/arcnode-phases/credentials.template.xml /opt/arcnode/credentials.template.xml
+install -m 0644 /root/arcnode-phases/docker-compose.yaml /opt/arcnode/docker-compose.yaml
 mkdir -p /usr/local/share/arcnode
 cp -r /root/arcnode-phases/test-order /usr/local/share/arcnode/test-order
 

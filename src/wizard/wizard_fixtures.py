@@ -93,6 +93,8 @@ class FakeRunner:
             "logs prometheus": ok("level=INFO msg=\"Server is ready to receive web requests.\"\n"),
             "logs mlflow": ok("Listening at: http://0.0.0.0:5000\n"),
             "mlflow:5000/health": ok("OK"),
+            "analyst-server:8000/health": ok(""),
+            "logs analyst-server": ok("Uvicorn running on http://0.0.0.0:8000\n"),
             "logs analyst-model": ok("✅ MLflow healthy at http://mlflow:5000\nScheduler started. Will run daily at 14:00\n"),
             "logs industrial-gateway": ok("initial spec fetched\nMQTT subscriptions established\n"),
             "logs hmi": ok("start worker processes\n"),

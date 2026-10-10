@@ -229,3 +229,19 @@ def test_analyst_model_runs_beta_stage_as_a_daily_daemon() -> None:
         "/opt/arcnode/analyst-model-cfg.customer.yml:/app/cfg.customer.yml:ro"
     ]
     assert service["command"] == ["uv", "run", "-m", "src.main", "--mode", "schedule"]
+
+
+def test_analyst_server_points_at_itself_and_the_device_api() -> None:
+    """The agent reads telemetry through the server in the same container and
+    fetches the topology from the Device API on the compose network.
+
+    Reason: the server listens on 0.0.0.0:8000 inside its container, so localhost
+    reaches it. The Device API is its compose service name.
+    """
+    # Arrange + Act
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["analyst-server"]
+
+    # Assert
+    assert service["environment"]["SERVER_URL"] == "http://localhost:8000"
+    assert service["environment"]["DEVICE_API_URL"] == "http://device-api:3000"
+    assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"

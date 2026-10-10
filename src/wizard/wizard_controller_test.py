@@ -15,6 +15,10 @@ DEVICE_API_SECRETS: dict[str, str] = {
     "operator_password": "Operator-pw-1!",
     "viewer_password": "Viewer-pw-1!",
 }
+ANALYST_SERVER_KEYS: dict[str, str] = {
+    "openweathermap_api_key": "owm-key-1234",
+    "gridstatus_api_key": "grid-key-1234",
+}
 BROKER_PASSWORDS: dict[str, str] = {
     "service": "Service-pw-1!",
     "operator": "Operator-pw-1!",
@@ -105,6 +109,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     prometheus = client.post("/api/prometheus")
     mlflow = client.post("/api/mlflow")
     analyst_model = client.post("/api/analyst-model")
+    analyst_server = client.post("/api/analyst-server", json=ANALYST_SERVER_KEYS)
     device_api = client.post("/api/device-api", json=DEVICE_API_SECRETS)
     gateway = client.post("/api/industrial-gateway")
     hmi = client.post("/api/hmi")
@@ -121,6 +126,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert prometheus.json()["verified"] is True
     assert mlflow.json()["verified"] is True
     assert analyst_model.json()["verified"] is True
+    assert analyst_server.json()["verified"] is True
     assert device_api.json()["verified"] is True
     assert gateway.json()["verified"] is True
     assert hmi.json()["verified"] is True

@@ -10,10 +10,6 @@ from typing import Final
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Command
 
-# Same file the cloud's UserData fetches (CI publishes it per variant).
-COMPOSE_URL: Final[str] = (
-    "https://arcnode-public.s3.us-east-1.amazonaws.com/compose/commercial/docker-compose.yaml"
-)
 COMPOSE_FILE: Final[str] = "docker-compose.yaml"
 ONPREM_OVERRIDE_FILE: Final[str] = "docker-compose.onprem.yaml"
 # Reason: compose's default network can't reach the host daemons on the

@@ -139,6 +139,10 @@ services:
       # cfg.defaults.yml at startup (see ems-analyst-agent/config.py).
       # UserData writes the file with the customer's market values.
       CFG_CUSTOMER_PATH: /app/cfg.customer.yml
+      # The agent reads telemetry through the server in this container, and
+      # fetches the topology from the Device API.
+      SERVER_URL: http://localhost:8000
+      DEVICE_API_URL: http://device-api:3000
     volumes:
       - /opt/arcnode/analyst-cfg.customer.yml:/app/cfg.customer.yml:ro
     ports:

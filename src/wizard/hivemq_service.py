@@ -8,7 +8,6 @@ from typing import Final
 
 from src.wizard.containers_compose import (
     COMPOSE_FILE,
-    COMPOSE_URL,
     ONPREM_OVERRIDE,
     ONPREM_OVERRIDE_FILE,
     compose_command,
@@ -63,7 +62,6 @@ class HivemqService:
             raise HivemqStepNotAvailableError("no HiveMQ step in the cloud")
         if self._tracker.is_done("hivemq"):
             raise StepAlreadyDoneError("HiveMQ is already set up")
-        self._fetch_files()
         self._write_files(request)
         # Reason: compose reads these env files itself, so they must exist
         # before `up` — the saved passwords come first.
@@ -77,12 +75,6 @@ class HivemqService:
         if verified:
             self._tracker.mark_done("hivemq")
         return StepResult(verified=verified, checks=checks)
-
-    def _fetch_files(self) -> None:
-        """The cloud's compose file, from arcnode-public. The credentials template is in the ISO."""
-        self._run(
-            Command(args=["curl", "-fsSL", COMPOSE_URL, "-o", str(self._ems_dir / COMPOSE_FILE)])
-        )
 
     def _write_files(self, request: BrokerPasswords) -> None:
         """config.env (empty), the broker's credentials.xml (0600), the override."""

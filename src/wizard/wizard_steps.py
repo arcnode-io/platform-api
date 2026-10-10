@@ -28,6 +28,7 @@ STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
         "hmi",
         "mlflow",
         "analyst_model",
+        "analyst_server",
         "prometheus",
         "grafana",
     ),

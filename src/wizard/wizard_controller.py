@@ -24,6 +24,10 @@ from src.wizard.hivemq_service import HivemqService, HivemqStepNotAvailableError
 from src.wizard.neo4j_service import Neo4jService, Neo4jStepNotAvailableError
 from src.wizard.ollama_service import OllamaService, OllamaStepNotAvailableError
 from src.wizard.postgres_service import PostgresService, PostgresStepNotAvailableError
+from src.wizard.analyst_server_service import (
+    AnalystServerService,
+    AnalystServerStepNotAvailableError,
+)
 from src.wizard.analyst_model_service import (
     AnalystModelService,
     AnalystModelStepNotAvailableError,
@@ -42,6 +46,7 @@ from src.wizard.ssh_service import (
     SshStepNotAvailableError,
 )
 from src.wizard.wizard_record import (
+    AnalystServerKeys,
     ApplyRequest,
     ApplyResult,
     BrokerPasswords,
@@ -82,6 +87,7 @@ class WizardController:
         prometheus: PrometheusService,
         mlflow: MlflowService,
         analyst_model: AnalystModelService,
+        analyst_server: AnalystServerService,
         device_api: DeviceApiService,
         industrial_gateway: IndustrialGatewayService,
         hmi: HmiService,
@@ -102,6 +108,7 @@ class WizardController:
         self._prometheus = prometheus
         self._mlflow = mlflow
         self._analyst_model = analyst_model
+        self._analyst_server = analyst_server
         self._device_api = device_api
         self._industrial_gateway = industrial_gateway
         self._hmi = hmi
@@ -128,6 +135,7 @@ class WizardController:
             ("POST", "/api/prometheus", self.prometheus),
             ("POST", "/api/mlflow", self.mlflow),
             ("POST", "/api/analyst-model", self.analyst_model),
+            ("POST", "/api/analyst-server", self.analyst_server),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
             ("POST", "/api/hmi", self.hmi),
@@ -252,6 +260,13 @@ class WizardController:
         try:
             return self._analyst_model.apply()
         except (StepAlreadyDoneError, AnalystModelStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def analyst_server(self, request: AnalystServerKeys) -> StepResult:
+        """The on-prem analyst server page — see AnalystServerService.apply."""
+        try:
+            return self._analyst_server.apply(request)
+        except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     async def device_api(self, request: DeviceApiSecrets) -> StepResult:
