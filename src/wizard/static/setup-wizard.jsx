@@ -460,7 +460,7 @@ function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
   return (
     <div style={{
       padding: `${SPACE[4]}px ${SPACE[6]}px`,
-      borderTop: `1px solid ${t.border}`,
+      borderBottom: `1px solid ${t.border}`,
       display: 'flex', alignItems: 'center', gap: SPACE[3],
       background: t.bg,
     }}>
@@ -635,6 +635,10 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     }}>
       <HeaderW t={t} steps={steps} deployment={setup?.deployment} current={current}
         isDark={isDark} onToggleTheme={onToggleTheme}/>
+      {setup && (
+        <FooterW t={t} steps={steps} current={current} stepVerified={completed.has(current)}
+          onBack={onBack} onNext={onNext}/>
+      )}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <StepRailW t={t} steps={steps} current={current} completed={completed} onJump={onJump}/>
         <div style={{
@@ -714,10 +718,6 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
         </div>
       </div>
-      {setup && (
-        <FooterW t={t} steps={steps} current={current} stepVerified={completed.has(current)}
-          onBack={onBack} onNext={onNext}/>
-      )}
     </div>
   );
 }
