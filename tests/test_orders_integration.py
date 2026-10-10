@@ -47,12 +47,13 @@ from tests.fixtures.containers import (
     start_postgres,
 )
 
-# Path to the real manifest produced by edp-module-assemblies CI. Loaded
-# verbatim into LocalStack so edp-api's startup S3 fetch resolves to a
-# valid Manifest object.
+# The real manifest, pinned by commit in CI (EDP_MODULE_ASSEMBLIES_SHA). Loaded
+# verbatim into LocalStack so edp-api's startup S3 fetch resolves to a valid
+# Manifest object. Locally: see tests/fixtures/README.md.
 EDP_MANIFEST_PATH: Path = (
-    Path(__file__).resolve().parents[2] / "edp-module-assemblies" / "manifest.yaml"
+    Path(__file__).resolve().parent / "fixtures" / "edp-module-assemblies-manifest.yaml"
 )
+ASSETS_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "edp-assets"
 
 POSTGRES_PASSWORD: str = "test"
 S3_BUCKET: str = "platform-api-artifacts-test"
@@ -158,7 +159,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
         start_postgres(password=POSTGRES_PASSWORD) as pg,
         start_localstack(network=net, network_alias="localstack") as ls,
     ):
-        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH, ASSETS_DIR)
         base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
@@ -299,7 +300,7 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
         start_postgres(password=POSTGRES_PASSWORD) as pg,
         start_localstack(network=net, network_alias="localstack") as ls,
     ):
-        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH)
+        seed_edp_manifest(ls.url, EDP_MANIFEST_PATH, ASSETS_DIR)
         base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,

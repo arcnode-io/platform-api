@@ -19,3 +19,7 @@ secrets.env
 
 iso-out/
 .playwright-mcp/
+
+# Downloaded at the pinned edp-module-assemblies commit (see tests/fixtures/README.md)
+tests/fixtures/edp-module-assemblies-manifest.yaml
+tests/fixtures/edp-assets/

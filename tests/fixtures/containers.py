@@ -12,6 +12,8 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from testcontainers.localstack import LocalStackContainer
 from testcontainers.postgres import PostgresContainer
 
+from tests.fixtures.edp_assets import referenced_keys
+
 # edp-api expects this bucket + key per its cfg.yml `manifest_url`.
 EDP_MANIFEST_BUCKET: str = "arcnode-artifacts"
 EDP_MANIFEST_KEY: str = "manifest.yaml"
@@ -154,18 +156,17 @@ def start_localstack(
         yield Container(host="localhost", port=port, url=url)
 
 
-def seed_edp_manifest(localstack_url: str, manifest_path: Path) -> None:
+def seed_edp_manifest(localstack_url: str, manifest_path: Path, assets_dir: Path) -> None:
     """Upload edp-module-assemblies/manifest.yaml + every asset it references.
 
     edp-api's ManifestService.from_client eagerly fetches the manifest at
-    container boot. The pipeline (BomGenerator, DtmGenerator) then fetches
-    every referenced bom.yaml, topology.yaml, spec.yaml when a job runs.
-    Without all of these in the bucket, the job fails with NoSuchKey.
+    container boot. The pipeline then fetches each referenced topology, bom
+    and spec when a job runs. Real files come from `assets_dir`, fetched at the
+    pinned commit by tests/fixtures/edp_assets.py.
 
-    Strategy: mirror the on-disk edp-module-assemblies repo into the bucket
-    (real bytes for files that exist), then synthesize empty-but-valid stubs
-    for any URL the manifest references that has no on-disk counterpart
-    (plate specs are absent from the repo, for example).
+    A missing topology fails here: edp-api rejects an empty one, so a stub
+    would only move the failure into the job. Boms and specs the repo doesn't
+    have (7 deployment boms, plate specs) get an empty stub.
     """
     s3 = boto3.client(
         "s3",
@@ -175,58 +176,19 @@ def seed_edp_manifest(localstack_url: str, manifest_path: Path) -> None:
         aws_secret_access_key="test",
     )
     s3.create_bucket(Bucket=EDP_MANIFEST_BUCKET)
-
-    # 1. Manifest itself.
     s3.put_object(
         Bucket=EDP_MANIFEST_BUCKET,
         Key=EDP_MANIFEST_KEY,
         Body=manifest_path.read_bytes(),
     )
-
-    # 2. Mirror everything on disk under the assemblies repo.
-    repo_root = manifest_path.parent
-    for path in repo_root.rglob("*"):
-        if not path.is_file() or path == manifest_path:
-            continue
-        rel = path.relative_to(repo_root).as_posix()
-        s3.put_object(Bucket=EDP_MANIFEST_BUCKET, Key=rel, Body=path.read_bytes())
-
-    # 3. Synthesize stubs for URLs the manifest references but that don't
-    #    exist on disk (plate specs/STEP/DXF are absent from the repo).
-    _seed_referenced_url_stubs(s3, manifest_path)
-
-
-def _seed_referenced_url_stubs(s3, manifest_path: Path) -> None:
-    """For every s3:// URL in the manifest, ensure something is in the bucket.
-
-    Tries HEAD first; only synthesizes if missing. Stub content is empty YAML
-    (`{}` for spec/topology/bom — the generators tolerate empty parts/fields).
-    """
-    import yaml
-    from botocore.exceptions import ClientError
-
-    manifest = yaml.safe_load(manifest_path.read_text())
-    for url in _walk_s3_urls(manifest):
-        if not url.startswith(f"s3://{EDP_MANIFEST_BUCKET}/"):
-            continue
-        key = url.removeprefix(f"s3://{EDP_MANIFEST_BUCKET}/")
-        try:
-            s3.head_object(Bucket=EDP_MANIFEST_BUCKET, Key=key)
-        except ClientError:
+    for key in referenced_keys(manifest_path):
+        real = assets_dir / key
+        if real.is_file():
+            s3.put_object(Bucket=EDP_MANIFEST_BUCKET, Key=key, Body=real.read_bytes())
+        elif key.endswith("topology.yaml"):
+            raise FileNotFoundError(f"topology {key} not fetched; run tests/fixtures/edp_assets.py")
+        else:
             s3.put_object(Bucket=EDP_MANIFEST_BUCKET, Key=key, Body=b"{}\n")
-
-
-def _walk_s3_urls(node: object) -> Generator[str]:
-    """Yield every string starting with `s3://` in a nested dict/list."""
-    if isinstance(node, str):
-        if node.startswith("s3://"):
-            yield node
-    elif isinstance(node, dict):
-        for v in node.values():
-            yield from _walk_s3_urls(v)
-    elif isinstance(node, list):
-        for v in node:
-            yield from _walk_s3_urls(v)
 
 
 @contextmanager
