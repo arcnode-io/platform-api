@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from src.wizard.system_runner import run_system_command, stream_system_command
 from src.wizard.wizard_config import load_wizard_config
+from src.wizard.setup_token import token_for
 from src.wizard.wizard_module import WizardModule
 from src.wizard.wizard_record import SshAccount
 
@@ -60,6 +61,7 @@ def main() -> None:
             config=config,
             run=run_system_command,
             stream=stream_system_command,
+            setup_token=token_for(config.deployment, SECRETS_ENV_PATH),
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.

@@ -5,6 +5,8 @@ import secrets
 from pathlib import Path
 from typing import Final
 
+from src.wizard.wizard_record import Deployment
+
 # Reason: a request header name, not a secret value.
 TOKEN_HEADER: Final[str] = "X-Setup-Token"  # noqa: S105
 
@@ -24,3 +26,13 @@ def setup_token_from_env_file(path: Path) -> str | None:
         if line.startswith("SETUP_TOKEN="):
             return line.removeprefix("SETUP_TOKEN=")
     return None
+
+
+def token_for(deployment: Deployment, secrets_env_path: Path) -> str | None:
+    """The gate the wizard runs with: cloud needs the stack owner's token, on-prem has none."""
+    if deployment == Deployment.ON_PREM:
+        return None
+    token = setup_token_from_env_file(secrets_env_path)
+    if token is None:
+        raise RuntimeError("cloud wizard has no SETUP_TOKEN in secrets.env; refusing to run an open wizard")
+    return token
