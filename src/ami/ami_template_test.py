@@ -21,7 +21,7 @@ def test_bakes_the_wizard_into_the_image() -> None:
     text = TEMPLATE.read_text()
 
     # Assert — the wizard source comes from this repo, not the network at boot
-    assert 'source      = "../src/wizard/"' in text
+    assert 'source      = "src/wizard/"' in text
     assert "/opt/arcnode-wizard-src/src/wizard" in text
 
 

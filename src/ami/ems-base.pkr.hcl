@@ -1,5 +1,5 @@
 # Base AMI for the cloud EMS box: Amazon Linux 2023 + Docker + the setup wizard.
-# Built by CI on a release (see .gitlab-ci.yml, job build_base_ami). The stack
+# Built by CI from the repo root on a release (job build_base_ami). The stack
 # reads the resulting AMI id from SSM, never a hardcoded id.
 
 packer {
@@ -47,7 +47,7 @@ build {
   sources = ["source.amazon-ebs.ems"]
 
   provisioner "file" {
-    source      = "../src/wizard/"
+    source      = "src/wizard/"
     destination = "/tmp/wizard-src/src/wizard/"
   }
 
