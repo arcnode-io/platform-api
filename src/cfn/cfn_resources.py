@@ -561,6 +561,36 @@ def build_userdata(
         f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
     )
+    # The cloud setup wizard: the same baked source as the ISO, configured for cloud
+    # with m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU). It starts after secrets.env
+    # holds SETUP_TOKEN, so the gate is never open.
+    wizard_block = (
+        "mkdir -p /etc/arcnode\n"
+        "cat > /etc/arcnode/wizard-cfg.yml <<YML\n"
+        "deployment: cloud\n"
+        "hardware:\n"
+        "  vcpus: 8\n"
+        "  memory_gib: 32\n"
+        "  gpus: 0\n"
+        "  gpu_memory_gb: 0\n"
+        "  disk_gb: 50\n"
+        "  disk_nvme: false\n"
+        "YML\n"
+        "cat > /etc/systemd/system/arcnode-wizard.service <<UNIT\n"
+        "[Unit]\n"
+        "Description=arcnode setup wizard\n"
+        "After=network-online.target docker.service\n"
+        "[Service]\n"
+        "WorkingDirectory=/opt/arcnode-wizard-src\n"
+        "Environment=PYTHONPATH=/opt/arcnode-wizard-src\n"
+        "ExecStart=/usr/bin/python3 -m src.wizard.main\n"
+        "Restart=on-failure\n"
+        "[Install]\n"
+        "WantedBy=multi-user.target\n"
+        "UNIT\n"
+        "systemctl daemon-reload\n"
+        "systemctl enable --now arcnode-wizard\n"
+    )
     # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
     # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.
     lfdi_allowlist_line = (
@@ -748,6 +778,7 @@ def build_userdata(
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
         f"{lfdi_allowlist_line}"
+        f"{wizard_block}"
         "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
         f"{credentials_block}"
         "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"

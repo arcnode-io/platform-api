@@ -639,3 +639,19 @@ def test_cloud_instance_uses_the_base_ami_from_ssm() -> None:
 
     # Assert
     assert "/arcnode/ems/base-ami-id" in rendered
+
+
+def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> None:
+    """The cloud box runs the baked wizard as a service, configured for cloud with
+    the m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU), after secrets.env exists."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert — configured as cloud, with CPU-only minimums
+    assert "deployment: cloud" in rendered
+    assert "vcpus: 8" in rendered
+    assert "gpus: 0" in rendered
+    # Assert — the unit runs the baked source, and starts after the token is written
+    assert "ExecStart=/usr/bin/python3 -m src.wizard.main" in rendered
+    assert "systemctl enable --now arcnode-wizard" in rendered
+    assert rendered.index("SETUP_TOKEN=$(") < rendered.index("systemctl enable --now arcnode-wizard")
