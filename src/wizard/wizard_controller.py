@@ -47,6 +47,7 @@ from src.wizard.ssh_service import (
     SshService,
     SshStepNotAvailableError,
 )
+from src.wizard.analyst_server_progress import StageProgress
 from src.wizard.setup_token import TOKEN_HEADER
 from src.wizard.wizard_record import (
     DerControlRequest,
@@ -154,6 +155,7 @@ class WizardController:
             ("POST", "/api/mlflow", self.mlflow),
             ("POST", "/api/analyst-model", self.analyst_model),
             ("POST", "/api/analyst-server", self.analyst_server),
+            ("GET", "/api/analyst-server/progress", self.analyst_server_progress),
             ("POST", "/api/der-control", self.der_control),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
@@ -297,6 +299,10 @@ class WizardController:
             return self._der_control.apply(request)
         except (StepAlreadyDoneError, DerControlStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def analyst_server_progress(self) -> list[StageProgress]:
+        """The analyst server's startup stages, for the page to poll while it starts."""
+        return self._analyst_server.progress()
 
     def device_api(self, request: DeviceApiSecrets) -> StepResult:
         """The on-prem Device API page — see DeviceApiService.apply."""

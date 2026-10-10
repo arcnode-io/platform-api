@@ -5,6 +5,7 @@ else to type; the Device API it reads from is already up."""
 from pathlib import Path
 from typing import Final
 
+from src.wizard.analyst_server_progress import StageProgress, stage_status
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import save_secrets, saved_check
@@ -69,6 +70,11 @@ class AnalystServerService:
         if verified:
             self._tracker.mark_done("analyst_server")
         return StepResult(verified=verified, checks=checks)
+
+    def progress(self) -> list[StageProgress]:
+        """Each startup stage, read from the container's own log lines."""
+        logs = self._run(compose_command(self._ems_dir, "logs", ANALYST_SERVER_SERVICE)).stdout
+        return stage_status(logs)
 
     def _running_check(self) -> VerifyCheck:
         out = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", ANALYST_SERVER_SERVICE))

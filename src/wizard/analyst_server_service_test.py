@@ -56,3 +56,14 @@ def test_no_key_reaches_argv(tmp_path: Path) -> None:
     for command in runner.calls:
         for key in (KEYS.openweathermap_api_key, KEYS.gridstatus_api_key):
             assert key not in " ".join(command.args)
+
+
+def test_progress_reports_each_stage_from_the_container_logs(tmp_path: Path) -> None:
+    # Arrange — the fake's analyst logs carry only the uvicorn line, so only the last stage is done
+    service = make_analyst_server(tmp_path, FakeRunner())
+
+    # Act
+    stages = service.progress()
+
+    # Assert
+    assert [s.done for s in stages] == [False, False, False, True]

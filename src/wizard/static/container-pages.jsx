@@ -361,6 +361,19 @@ const ANALYST_SERVER_FIELDS = [
 
 function StepAnalystServer({ t, page, keys, onKey, onApply }) {
   const isApplying = page.state === 'applying';
+  // Real startup stages from the container's log lines, polled while it starts.
+  const [stages, setStages] = React.useState(null);
+  React.useEffect(() => {
+    if (!isApplying) return undefined;
+    let cancelled = false;
+    const poll = () => fetch('/api/analyst-server/progress')
+      .then(r => r.json())
+      .then(list => { if (!cancelled) setStages(list); })
+      .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [isApplying]);
   const isDone     = page.state === 'done';
   const allFilled  = ANALYST_SERVER_FIELDS.every(f => (keys[f.key] || '').length >= 8);
   const canApply   = !isApplying && !isDone && allFilled;
@@ -383,6 +396,15 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
           {isApplying && <SpinnerW color="#fff" size={13}/>}
           {buttonLabel}
         </button>
+      )}
+      {isApplying && stages && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[2], marginTop: SPACE[4] }}>
+          {stages.map(stage => (
+            <div key={stage.label} style={{ fontSize: 13, color: stage.done ? t.statusOk : t.textSoft }}>
+              {stage.done ? '✓' : '…'} {stage.label}
+            </div>
+          ))}
+        </div>
       )}
       {page.state === 'error' && (
         <div style={{ marginTop: SPACE[4] }}>
