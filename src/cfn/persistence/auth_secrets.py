@@ -27,6 +27,8 @@ so UserData writes it straight to a file instead. See AUTH_SLOTS in
 cfn_resources.py for the slot→env mapping.
 """
 
+from src.customer_inputs import GRAFANA_ADMIN, OPERATOR_LOGIN, VIEWER_LOGIN
+
 # Chars excluded from generated secrets so the values are safe to drop into
 # XML element content (credentials.xml), a shell heredoc, and KEY=value lines
 # in secrets.env: XML specials < > &, quotes, and shell-active $ ` \ / @.
@@ -87,13 +89,13 @@ def auth_human_secrets() -> dict[str, dict]:
     """Two secrets sourced from the customer-set login-password params."""
     return {
         "AuthOperatorPwSecret": _param_secret(
-            "auth-operator-pw", "AuthOperatorPw", "Operator login password (plaintext)."
+            OPERATOR_LOGIN.slot, OPERATOR_LOGIN.cfn_param, "Operator login password (plaintext)."
         ),
         "AuthViewerPwSecret": _param_secret(
-            "auth-viewer-pw", "AuthViewerPw", "Viewer login password (plaintext)."
+            VIEWER_LOGIN.slot, VIEWER_LOGIN.cfn_param, "Viewer login password (plaintext)."
         ),
         "GrafanaAdminPwSecret": _param_secret(
-            "grafana-admin-pw", "GrafanaAdminPw", "Grafana admin password (plaintext)."
+            GRAFANA_ADMIN.slot, GRAFANA_ADMIN.cfn_param, "Grafana admin password (plaintext)."
         ),
     }
 

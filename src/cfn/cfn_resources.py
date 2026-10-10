@@ -6,6 +6,7 @@ out keeps the service file thin and lets unit tests target each block.
 
 from typing import Final
 
+from src.customer_inputs import GRAFANA_ADMIN, OPERATOR_LOGIN, VIEWER_LOGIN
 from src.cfn.bedrock_models import all_invoke_resources
 from src.orders.configurator_payload import DeploymentContext
 
@@ -59,9 +60,9 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     ("mqtt-service-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
     ("mqtt-service-password", "MQTT_DER_CONTROL_API_PASSWORD"),
     ("auth-jwt-secret", "AUTH_JWT_SECRET"),
-    ("auth-operator-pw", "AUTH_OPERATOR_PW"),
-    ("auth-viewer-pw", "AUTH_VIEWER_PW"),
-    ("grafana-admin-pw", "GF_SECURITY_ADMIN_PASSWORD"),
+    (OPERATOR_LOGIN.slot, OPERATOR_LOGIN.env_name),
+    (VIEWER_LOGIN.slot, VIEWER_LOGIN.env_name),
+    (GRAFANA_ADMIN.slot, GRAFANA_ADMIN.env_name),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.

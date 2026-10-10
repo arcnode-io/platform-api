@@ -115,12 +115,28 @@ services:
       hivemq:
         condition: service_started
 
-  hmi:
-    image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
+  # The only host entry point. Port 80 serves the Let's Encrypt challenge and
+  # redirects everything else to HTTPS; 443 terminates TLS and proxies to the
+  # HMI (WebSocket /mqtt included). Cert files: /opt/arcnode/tls, from UserData
+  # (cloud) or the ISO's self-signed bootstrap (on-prem).
+  https-ingress:
+    image: nginx:1.27-alpine
     restart: unless-stopped
     <<: *env-files
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/arcnode/https-ingress.conf:/etc/nginx/conf.d/default.conf:ro
+      - /opt/arcnode/tls:/etc/nginx/tls:ro
+    depends_on:
+      hmi:
+        condition: service_started
+
+  hmi:
+    image: public.ecr.aws/y1d2j6a8/ems-hmi:latest
+    restart: unless-stopped
+    <<: *env-files
     volumes:
       # nginx serves this at /cfg.customer.yml (alias); the SPA fetches it at
       # boot for siteId + same-origin URIs. Written by UserData.

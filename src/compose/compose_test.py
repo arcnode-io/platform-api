@@ -116,8 +116,6 @@ def test_der_control_ingress_terminates_mtls_in_front_of_der_control_api(
     assert any(v.endswith(":/etc/nginx/tls/truststore.pem:ro") for v in volumes)
     assert any(v.endswith(":/etc/nginx/conf.d/default.conf:ro") for v in volumes)
 
-    # Assert — HMI's own ingress path is untouched by this addition
-    assert services["hmi"]["ports"] == ["80:80"]
 
 
 def test_defense_ships_broker_leg_plus_analyst_server() -> None:
@@ -258,3 +256,17 @@ def test_analyst_server_is_not_published_to_the_host() -> None:
 
     # Assert
     assert "ports" not in service
+
+
+def test_hmi_is_only_reached_through_the_https_ingress() -> None:
+    """Port 80 on the host is the https-ingress: it redirects to HTTPS and
+    serves the Let's Encrypt challenge. The HMI publishes nothing.
+
+    Reason: an operator must never see the HMI over plain HTTP.
+    """
+    # Arrange + Act
+    services = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]
+
+    # Assert
+    assert "ports" not in services["hmi"]
+    assert services["https-ingress"]["ports"] == ["80:80", "443:443"]

@@ -5,6 +5,7 @@ broker, verify. The topology file was copied in by the Site page."""
 from pathlib import Path
 from typing import Final
 
+from src.customer_inputs import OPERATOR_LOGIN, VIEWER_LOGIN
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.device_api_verify import DEVICE_API_SERVICE, verify_device_api
 from src.wizard.secrets_env import save_secrets
@@ -49,8 +50,8 @@ class DeviceApiService:
             self._secrets_env_path,
             {
                 "AUTH_JWT_SECRET": request.jwt_secret,
-                "AUTH_OPERATOR_PW": request.operator_password,
-                "AUTH_VIEWER_PW": request.viewer_password,
+                OPERATOR_LOGIN.env_name: request.operator_password,
+                VIEWER_LOGIN.env_name: request.viewer_password,
             },
         )
         self._run(compose_command(self._ems_dir, "up", "-d", DEVICE_API_SERVICE))

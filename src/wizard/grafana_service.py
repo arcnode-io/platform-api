@@ -5,6 +5,7 @@ wait for its listen line, verify the admin login works."""
 from pathlib import Path
 from typing import Final
 
+from src.customer_inputs import GRAFANA_ADMIN
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import save_secrets, saved_check
@@ -15,7 +16,7 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 GRAFANA_SERVICE: Final[str] = "grafana"
 # Grafana's own variable, read from the env file; the cloud sets the same name.
 # Reason: an env var name, not a secret value.
-PASSWORD_NAME: Final[str] = "GF_SECURITY_ADMIN_PASSWORD"  # noqa: S105
+PASSWORD_NAME: Final[str] = GRAFANA_ADMIN.env_name
 LISTEN_LINE: Final[str] = "HTTP Server Listen"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 GRAFANA_URL: Final[str] = "http://grafana:3000"

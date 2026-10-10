@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Final
 
+from src.customer_inputs import OPERATOR_LOGIN, VIEWER_LOGIN
 from src.wizard.containers_compose import compose_command
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import saved_check
@@ -17,7 +18,7 @@ BASE_URL: Final[str] = "http://device-api:3000"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 OPERATOR_USERNAME: Final[str] = "operator"
 DTM_FILE: Final[str] = "dtm.json"
-SAVED_NAMES: Final[list[str]] = ["AUTH_JWT_SECRET", "AUTH_OPERATOR_PW", "AUTH_VIEWER_PW"]
+SAVED_NAMES: Final[list[str]] = ["AUTH_JWT_SECRET", OPERATOR_LOGIN.env_name, VIEWER_LOGIN.env_name]
 LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs device-api"
 
 
