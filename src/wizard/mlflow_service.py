@@ -10,7 +10,9 @@ from src.wizard.wizard_record import Deployment, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 MLFLOW_SERVICE: Final[str] = "mlflow"
-LISTENING_LINE: Final[str] = "Listening at: http://0.0.0.0:5000"
+# The line the current mlflow image prints once uvicorn is serving (the old
+# "Listening at:" line never appears on ghcr.io/mlflow/mlflow:latest).
+LISTENING_LINE: Final[str] = "Uvicorn running on http://0.0.0.0:5000"
 LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs mlflow"
 DATA_DIRS: Final[tuple[str, ...]] = ("mlflow/mlflow-data", "mlflow/mlflow-artifacts")
 

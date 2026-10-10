@@ -91,7 +91,7 @@ class FakeRunner:
             "-u arcnode_": ok(""),
             "logs telemetry-writer": ok("measurements bootstrap done\nsubscribed to sites/+/devices/+/measurements/# (reason_code=Success)\n"),
             "logs prometheus": ok("level=INFO msg=\"Server is ready to receive web requests.\"\n"),
-            "logs mlflow": ok("Listening at: http://0.0.0.0:5000\n"),
+            "logs mlflow": ok("Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)\n"),
             "mlflow:5000/health": ok("OK"),
             "analyst-server:8000/health": ok(""),
             "logs analyst-server": ok("Uvicorn running on http://0.0.0.0:8000\n"),
