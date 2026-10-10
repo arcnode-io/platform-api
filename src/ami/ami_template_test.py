@@ -32,3 +32,11 @@ def test_names_the_ami_by_release_so_each_build_is_findable() -> None:
     # Assert
     assert 'ami_name' in text
     assert "arcnode-ems-base-" in text
+
+
+def test_writes_a_manifest_so_ci_can_read_the_new_ami_id() -> None:
+    # Arrange
+    text = TEMPLATE.read_text()
+
+    # Assert
+    assert 'post-processor "manifest"' in text

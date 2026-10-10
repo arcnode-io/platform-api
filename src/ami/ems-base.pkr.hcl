@@ -60,4 +60,9 @@ build {
       "sudo touch /opt/arcnode-wizard-src/src/__init__.py",
     ]
   }
+
+  post-processor "manifest" {
+    output     = "ami-manifest.json"
+    strip_path = true
+  }
 }

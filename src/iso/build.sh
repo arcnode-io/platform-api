@@ -37,7 +37,8 @@ xorriso -indev "$SOURCE_ISO" \
   -map "$ISO_DIR/gtk.cfg" /isolinux/gtk.cfg \
   -map "$ISO_DIR/txt.cfg" /isolinux/txt.cfg \
   -map "$REPO_ROOT/src/wizard" /wizard-src/src/wizard \
-  -map "$REPO_ROOT/src/__init__.py" /wizard-src/src/__init__.py
+  -map "$REPO_ROOT/src/__init__.py" /wizard-src/src/__init__.py \
+  -map "$REPO_ROOT/src/customer_inputs.py" /wizard-src/src/customer_inputs.py
 
 echo "Verifying preseed.cfg + setup.sh + wizard source landed correctly in the built ISO..."
 # Reason: extract with xorriso instead of loop-mounting — no root needed, so

@@ -86,6 +86,26 @@ publish_compose:
   only:
     - main
 
+# Base AMI: Packer bakes the wizard and Docker into one image, the cloud's
+# equivalent of the ISO. Manual so a release is a deliberate build; it updates
+# the SSM parameter the stack reads, then keeps only the newest three AMIs.
+build_base_ami:
+  stage: publish
+  image:
+    name: hashicorp/packer:1.16.0
+    entrypoint: [""]
+  when: manual
+  variables:
+    AWS_DEFAULT_REGION: us-east-1
+  before_script:
+    - apk add --no-cache aws-cli py3-boto3 jq
+  script:
+    - packer init src/ami/ems-base.pkr.hcl
+    - packer build -var "release=${CI_COMMIT_SHORT_SHA}" src/ami/ems-base.pkr.hcl
+    - AMI_ID=$(jq -r '.builds[-1].artifact_id' ami-manifest.json | cut -d: -f2)
+    - aws ssm put-parameter --name /arcnode/ems/base-ami-id --type String --value "$AMI_ID" --overwrite
+    - python3 src/ami/prune_base_amis.py --keep 3
+
 publish_iso:
   # The appliance ISO: stock Debian netinst + preseed late_command hook.
   # Built in a throwaway Debian container (xorriso, no root on the runner);
