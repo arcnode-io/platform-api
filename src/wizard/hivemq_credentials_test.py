@@ -1,6 +1,7 @@
 """Unit tests for filling the broker's credentials.xml template on-prem."""
 
-import xml.etree.ElementTree as ET
+# Reason: the test parses the XML we rendered ourselves, not untrusted input.
+import xml.etree.ElementTree as ET  # nosec B405
 from pathlib import Path
 
 from src.wizard.hivemq_credentials import render_credentials
@@ -24,7 +25,7 @@ def test_render_escapes_xml_characters_in_passwords() -> None:
 
     # Assert
     # Reason: parsing our own rendered template, not untrusted input.
-    root = ET.fromstring(rendered)  # noqa: S314
+    root = ET.fromstring(rendered)  # noqa: S314  # nosec B314
     gateway = root.find("users/user[name='arcnode_gateway']/password")
     assert gateway is not None
     assert gateway.text == "a&b<c>\"d'e"

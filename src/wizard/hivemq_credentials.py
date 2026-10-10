@@ -2,7 +2,8 @@
 fills the same template with sed; passwords there never contain XML
 special characters, here the customer chooses them, so they're escaped."""
 
-from xml.sax.saxutils import escape
+# Reason: escape() writes our own values into the template; nothing is parsed here.
+from xml.sax.saxutils import escape  # nosec B406
 
 
 def render_credentials(template: str, passwords: dict[str, str]) -> str:
