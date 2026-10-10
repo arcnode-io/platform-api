@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Final
 
 from src.wizard.containers_compose import (
-    COMPOSE_FILE,
     ONPREM_OVERRIDE,
     ONPREM_OVERRIDE_FILE,
     compose_command,
@@ -19,7 +18,6 @@ from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     BrokerPasswords,
-    Command,
     Deployment,
     StepResult,
 )
