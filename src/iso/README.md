@@ -1,22 +1,16 @@
 # ARCNODE Appliance ISO 📦
 
-> Stock Debian netinst, remastered with a preseed file, plus ArcNode's own
-> provisioning via the installer's `late_command` hook. Attended: a person
-> runs the first-boot wizard afterwards. Install once, done.
+> Stock Debian netinst with the standard attended install, plus ArcNode's
+> own provisioning via the installer's `late_command` hook. A person then
+> runs the first-boot wizard. Install once, done.
 
 ## Scope right now
 
-**SSH access only.** The installed box runs OpenSSH (installed even if the
-Debian installer's "SSH server" task was skipped) and a first-boot wizard
-where the customer brings their own key: they paste the public half of
-their `.pem` (`ssh-keygen -y -f private-key.pem`), and log in with
-`ssh -i private-key.pem <their-account>@<box-ip>`. The private key never leaves
-their machine.
-
-Everything else that used to live here (Docker, PostgreSQL, the EMS
-containers, the install-progress UI) was removed to restart from a clean
-base — it's in git history. It comes back one daemon at a time, in
-dependency order.
+`setup.sh` installs SSH, the NVIDIA driver, Docker, PostgreSQL 17
+(+ TimescaleDB, pgvector) and Neo4j, then the first-boot wizard finishes
+each one on its own page, in dependency order: hardware check → SSH key →
+Docker network → PostgreSQL → Neo4j. Ollama, the EMS containers and the
+SSH password lock-down come next.
 
 ## History
 
@@ -29,13 +23,12 @@ preseeded Debian netinst, proven in small increments on real hardware.
 
 ## Architecture
 
-- **`preseed.cfg`** — dev-loop answers to the installer's routine questions
-  (locale, whole-disk partitioning, account) so a reinstall needs no
-  clicking. Dev scaffolding, not product config (see `MANUAL_TESTS.md`).
-  Its `late_command` copies `setup.sh` + the wizard source onto the target
-  and runs `setup.sh` in the chroot.
+- **`preseed.cfg`** — only the `late_command` hook; the installer asks
+  every routine question itself. The hook copies `setup.sh`, `phases/` and
+  the wizard source onto the target and runs `setup.sh` in the chroot.
 - **`setup.sh`** — the provisioning itself, one logged `==> [n/N]` phase at
-  a time: apt fix-up, OpenSSH, the wizard (native, apt-installed FastAPI —
+  a time (each daemon's install lives in `phases/`): apt fix-up, OpenSSH,
+  NVIDIA, Docker, PostgreSQL, Neo4j, the wizard (native, apt-installed FastAPI —
   no PyPI), and the motd that shows the wizard's URL.
 - **`grub.cfg` / `gtk.cfg` / `txt.cfg`** — stock Debian boot configs plus
   `preseed/file=/cdrom/preseed.cfg`, so BIOS and UEFI both pick it up.
@@ -49,12 +42,13 @@ preseeded Debian netinst, proven in small increments on real hardware.
   step is on-prem only — in the cloud EC2 already set SSH up, so the step
   doesn't exist (`POST /api/ssh` 404s).
 
-## Provision (dev loop)
+## Build + flash
 
 ```sh
 src/iso/build.sh                                  # downloads, verifies, remasters
 lsblk -o NAME,SIZE,RM,TRAN,MODEL                   # confirm the USB device — don't guess
-sudo dd if=/tmp/debian-13.7.0-amd64-netinst-arcnode.iso of=/dev/sdX bs=4M status=progress conv=fsync
+sudo dd if=/tmp/arcnode-ems-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-Then follow `MANUAL_TESTS.md`.
+Boot it, answer the standard Debian installer (pick a network mirror),
+then open the `Setup:` URL the console login banner shows.

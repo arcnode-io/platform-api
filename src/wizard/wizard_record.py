@@ -24,6 +24,16 @@ class HardwareMinimums(BaseModel):
     gpus: int
     gpu_memory_gb: int
     disk_gb: int
+    disk_nvme: bool  # production: true; test-mode.sh allows SATA
+
+
+class OllamaSettings(BaseModel):
+    """wizard-cfg.yml's ``ollama:`` block — the models the Ollama page pulls
+    and the chat context it serves (test-mode.sh swaps in tiny ones)."""
+
+    chat_model: str
+    embedding_model: str
+    context_length: int
 
 
 class WizardConfig(BaseModel):
@@ -31,6 +41,7 @@ class WizardConfig(BaseModel):
 
     deployment: Deployment
     hardware: HardwareMinimums
+    ollama: OllamaSettings | None = None  # on-prem only
 
 
 class SshAccount(BaseModel):

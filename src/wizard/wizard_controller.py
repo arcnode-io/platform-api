@@ -10,10 +10,11 @@ from pathlib import Path
 from typing import Final
 
 from fastapi import APIRouter, HTTPException, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from src.wizard.docker_service import DockerService, DockerStepNotAvailableError
 from src.wizard.neo4j_service import Neo4jService, Neo4jStepNotAvailableError
+from src.wizard.ollama_service import OllamaService, OllamaStepNotAvailableError
 from src.wizard.postgres_service import PostgresService, PostgresStepNotAvailableError
 from src.wizard.preflight_service import PreflightService
 from src.wizard.ssh_service import (
@@ -42,7 +43,7 @@ _NO_CACHE: Final[dict[str, str]] = {"Cache-Control": "no-cache"}
 class WizardController:
     """GET / (+ its static assets), GET /api/config, and one POST per page:
     /api/preflight (everywhere), /api/ssh, /api/docker, /api/postgres,
-    /api/neo4j (on-prem only). The wizard has its own
+    /api/neo4j, /api/ollama (on-prem only). The wizard has its own
     port (8080), so it lives at the root — no path prefix."""
 
     def __init__(
@@ -53,6 +54,7 @@ class WizardController:
         docker: DockerService,
         postgres: PostgresService,
         neo4j: Neo4jService,
+        ollama: OllamaService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -62,64 +64,26 @@ class WizardController:
         self._docker = docker
         self._postgres = postgres
         self._neo4j = neo4j
+        self._ollama = ollama
         self._tracker = tracker
         self._deployment = deployment
         self._account = account
         self.router = APIRouter()
-        self.router.add_api_route(
-            "/",
-            self.index,
-            methods=["GET"],
-            summary="Serve the wizard UI, or 404 once every page is done",
-        )
-        self.router.add_api_route(
-            "/{filename}",
-            self.static_asset,
-            methods=["GET"],
-            summary="Serve a static JSX/JS asset the UI references",
-        )
-        self.router.add_api_route(
-            "/api/config",
-            self.config,
-            methods=["GET"],
-            response_model=SetupInfo,
-            summary="Cloud or on-prem, and whose login SSH is for",
-        )
-        self.router.add_api_route(
-            "/api/preflight",
-            self.preflight,
-            methods=["POST"],
-            response_model=StepResult,
-            summary="Hardware check: GPU, NVMe, CPU, memory against wizard-cfg.yml",
-        )
-        self.router.add_api_route(
-            "/api/ssh",
-            self.ssh,
-            methods=["POST"],
-            response_model=ApplyResult,
-            summary="On-prem SSH step: authorize your public key, verify SSH works",
-        )
-        self.router.add_api_route(
-            "/api/docker",
-            self.docker,
-            methods=["POST"],
-            response_model=StepResult,
-            summary="On-prem Docker step: create the arcnode network, verify",
-        )
-        self.router.add_api_route(
-            "/api/postgres",
-            self.postgres,
-            methods=["POST"],
-            response_model=StepResult,
-            summary="On-prem PostgreSQL step: set the password, add extensions, verify",
-        )
-        self.router.add_api_route(
-            "/api/neo4j",
-            self.neo4j,
-            methods=["POST"],
-            response_model=StepResult,
-            summary="On-prem Neo4j step: fix memory, set the password, verify",
-        )
+        # Reason: FastAPI takes each route's response model from the handler's
+        # return annotation and its description from the docstring.
+        routes = [
+            ("GET", "/", self.index),
+            ("GET", "/{filename}", self.static_asset),
+            ("GET", "/api/config", self.config),
+            ("POST", "/api/preflight", self.preflight),
+            ("POST", "/api/ssh", self.ssh),
+            ("POST", "/api/docker", self.docker),
+            ("POST", "/api/postgres", self.postgres),
+            ("POST", "/api/neo4j", self.neo4j),
+            ("POST", "/api/ollama", self.ollama),
+        ]
+        for method, path, handler in routes:
+            self.router.add_api_route(path, handler, methods=[method])
 
     async def index(self) -> HTMLResponse:
         """Entry point the person's browser loads."""
@@ -184,6 +148,18 @@ class WizardController:
             return self._neo4j.apply(request)
         except (StepAlreadyDoneError, Neo4jStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    async def ollama(self) -> StreamingResponse:
+        """The on-prem Ollama page — see OllamaService.apply. NDJSON: model
+        downloads take minutes to hours, so progress streams as it happens."""
+        try:
+            events = self._ollama.apply()
+        except (StepAlreadyDoneError, OllamaStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        # Reason: a sync iterator — Starlette runs it in a worker thread, so
+        # the blocking curl reads don't stall the event loop.
+        lines = (event.model_dump_json(exclude_none=True) + "\n" for event in events)
+        return StreamingResponse(lines, media_type="application/x-ndjson")
 
     def _refuse_if_applied(self) -> None:
         if self._tracker.all_done():

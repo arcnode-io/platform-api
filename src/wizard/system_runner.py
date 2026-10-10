@@ -8,11 +8,13 @@ and real daemons. Secrets go in through ``input``/``env``, never ``args``
 import os
 import shutil
 import subprocess  # nosec B404 — fixed-arg commands below, resolved paths, no shell
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from src.wizard.wizard_record import Command, CommandOutput
 
 Runner = Callable[[Command], CommandOutput]
+# Output line by line as it arrives — for long downloads that report progress.
+LineStream = Callable[[Command], Iterator[str]]
 
 
 def run_system_command(command: Command) -> CommandOutput:
@@ -33,3 +35,21 @@ def run_system_command(command: Command) -> CommandOutput:
     return CommandOutput(
         returncode=result.returncode, stdout=result.stdout or result.stderr
     )
+
+
+def stream_system_command(command: Command) -> Iterator[str]:
+    """Real line stream: stdout + stderr lines as the command prints them."""
+    binary = shutil.which(command.args[0])
+    if binary is None:
+        yield f"{command.args[0]} not found"
+        return
+    with subprocess.Popen(  # noqa: S603  # nosec B603 — resolved absolute path, fixed args
+        [binary, *command.args[1:]],
+        env={**os.environ, **command.env},
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    ) as process:
+        assert process.stdout is not None  # nosec B101 — set by stdout=PIPE
+        for line in process.stdout:
+            yield line.rstrip("\n")

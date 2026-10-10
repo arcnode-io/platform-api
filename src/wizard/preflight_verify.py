@@ -1,6 +1,6 @@
 """The hardware check — the wizard's first page and the root of the
-dependency graph. The minimums come from wizard-cfg.yml; NVMe is always
-required, GPUs as many as the config says (production: 1)."""
+dependency graph. The minimums come from wizard-cfg.yml (production: 1 GPU,
+NVMe; test-mode.sh lowers them for under-spec test boxes)."""
 
 from typing import Final
 
@@ -131,9 +131,11 @@ def _data_disk(run: Runner, minimums: HardwareMinimums) -> VerifyCheck:
     transport = disk_rows[0][1] if disk_rows and len(disk_rows[0]) > 1 else ""
     label = TRANSPORT_LABELS.get(transport, transport.upper())
     gb = int(size) // GB
+    nvme_ok = transport == "nvme" or not minimums.disk_nvme
+    need = "NVMe " if minimums.disk_nvme else ""
     return VerifyCheck(
         name="Data disk",
-        ok=transport == "nvme" and int(size) >= minimums.disk_gb * GB,
-        detail=f"{label}, {gb} GB (need NVMe ≥ {minimums.disk_gb} GB)",
+        ok=nvme_ok and int(size) >= minimums.disk_gb * GB,
+        detail=f"{label}, {gb} GB (need {need}≥ {minimums.disk_gb} GB)",
         hint=f"findmnt --target {DATA_DIR}; lsblk -o NAME,TRAN,ROTA,SIZE",
     )

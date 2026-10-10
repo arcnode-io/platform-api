@@ -287,8 +287,7 @@ class OrchestratorService:
             to=to,
             subject="ARCNODE deployment package ready",
             body_text=(
-                "Your ARCNODE deployment package is ready.\n\n"
-                f"Portal: {portal_url}\n"
+                f"Your ARCNODE deployment package is ready.\n\nPortal: {portal_url}\n"
             ),
         )
 

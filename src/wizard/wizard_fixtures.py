@@ -66,11 +66,30 @@ class FakeRunner:
             "findmnt": ok("/dev/nvme1n1p1 1000202273280\n"),
             "lsblk": ok("part \ndisk nvme\n"),
             "tee": ok(""),
+            "mkdir": ok(""),
             "sed": ok(""),
             # Neo4j's bolt port, on the arcnode gateway only (java's v4-mapped socket)
             "ss": ok("LISTEN 0      4096   [::ffff:172.23.0.1]:7687 *:*\n"),
         }
         self.queries: dict[str, CommandOutput] = {
+            # Before "run --rm" and "/api/embed": the ollama probe container.
+            "curlimages/curl": ok(
+                '{"model":"qwen3-embedding:4b-ctx8192","embeddings":[[0.1,0.2,0.3]]}'
+            ),
+            "sport = :11434": ok("LISTEN 0      4096   172.23.0.1:11434 0.0.0.0:*\n"),
+            "/api/tags": ok(
+                '{"models":[{"name":"gemma4:26b"},{"name":"qwen3-embedding:4b-ctx8192"},'
+                '{"name":"qwen3-embedding:4b"}]}'
+            ),
+            # Both fully on the GPU (size_vram == size), each at its context.
+            "/api/ps": ok(
+                '{"models":['
+                '{"name":"gemma4:26b","size":24900000000,"size_vram":24900000000,"context_length":131072},'
+                '{"name":"qwen3-embedding:4b-ctx8192","size":8300000000,"size_vram":8300000000,"context_length":8192}]}'
+            ),
+            "/api/generate": ok('{"response":"OK","done":true,"eval_count":2}'),
+            "/api/create": ok('{"status":"success"}'),
+            "/api/embed": ok('{"embeddings":[[0.1,0.2,0.3]]}'),
             # Before "run --rm": the neo4j probe container is a docker run too.
             "neo4j:2026.09.0-community": ok("ok\n1\n"),
             # Before "run --rm": the postgres probe container is a docker run too.

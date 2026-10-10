@@ -1,15 +1,17 @@
 """HTTP-layer tests for the wizard controller — real requests through
 FastAPI's request validation, not WizardService called directly."""
 
+import json
 from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from src.wizard.ollama_fixtures import PRODUCTION, FakeStream
 from src.wizard.wizard_fixtures import FakeRunner, account, ec2_style_pem, ok
 from src.wizard.wizard_module import WizardModule
-from src.wizard.wizard_record import Deployment, HardwareMinimums, WizardConfig
+from src.wizard.wizard_record import Deployment
 
 
 def _client(
@@ -23,13 +25,10 @@ def _client(
             base_dir=tmp_path,
             secrets_env_path=tmp_path / "secrets.env",
             account=account(tmp_path),
-            config=WizardConfig(
-                deployment=deployment,
-                hardware=HardwareMinimums(
-                    vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000
-                ),
-            ),
+            analyst_cfg_path=tmp_path / "analyst-cfg.customer.yml",
+            config=PRODUCTION.model_copy(update={"deployment": deployment}),
             run=runner or FakeRunner(),
+            stream=FakeStream(),
         ).router
     )
     return TestClient(app)
@@ -146,13 +145,16 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     client.post("/api/ssh", json={"ssh_public_key": public_key})
     client.post("/api/docker")
     client.post("/api/postgres", json={"password": "Pg-pass1!"})
+    client.post("/api/neo4j", json={"password": "Ne-4jpass1!"})
 
-    # Act
-    response = client.post("/api/neo4j", json={"password": "Ne-4jpass1!"})
+    # Act: the last page streams NDJSON — progress lines, then the result
+    response = client.post("/api/ollama")
 
     # Assert
-    assert response.status_code == 200
-    assert response.json()["verified"] is True
+    lines = [json.loads(line) for line in response.text.splitlines()]
+    assert response.headers["content-type"] == "application/x-ndjson"
+    assert lines[0]["progress"]["model"] == "gemma4:26b"
+    assert lines[-1]["result"]["verified"] is True
     assert client.get("/").status_code == 404
 
 
@@ -168,9 +170,11 @@ def test_docker_page_reports_the_range_docker_picked(tmp_path: Path) -> None:
     assert response.json()["checks"][1]["detail"] == "172.23.0.0/16, gateway 172.23.0.1"
 
 
-@pytest.mark.parametrize("route", ["/api/docker", "/api/postgres", "/api/neo4j"])
+@pytest.mark.parametrize(
+    "route", ["/api/docker", "/api/postgres", "/api/neo4j", "/api/ollama"]
+)
 def test_cloud_has_no_daemon_routes(tmp_path: Path, route: str) -> None:
-    # Arrange: EC2 sets up Docker; the cloud's databases are managed services
+    # Arrange: EC2 sets up Docker; databases + LLM are managed services
     client = _client(tmp_path, deployment=Deployment.CLOUD)
 
     # Act

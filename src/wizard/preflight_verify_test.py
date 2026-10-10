@@ -7,7 +7,7 @@ from src.wizard.wizard_record import CommandOutput, HardwareMinimums
 
 # What setup.sh writes into wizard-cfg.yml — g6e.2xlarge class.
 PRODUCTION = HardwareMinimums(
-    vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000
+    vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000, disk_nvme=True
 )
 
 
@@ -83,6 +83,20 @@ def test_spinning_disk_blocks() -> None:
 
     # Assert
     assert (disk.ok, disk.detail) == (False, "SATA, 1000 GB (need NVMe ≥ 1000 GB)")
+
+
+def test_sata_passes_when_the_config_doesnt_require_nvme() -> None:
+    # Arrange: test-mode.sh's profile on a SATA laptop
+    runner = _g6e_2xlarge()
+    runner.outputs["findmnt"] = ok("/dev/sda2 486000000000\n")
+    runner.outputs["lsblk"] = ok("part \ndisk sata\n")
+    sata_ok = PRODUCTION.model_copy(update={"disk_gb": 100, "disk_nvme": False})
+
+    # Act
+    disk = verify_hardware(runner, sata_ok)[4]
+
+    # Assert
+    assert (disk.ok, disk.detail) == (True, "SATA, 486 GB (need ≥ 100 GB)")
 
 
 def test_too_little_memory_blocks() -> None:

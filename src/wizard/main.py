@@ -15,7 +15,7 @@ from typing import Final
 import uvicorn
 from fastapi import FastAPI
 
-from src.wizard.system_runner import run_system_command
+from src.wizard.system_runner import run_system_command, stream_system_command
 from src.wizard.wizard_config import load_wizard_config
 from src.wizard.wizard_module import WizardModule
 from src.wizard.wizard_record import SshAccount
@@ -26,6 +26,8 @@ CONFIG_PATH: Final[Path] = BASE_DIR / "wizard-cfg.yml"
 # What every EMS container loads (src/compose/*/docker-compose.yaml) — the
 # same path the cloud's UserData writes.
 SECRETS_ENV_PATH: Final[Path] = Path("/opt/arcnode/secrets.env")
+# ems-analyst's overlay — the compose files mount it; the cloud writes it too.
+ANALYST_CFG_PATH: Final[Path] = Path("/opt/arcnode/analyst-cfg.customer.yml")
 PORT: Final[int] = 8080
 # Debian's adduser gives the first account created in the installer
 # FIRST_UID=1000 (/etc/adduser.conf) — that's the customer's login.
@@ -48,9 +50,11 @@ def main() -> None:
         WizardModule(
             base_dir=BASE_DIR,
             secrets_env_path=SECRETS_ENV_PATH,
+            analyst_cfg_path=ANALYST_CFG_PATH,
             account=installer_account(),
             config=config,
             run=run_system_command,
+            stream=stream_system_command,
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.

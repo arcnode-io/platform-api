@@ -15,7 +15,12 @@ def _service(tmp_path: Path, runner: FakeRunner) -> PreflightService:
     return PreflightService(
         tracker=tracker(tmp_path),
         minimums=HardwareMinimums(
-            vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000
+            vcpus=8,
+            memory_gib=64,
+            gpus=1,
+            gpu_memory_gb=48,
+            disk_gb=1000,
+            disk_nvme=True,
         ),
         run=runner,
     )

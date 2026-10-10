@@ -15,6 +15,7 @@ const ALL_STEPS = [
   { id: 'docker',   n: 2, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
   { id: 'postgres', n: 3, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
   { id: 'neo4j',    n: 4, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
+  { id: 'ollama',   n: 5, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -536,6 +537,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [sshKey, setSshKey] = useStateW('');
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
+  // { [model]: latest download progress } while the Ollama page streams
+  const [downloads, setDownloads] = useStateW({});
 
   useEffectW(() => {
     fetch('/api/config').then(r => r.json()).then(setSetup);
@@ -567,6 +570,19 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
         if (body.verified) setCompleted(s => new Set([...s, id]));
       })
       .catch((err) => setPage(id, { state: 'error', error: String(err.message || err) }));
+  };
+
+  const applyOllama = () => {
+    setPage('ollama', { state: 'applying', error: null });
+    setDownloads({});
+    streamOllama(progress => setDownloads(d => ({
+      ...d, [progress.model]: nextDownload(d[progress.model], progress, Date.now()),
+    })))
+      .then((body) => {
+        setPage('ollama', { state: body.verified ? 'done' : 'unverified', result: body });
+        if (body.verified) setCompleted(s => new Set([...s, 'ollama']));
+      })
+      .catch((err) => setPage('ollama', { state: 'error', error: String(err.message || err) }));
   };
 
   const onNext = () => {
@@ -615,6 +631,9 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'neo4j' && (
             <StepNeo4j t={t} page={pageOf('neo4j')} password={neo4jPassword} onPassword={setNeo4jPassword}
               onApply={() => applyStep('neo4j', '/api/neo4j', { password: neo4jPassword })}/>
+          )}
+          {current === 'ollama' && (
+            <StepOllama t={t} page={pageOf('ollama')} downloads={downloads} onApply={applyOllama}/>
           )}
         </div>
       </div>

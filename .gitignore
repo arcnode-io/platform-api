@@ -17,3 +17,5 @@ wheels/
 **/.coverage
 secrets.env
 
+iso-out/
+.playwright-mcp/

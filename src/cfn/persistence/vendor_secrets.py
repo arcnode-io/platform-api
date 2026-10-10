@@ -70,7 +70,7 @@ def commercial_url_parameters() -> dict[str, dict]:
             "NoEcho": True,
             "MinLength": 1,
             "Description": (
-                "Neo4j Aura connection URL. Format: " "neo4j+s://user:pass@host:port"
+                "Neo4j Aura connection URL. Format: neo4j+s://user:pass@host:port"
             ),
         },
     }
@@ -91,8 +91,7 @@ def agent_api_key_secrets() -> dict[str, dict]:
             "Type": "AWS::SecretsManager::Secret",
             "Properties": {
                 "Name": {
-                    "Fn::Sub": "arcnode-ems-${AWS::StackName}"
-                    "/openweathermap-api-key",
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}/openweathermap-api-key",
                 },
                 "Description": (
                     "OpenWeatherMap API key consumed by analyst-agent's "
@@ -105,7 +104,7 @@ def agent_api_key_secrets() -> dict[str, dict]:
             "Type": "AWS::SecretsManager::Secret",
             "Properties": {
                 "Name": {
-                    "Fn::Sub": "arcnode-ems-${AWS::StackName}" "/gridstatus-api-key",
+                    "Fn::Sub": "arcnode-ems-${AWS::StackName}/gridstatus-api-key",
                 },
                 "Description": (
                     "GridStatus (gridstatus.io) API key consumed by "

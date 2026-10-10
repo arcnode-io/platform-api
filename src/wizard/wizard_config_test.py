@@ -20,6 +20,7 @@ def test_load_reads_the_deployment(tmp_path: Path) -> None:
         "  gpus: 1\n"
         "  gpu_memory_gb: 48\n"
         "  disk_gb: 1000\n"
+        "  disk_nvme: true\n"
     )
 
     # Act
@@ -29,7 +30,12 @@ def test_load_reads_the_deployment(tmp_path: Path) -> None:
     assert actual == WizardConfig(
         deployment=Deployment.ON_PREM,
         hardware=HardwareMinimums(
-            vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000
+            vcpus=8,
+            memory_gib=64,
+            gpus=1,
+            gpu_memory_gb=48,
+            disk_gb=1000,
+            disk_nvme=True,
         ),
     )
 

@@ -81,6 +81,21 @@ publish_compose:
   only:
     - main
 
+publish_iso:
+  # The appliance ISO: stock Debian netinst + preseed late_command hook.
+  # Built in a throwaway Debian container (xorriso, no root on the runner);
+  # chown hands the root-owned output back so the runner can clean it up.
+  # Latest on main wins, same as the compose files.
+  stage: publish
+  script:
+    - mkdir -p iso-out
+    - docker run --rm -v "$PWD:/w" debian:trixie sh -c "apt-get update -qq && apt-get install -y -qq xorriso curl ca-certificates && /w/src/iso/build.sh /w/iso-out && chown -R $(id -u):$(id -g) /w/iso-out"
+    - cd iso-out && sha256sum arcnode-ems-amd64.iso > arcnode-ems-amd64.iso.sha256
+    - aws s3 cp arcnode-ems-amd64.iso s3://arcnode-public/iso/arcnode-ems-amd64.iso
+    - aws s3 cp arcnode-ems-amd64.iso.sha256 s3://arcnode-public/iso/arcnode-ems-amd64.iso.sha256
+  only:
+    - main
+
 .e2e_base: &e2e_base
   stage: e2e
   artifacts:
