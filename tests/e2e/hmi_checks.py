@@ -9,6 +9,7 @@ per the no-conftest rule this is a normal module imported explicitly.
 from __future__ import annotations
 
 import json as json_lib
+import ssl
 import threading
 import time
 import uuid
@@ -19,6 +20,7 @@ import urllib3
 from playwright.sync_api import expect, sync_playwright
 
 from .fixtures import E2E_OPERATOR_PW, E2E_VIEWER_PW
+from .tls import insecure_pool
 
 HMI_TIMEOUT_S = 600
 HMI_POLL_S = 15
@@ -27,7 +29,7 @@ TELEMETRY_TIMEOUT_S = 60
 
 
 def _http() -> urllib3.PoolManager:
-    return urllib3.PoolManager()
+    return insecure_pool()
 
 
 def _wait_for_hmi(public_ip: str) -> None:
@@ -40,7 +42,7 @@ def _wait_for_hmi(public_ip: str) -> None:
         try:
             r = http.request(
                 "GET",
-                f"http://{public_ip}/",
+                f"https://{public_ip}/",
                 timeout=urllib3.Timeout(connect=5, read=5),
             )
             if r.status == 200:
@@ -57,7 +59,7 @@ def _login(public_ip: str, username: str, password: str) -> str:
     body = json_lib.dumps({"username": username, "password": password}).encode()
     r = _http().request(
         "POST",
-        f"http://{public_ip}/api/auth/login",
+        f"https://{public_ip}/api/auth/login",
         body=body,
         headers={"Content-Type": "application/json"},
         timeout=urllib3.Timeout(connect=5, read=15),
@@ -71,7 +73,7 @@ def _mqtt_credentials(public_ip: str, token: str) -> dict[str, str]:
     """GET /api/auth/mqtt-credentials with the session JWT → role broker cred."""
     r = _http().request(
         "GET",
-        f"http://{public_ip}/api/auth/mqtt-credentials",
+        f"https://{public_ip}/api/auth/mqtt-credentials",
         headers={"Authorization": f"Bearer {token}"},
         timeout=urllib3.Timeout(connect=5, read=15),
     )
@@ -89,6 +91,8 @@ def _broker_connect_rc(
     """
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
     client.ws_set_options(path="/mqtt")
+    client.tls_set(cert_reqs=ssl.CERT_NONE)
+    client.tls_insecure_set(True)
     if username is not None:
         client.username_pw_set(username, password)
     rc_box: dict[str, int] = {}
@@ -100,7 +104,7 @@ def _broker_connect_rc(
 
     client.on_connect = on_connect
     try:
-        client.connect(public_ip, 80, keepalive=30)
+        client.connect(public_ip, 443, keepalive=30)
         client.loop_start()
         got.wait(BROKER_CONNECT_TIMEOUT_S)
     except Exception:
@@ -118,9 +122,9 @@ def check_spa_and_runtime_config(stack: dict[str, str]) -> None:
     _wait_for_hmi(ip)
 
     # Act
-    spa = _http().request("GET", f"http://{ip}/", timeout=urllib3.Timeout(read=10))
+    spa = _http().request("GET", f"https://{ip}/", timeout=urllib3.Timeout(read=10))
     cfg = _http().request(
-        "GET", f"http://{ip}/cfg.customer.yml", timeout=urllib3.Timeout(read=10)
+        "GET", f"https://{ip}/cfg.customer.yml", timeout=urllib3.Timeout(read=10)
     )
 
     # Assert
@@ -167,6 +171,8 @@ def check_viewer_receives_telemetry(stack: dict[str, str]) -> None:
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
     client.ws_set_options(path="/mqtt")
+    client.tls_set(cert_reqs=ssl.CERT_NONE)
+    client.tls_insecure_set(True)
     client.username_pw_set(cred["username"], cred["password"])
     received: dict[str, str] = {}
     got = threading.Event()
@@ -183,7 +189,7 @@ def check_viewer_receives_telemetry(stack: dict[str, str]) -> None:
     client.on_message = on_message
 
     # Act
-    client.connect(ip, 80, keepalive=30)
+    client.connect(ip, 443, keepalive=30)
     client.loop_start()
     delivered = got.wait(TELEMETRY_TIMEOUT_S)
     client.loop_stop()
@@ -210,6 +216,8 @@ def check_dispatch_round_trip(stack: dict[str, str]) -> None:
     run_id = uuid.uuid4().hex[:8]
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, transport="websockets")
     client.ws_set_options(path="/mqtt")
+    client.tls_set(cert_reqs=ssl.CERT_NONE)
+    client.tls_insecure_set(True)
     client.username_pw_set(cred["username"], cred["password"])
     events: list[dict[str, str]] = []
     wanted: dict[str, str] = {"command_id": ""}
@@ -228,7 +236,7 @@ def check_dispatch_round_trip(stack: dict[str, str]) -> None:
 
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect(ip, 80, keepalive=30)
+    client.connect(ip, 443, keepalive=30)
     client.loop_start()
     time.sleep(3)  # let the subscribe settle before publishing
 
@@ -282,10 +290,12 @@ def check_browser_login_sld(stack: dict[str, str]) -> None:
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page = browser.new_page(
+            viewport={"width": 1440, "height": 900}, ignore_https_errors=True
+        )
         try:
             # Act — load + log in via the shipped login page.
-            page.goto(f"http://{ip}/", wait_until="domcontentloaded")
+            page.goto(f"https://{ip}/", wait_until="domcontentloaded")
             page.get_by_test_id("login-username").fill("operator")
             page.get_by_test_id("login-password").fill(E2E_OPERATOR_PW)
             page.get_by_test_id("login-submit").click()
@@ -296,7 +306,7 @@ def check_browser_login_sld(stack: dict[str, str]) -> None:
             # Act — navigate to the single-line diagram (default screen is
             # Overview; SLD is its own route /modules/sld). SPA route, served
             # via nginx history-fallback.
-            page.goto(f"http://{ip}/modules/sld", wait_until="domcontentloaded")
+            page.goto(f"https://{ip}/modules/sld", wait_until="domcontentloaded")
 
             # Assert — the SLD canvas mounts (topology rendered from the broker).
             expect(page.get_by_test_id("sld-canvas")).to_be_visible(timeout=20_000)
@@ -312,9 +322,11 @@ def check_browser_dispatch_settles(stack: dict[str, str]) -> None:
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1440, "height": 900})
+        page = browser.new_page(
+            viewport={"width": 1440, "height": 900}, ignore_https_errors=True
+        )
         try:
-            page.goto(f"http://{ip}/", wait_until="domcontentloaded")
+            page.goto(f"https://{ip}/", wait_until="domcontentloaded")
             page.get_by_test_id("login-username").fill("operator")
             page.get_by_test_id("login-password").fill(E2E_OPERATOR_PW)
             page.get_by_test_id("login-submit").click()
@@ -323,7 +335,7 @@ def check_browser_dispatch_settles(stack: dict[str, str]) -> None:
             # Act — open the dispatchable BESS module (bess_module in the
             # smoke DTM exists exactly for this test).
             page.goto(
-                f"http://{ip}/devices/bess_module_01", wait_until="domcontentloaded"
+                f"https://{ip}/devices/bess_module_01", wait_until="domcontentloaded"
             )
             apply_btn = page.get_by_test_id("dispatch-apply")
             expect(apply_btn).to_be_visible(timeout=20_000)

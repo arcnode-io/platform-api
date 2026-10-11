@@ -10,6 +10,7 @@ Server-side validation (live image pulls, IAM evaluation, real launch)
 happens when the operator actually runs the stack — out of scope here.
 """
 
+import yaml
 from cfnlint import api as cfnlint_api
 
 from src.cfn.cfn_resources import ARCNODE_PUBLIC_BASE_URL
@@ -744,3 +745,19 @@ def test_userdata_hands_the_observability_data_dirs_to_the_containers_users() ->
     assert "chown -R 65534:65534 /opt/arcnode/observability/prometheus-data" in rendered
     assert "chown -R 472:472 /opt/arcnode/observability/grafana-data" in rendered
     assert rendered.index("chown -R 472:472") < rendered.index("docker compose")
+
+
+def test_the_instance_firewall_opens_https_for_the_ingress() -> None:
+    """Port 80 redirects to HTTPS and the ingress listens on 443, so the security group has to
+    let 443 in or every customer lands on a dead redirect (found on the first real defense
+    stack: 80 answered 301 → https://<ip>/ and 443 timed out)."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+    template = yaml.safe_load(rendered)
+    ingress = template["Resources"]["EmsSecurityGroup"]["Properties"][
+        "SecurityGroupIngress"
+    ]
+
+    # Assert
+    assert sorted(rule["FromPort"] for rule in ingress) == [80, 443, 8443]
+    assert all(rule["CidrIp"] == "0.0.0.0/0" for rule in ingress)

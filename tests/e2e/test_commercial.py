@@ -22,6 +22,7 @@ import urllib3
 # Explicit fixture imports — no conftest.py auto-discovery. commercial_stack
 # pulls in cfn/aura_url/tiger_url/commercial_site_id transitively, so all
 # must be in scope here for pytest's resolver.
+from .tls import insecure_pool
 from .fixtures import (  # noqa: F401
     aura_url,
     cfn,
@@ -39,11 +40,11 @@ HEALTH_POLL_S = 15
 
 
 def _http() -> urllib3.PoolManager:
-    return urllib3.PoolManager()
+    return insecure_pool()
 
 
 def _wait_for_health(public_ip: str) -> None:
-    url = f"http://{public_ip}/analyst/health"
+    url = f"https://{public_ip}/analyst/health"
     http = _http()
     deadline = time.time() + HEALTH_TIMEOUT_S
     last_err: str | None = None
@@ -103,7 +104,7 @@ def test_commercial_graph_chat_returns_assistant_message(
     }
     resp = _http().request(
         "POST",
-        f"http://{public_ip}/analyst/chat",
+        f"https://{public_ip}/api/analyst/chat",
         body=json_lib.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
         timeout=urllib3.Timeout(connect=5, read=120),

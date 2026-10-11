@@ -248,16 +248,15 @@ def test_analyst_server_points_at_itself_and_the_device_api() -> None:
     assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
 
 
-def test_analyst_server_is_not_published_to_the_host() -> None:
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_analyst_server_is_not_published_to_the_host(variant_path: Path) -> None:
     """The HMI reaches the analyst server over the compose network through its
     nginx, so no host port is needed.
 
     Reason: a published analyst port is an internet-facing chat API with no auth.
     """
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
-        "analyst-server"
-    ]
+    service = yaml.safe_load(variant_path.read_text())["services"]["analyst-server"]
 
     # Assert
     assert "ports" not in service

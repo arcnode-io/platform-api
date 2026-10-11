@@ -208,13 +208,21 @@ def network_resources() -> dict[str, object]:
         "EmsSecurityGroup": {
             "Type": "AWS::EC2::SecurityGroup",
             "Properties": {
-                "GroupDescription": "ARCNODE EMS HMI + analyst-server inbound",
+                "GroupDescription": "ARCNODE EMS HTTPS ingress (80 redirects to 443) + DER intake",
                 "VpcId": {"Ref": "EmsVpc"},
                 "SecurityGroupIngress": [
                     {
                         "IpProtocol": "tcp",
                         "FromPort": 80,
                         "ToPort": 80,
+                        "CidrIp": "0.0.0.0/0",
+                    },
+                    # https-ingress: the HMI, /api and the /mqtt websocket, behind the
+                    # box's self-signed cert. Port 80 only redirects here.
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 443,
+                        "ToPort": 443,
                         "CidrIp": "0.0.0.0/0",
                     },
                     # der-control-ingress — mTLS terminator for the utility/

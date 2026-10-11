@@ -26,6 +26,7 @@ import urllib3
 
 # Explicit fixture imports — no conftest.py auto-discovery. defense_stack
 # pulls in cfn + defense_site_id transitively.
+from .tls import insecure_pool
 from .fixtures import cfn, defense_site_id, defense_stack  # noqa: F401
 
 pytestmark = pytest.mark.skipif(
@@ -41,12 +42,12 @@ TELEMETRY_SETTLE_S: Final[int] = 60
 
 
 def _http() -> urllib3.PoolManager:
-    return urllib3.PoolManager()
+    return insecure_pool()
 
 
 def _wait_for_health(public_ip: str) -> None:
     """Poll analyst-server /health until 200 or HEALTH_TIMEOUT_S."""
-    url = f"http://{public_ip}:8000/health"
+    url = f"https://{public_ip}/analyst/health"
     http = _http()
     deadline = time.time() + HEALTH_TIMEOUT_S
     last_err: str | None = None
@@ -95,7 +96,7 @@ def test_defense_telemetry_persists_to_aurora(
     end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     start = (now - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
     url = (
-        f"http://{public_ip}:8000/measurements"
+        f"https://{public_ip}/api/analyst/measurements"
         f"?device_id=meter_01&measurement=kwh_delivered&start={start}&end={end}"
     )
     resp = _http().request("GET", url, timeout=urllib3.Timeout(connect=5, read=15))
@@ -125,7 +126,7 @@ def test_defense_graph_chat_returns_assistant_message(
     }
     resp = _http().request(
         "POST",
-        f"http://{public_ip}:8000/analyst/chat",
+        f"https://{public_ip}/api/analyst/chat",
         body=json_lib.dumps(body).encode(),
         headers={"Content-Type": "application/json"},
         timeout=urllib3.Timeout(connect=5, read=120),  # LLM call up to ~90s
