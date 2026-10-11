@@ -46,6 +46,10 @@ source "amazon-ebs" "ems" {
 build {
   sources = ["source.amazon-ebs.ems"]
 
+  provisioner "shell" {
+    inline = ["mkdir -p /tmp/wizard-src/src/wizard"]
+  }
+
   provisioner "file" {
     source      = "src/wizard/"
     destination = "/tmp/wizard-src/src/wizard/"
