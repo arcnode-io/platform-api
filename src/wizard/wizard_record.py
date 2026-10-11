@@ -209,6 +209,7 @@ class DerControlRequest(BaseModel):
     gives. Optional: blank means the utility isn't connected yet."""
 
     utility_mirror_url: str | None = None
+    lfdi_allowlist: str = ""  # the DERMS certificate's LFDIs; empty refuses every DER control
 
     @field_validator("utility_mirror_url")
     @classmethod
@@ -217,6 +218,16 @@ class DerControlRequest(BaseModel):
         if value is not None and not value.startswith("https://"):
             raise ValueError("must be an https:// URL")
         return value
+
+    @field_validator("lfdi_allowlist")
+    @classmethod
+    def lfdis_are_40_hex(cls, value: str) -> str:
+        """Comma, space, or newline separated; each id is 40 hex characters. Stored lowercase, space separated."""
+        ids = [part for part in re.split(r"[,\s]+", value) if part]
+        for lfdi in ids:
+            if not re.fullmatch(r"[0-9a-fA-F]{40}", lfdi):
+                raise ValueError(f"not a 40-character hex LFDI: {lfdi!r}")
+        return " ".join(lfdi.lower() for lfdi in ids)
 
 
 class AnalystServerKeys(BaseModel):

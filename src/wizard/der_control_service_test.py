@@ -3,6 +3,7 @@ order's site and the box's address, the service starts, and its health answers."
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from src.wizard.der_control_service import DerControlService
@@ -18,6 +19,7 @@ def make_der_control(tmp_path: Path) -> DerControlService:
         tracker=tracker(tmp_path),
         order_dir=TEST_ORDER,
         ems_dir=tmp_path / "opt",
+        secrets_env_path=tmp_path / "secrets.env",
         run=FakeRunner(),
     )
 
@@ -64,3 +66,33 @@ def test_skipping_the_der_page_lets_the_wizard_continue(tmp_path: Path) -> None:
     assert result.verified
     assert [c.name for c in result.checks] == ["Skipped for now"]
     assert tracker(tmp_path).is_done("der_control_api")
+
+
+LFDI_A = "a" * 40
+LFDI_B = "0123456789abcdef" * 2 + "01234567"
+
+
+def test_allowed_lfdis_are_written_to_secrets_env(tmp_path: Path) -> None:
+    # Arrange — the DERMS certificate's device identities, comma and newline separated
+    service = make_der_control(tmp_path)
+
+    # Act
+    service.apply(DerControlRequest(lfdi_allowlist=f"{LFDI_A},\n{LFDI_B}"))
+
+    # Assert — one line in secrets.env, spaces between the ids
+    saved = (tmp_path / "secrets.env").read_text()
+    assert f"DER_CONTROL_LFDI_ALLOWLIST={LFDI_A} {LFDI_B}\n" in saved
+
+
+def test_an_lfdi_that_is_not_40_hex_is_refused() -> None:
+    # Arrange + Act / Assert — a typo here would silently refuse the real utility
+    with pytest.raises(ValueError):
+        DerControlRequest(lfdi_allowlist="not-an-lfdi")
+
+
+def test_an_empty_allowlist_is_allowed_and_fails_closed(tmp_path: Path) -> None:
+    # Arrange + Act
+    make_der_control(tmp_path).apply(DerControlRequest(lfdi_allowlist=""))
+
+    # Assert — written empty; der-control-api refuses everyone until one is given
+    assert "DER_CONTROL_LFDI_ALLOWLIST=\n" in (tmp_path / "secrets.env").read_text()

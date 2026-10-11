@@ -424,7 +424,7 @@ window.StepAnalystServer = StepAnalystServer;
 
 // ─── DER control API ────────────────────────────────────────────────────────────
 // Optional: the DERMS base URL the utility gives. Blank means the utility isn't connected yet.
-function StepDerControl({ t, page, url, onUrl, onApply, onSkip }) {
+function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, onApply, onSkip }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
   const badUrl     = url !== '' && !url.startsWith('https://');
@@ -444,6 +444,15 @@ function StepDerControl({ t, page, url, onUrl, onApply, onSkip }) {
           fontFamily: t.fontLabel, fontSize: 13,
         }}/>
       {badUrl && <HelperW t={t} error>Must start with https://</HelperW>}
+      <FieldLabelW t={t}>ALLOWED DEVICE IDS (OPTIONAL)</FieldLabelW>
+      <input type="text" value={lfdis} disabled={isApplying || isDone} placeholder="40 hex characters each, comma or space separated"
+        onChange={e => onLfdis(e.target.value)} aria-label="Allowed device IDs"
+        style={{
+          width: '100%', height: 40, padding: '0 12px', boxSizing: 'border-box', marginBottom: SPACE[4],
+          background: t.bg, color: t.text, outline: 'none',
+          border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
+          fontFamily: t.fontLabel, fontSize: 13,
+        }}/>
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={{ ...primaryBtnStyle(t, !canApply), marginTop: SPACE[4] }}>

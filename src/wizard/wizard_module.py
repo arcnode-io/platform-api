@@ -150,6 +150,7 @@ class WizardModule:
             tracker=tracker,
             order_dir=base_dir / "order",
             ems_dir=ems_dir,
+            secrets_env_path=secrets_env_path,
             run=run,
         )
         self.cloud_secrets = CloudSecretsService(

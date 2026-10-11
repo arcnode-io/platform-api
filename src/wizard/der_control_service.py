@@ -13,11 +13,13 @@ from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE, DerControlCfg, write_yaml
 from src.wizard.order_record import SITE_FILE, OrderSite
+from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Command, Deployment, DerControlRequest, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 DER_CONTROL_SERVICE: Final[str] = "der-control-api"
+LFDI_ALLOWLIST_NAME: Final[str] = "DER_CONTROL_LFDI_ALLOWLIST"
 # Spring Boot prints this once the app has started, whatever the allowlist holds.
 # (An empty allowlist logs a WARN instead of the LFDI count, so waiting on that line hangs.)
 READY_LINE: Final[str] = "Started Application in"
@@ -44,11 +46,13 @@ class DerControlService:
         tracker: StepTracker,
         order_dir: Path,
         ems_dir: Path,
+        secrets_env_path: Path,
         run: Runner,
     ) -> None:
         self._deployment = deployment
         self._tracker = tracker
         self._order_dir = order_dir
+        self._secrets_env_path = secrets_env_path
         self._ems_dir = ems_dir
         self._run = run
 
@@ -65,7 +69,9 @@ class DerControlService:
             utility_mirror_url=request.utility_mirror_url,
         )
         write_yaml(self._ems_dir / DER_CONTROL_CFG_FILE, expected)
-        self._run(compose_command(self._ems_dir, "up", "-d", DER_CONTROL_SERVICE))
+        # Reason: the allowlist is read once at boot, so the container is recreated to pick it up.
+        save_secrets(self._secrets_env_path, {LFDI_ALLOWLIST_NAME: request.lfdi_allowlist})
+        self._run(compose_command(self._ems_dir, "up", "-d", "--force-recreate", DER_CONTROL_SERVICE))
         wait_for_log(self._run, self._ems_dir, DER_CONTROL_SERVICE, READY_LINE)
         checks = [self._running_check(), self._health_check(), self._saved_check(expected)]
         verified = all(check.ok for check in checks)

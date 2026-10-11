@@ -559,6 +559,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [analystServerKeys, setAnalystServerKeys] = useStateW({});
   // The utility's DERMS base URL, optional.
   const [derControlUrl, setDerControlUrl] = useStateW('');
+  // The DER device IDs the utility's certificate presents; empty refuses every DER control.
+  const [derLfdis, setDerLfdis] = useStateW('');
   // The cloud box's three customer passwords.
   const [cloudPasswords, setCloudPasswords] = useStateW({});
   // { [model]: latest download progress } while the Ollama page streams
@@ -711,8 +713,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {current === 'der_control_api' && (
             <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}
-              onUrl={setDerControlUrl}
-              onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null })}
+              onUrl={setDerControlUrl} lfdis={derLfdis} onLfdis={setDerLfdis}
+              onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null, lfdi_allowlist: derLfdis })}
               onSkip={() => applyStep('der_control_api', '/api/der-control/skip', {})}/>
           )}
           {current === 'analyst_server' && (
