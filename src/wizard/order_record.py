@@ -18,6 +18,11 @@ class OrderSite(BaseModel):
     site_id: str  # already slugified by the orchestrator
     market_region: str | None = None
     settlement_point: str | None = None
+    # What the wizard's first page shows so the customer can confirm this is the ISO
+    # built for their site. Absent on generic-ISO / test-mode orders.
+    customer: str | None = None
+    site_name: str | None = None
+    order_id: str | None = None
 
 
 class OrderDevice(BaseModel):

@@ -15,6 +15,8 @@ STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
     # Then the order's site, which every EMS container reads.
     Deployment.ON_PREM: (
         "preflight",
+        # Right after the hardware check: the customer confirms this is their site's ISO.
+        "identity",
         "ssh",
         "docker",
         "postgres",

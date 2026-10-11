@@ -112,6 +112,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     client = wizard_client(tmp_path)
     _, public_key = ec2_style_pem(tmp_path)
     client.post("/api/preflight")
+    client.post("/api/identity")
     client.post("/api/ssh", json={"ssh_public_key": public_key})
     client.post("/api/docker")
     client.post("/api/postgres", json={"password": "Pg-pass1!"})
@@ -216,3 +217,22 @@ def test_der_control_can_be_skipped_so_setup_continues(tmp_path: Path) -> None:
 
     # Assert
     assert response.json()["verified"] is True
+
+
+def test_identity_page_shows_the_order_then_confirms(tmp_path: Path) -> None:
+    # Arrange
+    client = wizard_client(tmp_path)
+
+    # Act
+    info = client.get("/api/identity")
+    confirmed = client.post("/api/identity")
+    again = client.post("/api/identity")
+
+    # Assert — the test order's identity, one confirmation, then the page is closed
+    assert info.status_code == 200
+    assert (info.json()["customer"], info.json()["site"]) == (
+        "Test customer",
+        "Test site",
+    )
+    assert confirmed.json()["verified"] is True
+    assert again.status_code == 404

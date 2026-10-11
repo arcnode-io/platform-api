@@ -6,3 +6,6 @@
 site_id: test_site
 market_region: ercot
 settlement_point: HB_HOUSTON
+customer: Test customer
+site_name: Test site
+order_id: test-mode

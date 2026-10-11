@@ -19,6 +19,7 @@ from src.wizard.device_api_service import (
 )
 from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
 from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
+from src.wizard.identity_service import IdentityService, IdentityStepNotAvailableError
 from src.wizard.ssh_lockdown_service import (
     SshKeyNotProvenError,
     SshLockdownService,
@@ -78,6 +79,7 @@ from src.wizard.wizard_record import (
     BrokerPasswords,
     Deployment,
     DeviceApiSecrets,
+    IdentityInfo,
     PasswordRequest,
     SetupInfo,
     SshAccount,
@@ -136,6 +138,7 @@ class WizardController:
         hmi: HmiService,
         grafana: GrafanaService,
         ssh_lockdown: SshLockdownService,
+        identity: IdentityService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -162,6 +165,7 @@ class WizardController:
         self._hmi = hmi
         self._grafana = grafana
         self._ssh_lockdown = ssh_lockdown
+        self._identity = identity
         self._tracker = tracker
         self._deployment = deployment
         self._variant = variant
@@ -174,6 +178,8 @@ class WizardController:
             ("GET", "/", self.index),
             ("GET", "/{filename}", self.static_asset),
             ("GET", "/api/config", self.config),
+            ("GET", "/api/identity", self.identity_info),
+            ("POST", "/api/identity", self.identity),
             ("POST", "/api/preflight", self.preflight),
             ("POST", "/api/ssh", self.ssh),
             ("POST", "/api/docker", self.docker),
@@ -386,6 +392,20 @@ class WizardController:
         try:
             return self._grafana.apply(request)
         except (StepAlreadyDoneError, GrafanaStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def identity_info(self) -> IdentityInfo:
+        """The site identity this ISO was built for — see IdentityService.info."""
+        try:
+            return self._identity.info()
+        except IdentityStepNotAvailableError as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def identity(self) -> StepResult:
+        """The customer confirms the identity — see IdentityService.confirm."""
+        try:
+            return self._identity.confirm()
+        except (StepAlreadyDoneError, IdentityStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def ssh_lockdown(self, request: SshLockdownRequest) -> StepResult:

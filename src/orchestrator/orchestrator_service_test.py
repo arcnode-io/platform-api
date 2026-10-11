@@ -35,3 +35,22 @@ class TestSlugifySiteId:
 
     def test_kanji_stripped(self) -> None:
         assert _slugify_site_id("Tokyo 東京 site") == "tokyo_site"
+
+
+def test_the_order_site_carries_the_identity_the_configurator_submitted() -> None:
+    """The box's first wizard page shows these so the customer can confirm it is the
+    ISO built for their site: customer, site name and order id come from the order."""
+    # Arrange
+    from src.orders.configurator_payload import ConfiguratorPayload
+    from src.orders.configurator_payload_test import JS_PAYLOAD
+    from src.orchestrator.orchestrator_service import _order_site
+
+    payload = ConfiguratorPayload.model_validate(JS_PAYLOAD)
+
+    # Act
+    site = _order_site(payload, order_id="6f1c2a9e-0000-4000-8000-000000000042")
+
+    # Assert
+    assert site.customer == payload.operator_org
+    assert site.site_name == payload.deployment_site_name
+    assert site.order_id == "6f1c2a9e-0000-4000-8000-000000000042"

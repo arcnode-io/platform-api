@@ -159,7 +159,7 @@ class OrchestratorService:
         Both get the site from `_order_site`, so they can't disagree.
         """
         path = derive_delivery_path(payload.aws_partition)
-        site = _order_site(payload)
+        site = _order_site(payload, order_id=order_id)
         self._find_dtm_url(archived)  # validate it exists
         if path == DeliveryPath.ISO:
             baked = await self._iso.bake(order_id=order_id, site=site)
@@ -358,7 +358,7 @@ class OrchestratorService:
 _SITE_ID_RX = re.compile(r"[^a-z0-9]+")
 
 
-def _order_site(payload: ConfiguratorPayload) -> OrderSite:
+def _order_site(payload: ConfiguratorPayload, *, order_id: str) -> OrderSite:
     """The order's site as every EMS delivery bakes it in — CFN template or
     ISO. market_region is None when the grid path has no settlement point
     (off-grid, or a market_region not yet pinned to one)."""
@@ -370,6 +370,9 @@ def _order_site(payload: ConfiguratorPayload) -> OrderSite:
             else None
         ),
         settlement_point=payload.grid.settlement_point,
+        customer=payload.operator_org,
+        site_name=payload.deployment_site_name,
+        order_id=order_id,
     )
 
 

@@ -11,6 +11,7 @@ const { useState: useStateW, useEffect: useEffectW } = React;
 // Each step lists the deployments it exists in — the body filters to this
 // box's deployment. SSH is on-prem only: in the cloud EC2 already set it up.
 const ALL_STEPS = [
+  { id: 'identity', n: 1, title: 'Site identity', sub: 'Confirm your order', deployments: ['on-prem'] },
   { id: 'ssh',      n: 1, title: 'SSH access', sub: 'Add + verify your key',    deployments: ['on-prem'] },
   { id: 'docker',   n: 2, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
   { id: 'postgres', n: 3, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
@@ -589,6 +590,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
   const [grafanaPassword, setGrafanaPassword] = useStateW('');
+  // The order's identity, shown read-only on the first page (on-prem only).
+  const [identity, setIdentity] = useStateW(null);
   // Checked by default: key-only SSH is the recommended end state.
   const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
   // One password per MQTT broker account, keyed as the API expects.
@@ -611,7 +614,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   useEffectW(() => {
     fetch('/api/config').then(r => r.json()).then(setSetup);
   }, []);
-  const steps = setup ? ALL_STEPS.filter(s => s.deployments.includes(setup.deployment)) : [];
+  // Numbered by position, so adding a page never means renumbering the rest.
+  const steps = setup ? ALL_STEPS.filter(s => s.deployments.includes(setup.deployment)).map((s, i) => ({ ...s, n: i + 1 })) : [];
   // Page order: the hardware check, then this deployment's steps.
   const order = ['preflight', ...steps.map(s => s.id)];
   // Resume where setup left off: done pages from the server, first unfinished page current.
@@ -711,6 +715,10 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     const idx = order.indexOf(current);
     if (idx > 0) setCurrent(order[idx - 1]);
   };
+  useEffectW(() => {
+    if (!setup || setup.deployment !== 'on-prem') return;
+    fetch('/api/identity').then(r => (r.ok ? r.json() : null)).then(setIdentity).catch(() => setIdentity(null));
+  }, [setup]);
   const onJump = (id) => setCurrent(id);
   // Every page verified: show the end screen instead of the last page.
   const finished = setup != null && steps.length > 0 && steps.every(s => completed.has(s.id));
@@ -779,6 +787,10 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {shown === 'hmi' && (
             <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
+          )}
+          {shown === 'identity' && (
+            <StepIdentity t={t} page={pageOf('identity')} identity={identity}
+              onApply={() => applyStep('identity', '/api/identity', {})}/>
           )}
           {shown === 'ssh_lockdown' && (
             <StepSshLockdown t={t} page={pageOf('ssh_lockdown')} checked={lockdownPasswords} onChecked={setLockdownPasswords}

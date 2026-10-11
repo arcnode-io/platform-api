@@ -601,3 +601,60 @@ function StepSshLockdown({ t, page, checked, onChecked, onApply }) {
     </StepShellW>
   );
 }
+
+
+// ─── Site identity ──────────────────────────────────────────────────────────────
+// The first page after the hardware check. Read-only: what the configurator baked into
+// this ISO. The customer confirms it is their site, or stops and contacts ARCNODE.
+function StepIdentity({ t, page, identity, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const rows = identity ? [
+    { label: 'Customer', value: identity.customer },
+    { label: 'Site', value: identity.site },
+    { label: 'Market', value: identity.market },
+    { label: 'Configurator order', value: identity.order_id, mono: true },
+  ] : [];
+  return (
+    <StepShellW t={t} title="Confirm site identity"
+      blurb="Make sure this is the ISO that was built for your site. If anything below is wrong, stop here and contact your ARCNODE configurator.">
+      {!identity && <SpinnerW color={t.accent} size={16}/>}
+      {identity && (
+        <div style={{ background: t.panel, border: `1px solid ${t.border}`, borderRadius: RADIUS[3], overflow: 'hidden' }}>
+          {rows.map((row, i) => (
+            <div key={row.label} style={{
+              display: 'grid', gridTemplateColumns: '180px 1fr', alignItems: 'center',
+              padding: `${SPACE[3]}px ${SPACE[4]}px`,
+              borderBottom: i < rows.length - 1 ? `1px solid ${t.border}` : 'none',
+            }}>
+              <span style={{ fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.18,
+                color: t.textSoft, textTransform: 'uppercase' }}>{row.label}</span>
+              <span style={{ fontFamily: row.mono ? t.fontLabel : t.fontBody, fontSize: 14, color: t.text }}>
+                {row.value || '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {identity && !isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={{ ...primaryBtnStyle(t, isApplying), marginTop: SPACE[5] }}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          This is my site — confirm
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+window.StepIdentity = StepIdentity;
