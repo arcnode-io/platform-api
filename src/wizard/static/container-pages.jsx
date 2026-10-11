@@ -361,19 +361,8 @@ const ANALYST_SERVER_FIELDS = [
 
 function StepAnalystServer({ t, page, keys, onKey, onApply }) {
   const isApplying = page.state === 'applying';
-  // Real startup stages from the container's log lines, polled while it starts.
-  const [stages, setStages] = React.useState(null);
-  React.useEffect(() => {
-    if (!isApplying) return undefined;
-    let cancelled = false;
-    const poll = () => fetch('/api/analyst-server/progress')
-      .then(r => r.json())
-      .then(list => { if (!cancelled) setStages(list); })
-      .catch(() => {});
-    poll();
-    const timer = setInterval(poll, 2000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [isApplying]);
+  // Stage updates arrive on the apply request's stream.
+  const stages = page.stages;
   const isDone     = page.state === 'done';
   const allFilled  = ANALYST_SERVER_FIELDS.every(f => (keys[f.key] || '').length >= 8);
   const canApply   = !isApplying && !isDone && allFilled;

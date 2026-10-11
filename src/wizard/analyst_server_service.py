@@ -84,6 +84,13 @@ class AnalystServerService:
             self._tracker.mark_done("analyst_server")
         return StepResult(verified=verified, checks=checks)
 
+    def ensure_startable(self) -> None:
+        """Refuse a start that can't happen, before the response begins streaming."""
+        if self._deployment == Deployment.CLOUD:
+            raise AnalystServerStepNotAvailableError("no analyst server page in the cloud")
+        if self._tracker.is_done("analyst_server"):
+            raise StepAlreadyDoneError("the analyst server is already set up")
+
     def start_stream(self, request: AnalystServerKeys) -> Iterator[str]:
         """Start the analyst and stream its stages as JSON lines while it seeds, then one
         verdict line. Streaming keeps the request alive; the page reads it like Ollama's pull."""

@@ -315,12 +315,13 @@ class WizardController:
         except (StepAlreadyDoneError, AnalystModelStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    def analyst_server(self, request: AnalystServerKeys) -> StepResult:
-        """The on-prem analyst server page — see AnalystServerService.apply."""
+    def analyst_server(self, request: AnalystServerKeys) -> StreamingResponse:
+        """The on-prem analyst server page: streams its stages as NDJSON while it seeds, then the verdict."""
         try:
-            return self._analyst_server.apply(request)
+            self._analyst_server.ensure_startable()
         except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        return StreamingResponse(self._analyst_server.start_stream(request), media_type="application/x-ndjson")
 
     def cloud_secrets(self, request: CloudSecrets) -> StepResult:
         """The cloud password page — see CloudSecretsService.apply."""

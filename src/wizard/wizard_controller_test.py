@@ -144,7 +144,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert prometheus.json()["verified"] is True
     assert mlflow.json()["verified"] is True
     assert analyst_model.json()["verified"] is True
-    assert analyst_server.json()["verified"] is True
+    assert json.loads(analyst_server.text.splitlines()[-1])["result"]["verified"] is True
     assert device_api.json()["verified"] is True
     assert der_control.json()["verified"] is True
     assert gateway.json()["verified"] is True

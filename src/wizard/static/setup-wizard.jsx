@@ -613,6 +613,43 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
       .catch((err) => setPage(id, { state: 'error', error: String(err.message || err) }));
   };
 
+  // The analyst start streams its stage updates as NDJSON while it seeds, then the verdict.
+  const applyAnalystServer = () => {
+    setPage('analyst_server', { state: 'applying', error: null, stages: null });
+    fetch('/api/analyst-server', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(analystServerKeys),
+    })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
+        }
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let newline;
+          while ((newline = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newline);
+            buffer = buffer.slice(newline + 1);
+            if (!line.trim()) continue;
+            const msg = JSON.parse(line);
+            if (msg.stages) setPage('analyst_server', { state: 'applying', stages: msg.stages });
+            if (msg.result) {
+              setPage('analyst_server', { state: msg.result.verified ? 'done' : 'unverified', result: msg.result, stages: null });
+              if (msg.result.verified) setCompleted(s => new Set([...s, 'analyst_server']));
+            }
+          }
+        }
+      })
+      .catch((err) => setPage('analyst_server', { state: 'error', error: String(err.message || err) }));
+  };
+
   const applyOllama = () => {
     setPage('ollama', { state: 'applying', error: null });
     setDownloads({});
@@ -723,7 +760,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'analyst_server' && (
             <StepAnalystServer t={t} page={pageOf('analyst_server')} keys={analystServerKeys}
               onKey={(k, v) => setAnalystServerKeys(s => ({ ...s, [k]: v }))}
-              onApply={() => applyStep('analyst_server', '/api/analyst-server', analystServerKeys)}/>
+              onApply={() => applyAnalystServer()}/>
           )}
           {current === 'analyst_model' && (
             <StepAnalystModel t={t} page={pageOf('analyst_model')}
