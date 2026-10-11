@@ -90,6 +90,9 @@ class FakeRunner:
             # HiveMQ: compose's status + readiness log, and the broker probes.
             # These sit above "run --rm", which would otherwise catch the probes.
             "--status running": ok("3f1c2a9e0b7d\n"),
+            # Liveness during a log wait: the container exists and is running.
+            "ps -q -a": ok("3f1c2a9e0b7d\n"),
+            "inspect --format": ok("running\n"),
             "logs hivemq": ok("Started HiveMQ in 5496ms\n"),
             "1883 -t": CommandOutput(
                 returncode=4, stdout="Connection Refused: bad user name or password\n"
