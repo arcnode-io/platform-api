@@ -3,7 +3,7 @@ itself was installed at install time by src/iso/phases/docker.sh."""
 
 from src.wizard.docker_verify import DOCKER_NETWORK, inspect_network, verify_docker
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Command, Deployment, StepResult
+from src.wizard.wizard_record import SshAccount, Command, Deployment, StepResult
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 
@@ -15,10 +15,11 @@ class DockerService:
     """Create the network every EMS container and host daemon meets on."""
 
     def __init__(
-        self, *, deployment: Deployment, tracker: StepTracker, run: Runner
+        self, *, deployment: Deployment, tracker: StepTracker, account: SshAccount, run: Runner
     ) -> None:
         self._deployment = deployment
         self._tracker = tracker
+        self._account = account
         self._run = run
 
     def apply(self) -> StepResult:
@@ -33,6 +34,8 @@ class DockerService:
         if inspect_network(self._run).returncode != 0:
             # No --subnet: Docker picks a free range from its address pools.
             self._run(Command(args=["docker", "network", "create", DOCKER_NETWORK]))
+        # Reason: the installer account can run docker without sudo afterwards.
+        self._run(Command(args=["usermod", "-aG", "docker", self._account.name]))
         checks = verify_docker(self._run)
         verified = all(check.ok for check in checks)
         if verified:

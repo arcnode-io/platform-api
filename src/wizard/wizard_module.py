@@ -63,7 +63,9 @@ class WizardModule:
         self.ssh = SshService(
             account=account, deployment=deployment, tracker=tracker, run=run
         )
-        self.docker = DockerService(deployment=deployment, tracker=tracker, run=run)
+        self.docker = DockerService(
+            deployment=deployment, tracker=tracker, account=account, run=run
+        )
         self.postgres = PostgresService(
             deployment=deployment,
             tracker=tracker,
