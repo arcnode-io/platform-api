@@ -95,7 +95,7 @@ def test_config_tells_the_ui_where_it_runs(tmp_path: Path) -> None:
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {"deployment": "cloud", "badge": "Commercial", "account": "joe", "completed": []}
+    assert response.json() == {"deployment": "cloud", "badge": "☁️ Commercial", "account": "joe", "completed": []}
 
 
 def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:

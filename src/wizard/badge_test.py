@@ -10,7 +10,7 @@ def test_on_prem_box_is_labelled_on_prem() -> None:
 
     # Assert
     assert badge == Badge.ON_PREM
-    assert badge.value == "On-Prem"
+    assert badge.value == "🖥️ On-Prem"
 
 
 def test_commercial_cloud_box_is_labelled_commercial() -> None:

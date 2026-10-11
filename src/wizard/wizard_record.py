@@ -46,9 +46,9 @@ class Variant(StrEnum):
 class Badge(StrEnum):
     """The label in the wizard header: where the box runs and which product it is."""
 
-    ON_PREM = "On-Prem"
-    COMMERCIAL = "Commercial"
-    DEFENSE = "Defense"
+    ON_PREM = "🖥️ On-Prem"
+    COMMERCIAL = "☁️ Commercial"
+    DEFENSE = "🛡️ Defense"
 
 
 def badge_for(deployment: Deployment, variant: Variant) -> Badge:
