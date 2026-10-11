@@ -11,6 +11,8 @@ SOURCE_ISO="/tmp/debian-13.7.0-amd64-netinst.iso"
 # Output dir is the one optional arg — CI passes the repo, so the ISO
 # lands outside the build container.
 OUTPUT_ISO="${1:-/tmp}/arcnode-ems-amd64.iso"
+# xorriso can't create the output directory itself ("Cannot acquire drive").
+mkdir -p "$(dirname "$OUTPUT_ISO")"
 SOURCE_URL="https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.7.0-amd64-netinst.iso"
 # Verified against the real download.
 EXPECTED_SHA256="a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355"
