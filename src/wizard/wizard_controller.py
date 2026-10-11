@@ -19,6 +19,11 @@ from src.wizard.device_api_service import (
 )
 from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
 from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
+from src.wizard.ssh_lockdown_service import (
+    SshKeyNotProvenError,
+    SshLockdownService,
+    SshLockdownStepNotAvailableError,
+)
 from src.wizard.industrial_gateway_service import (
     IndustrialGatewayService,
     IndustrialGatewayStepNotAvailableError,
@@ -76,6 +81,7 @@ from src.wizard.wizard_record import (
     PasswordRequest,
     SetupInfo,
     SshAccount,
+    SshLockdownRequest,
     StepResult,
 )
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
@@ -129,6 +135,7 @@ class WizardController:
         industrial_gateway: IndustrialGatewayService,
         hmi: HmiService,
         grafana: GrafanaService,
+        ssh_lockdown: SshLockdownService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -154,6 +161,7 @@ class WizardController:
         self._industrial_gateway = industrial_gateway
         self._hmi = hmi
         self._grafana = grafana
+        self._ssh_lockdown = ssh_lockdown
         self._tracker = tracker
         self._deployment = deployment
         self._variant = variant
@@ -187,6 +195,7 @@ class WizardController:
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
             ("POST", "/api/hmi", self.hmi),
             ("POST", "/api/grafana", self.grafana),
+            ("POST", "/api/ssh-lockdown", self.ssh_lockdown),
         ]
         for method, path, handler in routes:
             self.router.add_api_route(
@@ -321,7 +330,10 @@ class WizardController:
             self._analyst_server.ensure_startable()
         except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-        return StreamingResponse(self._analyst_server.start_stream(request), media_type="application/x-ndjson")
+        return StreamingResponse(
+            self._analyst_server.start_stream(request),
+            media_type="application/x-ndjson",
+        )
 
     def cloud_secrets(self, request: CloudSecrets) -> StepResult:
         """The cloud password page — see CloudSecretsService.apply."""
@@ -375,6 +387,15 @@ class WizardController:
             return self._grafana.apply(request)
         except (StepAlreadyDoneError, GrafanaStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def ssh_lockdown(self, request: SshLockdownRequest) -> StepResult:
+        """The last on-prem page — see SshLockdownService.apply."""
+        try:
+            return self._ssh_lockdown.apply(request)
+        except (StepAlreadyDoneError, SshLockdownStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        except SshKeyNotProvenError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     def _refuse_if_applied(self) -> None:
         if self._tracker.all_done():

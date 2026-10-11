@@ -132,6 +132,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     gateway = client.post("/api/industrial-gateway")
     hmi = client.post("/api/hmi")
     grafana = client.post("/api/grafana", json={"password": "Grafana-pw-1!"})
+    lockdown = client.post("/api/ssh-lockdown", json={"disable_password_login": True})
 
     # Assert
     lines = [json.loads(line) for line in ollama.text.splitlines()]
@@ -144,12 +145,15 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert prometheus.json()["verified"] is True
     assert mlflow.json()["verified"] is True
     assert analyst_model.json()["verified"] is True
-    assert json.loads(analyst_server.text.splitlines()[-1])["result"]["verified"] is True
+    assert (
+        json.loads(analyst_server.text.splitlines()[-1])["result"]["verified"] is True
+    )
     assert device_api.json()["verified"] is True
     assert der_control.json()["verified"] is True
     assert gateway.json()["verified"] is True
     assert hmi.json()["verified"] is True
     assert grafana.json()["verified"] is True
+    assert lockdown.json()["verified"] is True
     assert client.get("/").status_code == 404
 
 

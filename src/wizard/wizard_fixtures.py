@@ -57,7 +57,9 @@ class FakeRunner:
         self.outputs: dict[str, CommandOutput] = {
             "systemctl": ok("active\n"),
             "ssh-keyscan": ok("localhost ssh-ed25519 AAAAhostkey\n"),
-            "sshd": ok("port 22\npubkeyauthentication yes\n"),
+            "sshd": ok(
+                "port 22\npubkeyauthentication yes\npasswordauthentication no\n"
+            ),
             "psql": ok("postgres\n"),  # password login as postgres
             # A g6e.2xlarge with a 1 TB EBS data volume (NVMe on Nitro).
             "nproc": ok("8\n"),

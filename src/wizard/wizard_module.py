@@ -1,10 +1,12 @@
 """Wizard module — DI assembly for the standalone setup-wizard app."""
 
 from pathlib import Path
+from typing import Final
 
 from src.wizard.device_api_service import DeviceApiService
 from src.wizard.docker_service import DockerService
 from src.wizard.grafana_service import GrafanaService
+from src.wizard.ssh_lockdown_service import SshLockdownService
 from src.wizard.hmi_service import HmiService
 from src.wizard.industrial_gateway_service import IndustrialGatewayService
 from src.wizard.hivemq_service import HivemqService
@@ -25,6 +27,9 @@ from src.wizard.system_runner import LineStream, Runner
 from src.wizard.wizard_controller import WizardController
 from src.wizard.wizard_record import SshAccount, WizardConfig
 from src.wizard.wizard_steps import StepTracker
+
+# Debian's sshd includes this directory; the lockdown page drops its file there.
+SSHD_CONFIG_DIR: Final[Path] = Path("/etc/ssh/sshd_config.d")
 
 
 class WizardModule:
@@ -52,6 +57,7 @@ class WizardModule:
         run: Runner,
         stream: LineStream,
         setup_token: str | None = None,
+        sshd_config_dir: Path = SSHD_CONFIG_DIR,
     ) -> None:
         deployment = config.deployment
         tracker = StepTracker(steps_dir=base_dir / "steps", deployment=deployment)
@@ -166,6 +172,13 @@ class WizardModule:
             ems_dir=ems_dir,
             run=run,
         )
+        self.ssh_lockdown = SshLockdownService(
+            deployment=deployment,
+            tracker=tracker,
+            account=account,
+            sshd_config_dir=sshd_config_dir,
+            run=run,
+        )
         self.router = WizardController(
             preflight=self.preflight,
             ssh=self.ssh,
@@ -187,6 +200,7 @@ class WizardModule:
             industrial_gateway=self.industrial_gateway,
             hmi=self.hmi,
             grafana=self.grafana,
+            ssh_lockdown=self.ssh_lockdown,
             tracker=tracker,
             deployment=deployment,
             account=account,

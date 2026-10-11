@@ -29,6 +29,7 @@ const ALL_STEPS = [
   { id: 'analyst_server', n: 15, title: 'Analyst server', sub: 'Chat + weather keys', deployments: ['on-prem'] },
   { id: 'prometheus', n: 16, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
   { id: 'grafana',  n: 17, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
+  { id: 'ssh_lockdown', n: 18, title: 'SSH lockdown', sub: 'Key-only login',     deployments: ['on-prem'] },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -551,6 +552,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
   const [grafanaPassword, setGrafanaPassword] = useStateW('');
+  // Checked by default: key-only SSH is the recommended end state.
+  const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
   // One password per MQTT broker account, keyed as the API expects.
   const [brokerPasswords, setBrokerPasswords] = useStateW({});
   // The Device API's signing key and login passwords.
@@ -735,6 +738,10 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {current === 'hmi' && (
             <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
+          )}
+          {current === 'ssh_lockdown' && (
+            <StepSshLockdown t={t} page={pageOf('ssh_lockdown')} checked={lockdownPasswords} onChecked={setLockdownPasswords}
+              onApply={() => applyStep('ssh_lockdown', '/api/ssh-lockdown', { disable_password_login: lockdownPasswords })}/>
           )}
           {current === 'device_api' && (
             <StepDeviceApi t={t} page={pageOf('device_api')} secrets={deviceApiSecrets}

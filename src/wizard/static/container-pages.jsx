@@ -542,3 +542,44 @@ function StepCloudSecrets({ t, page, passwords, onPassword, onApply }) {
   );
 }
 window.StepCloudSecrets = StepCloudSecrets;
+
+// ─── SSH lockdown ────────────────────────────────────────────────
+// The last page. Password SSH stayed on as the recovery path through setup;
+// with the key proven, this turns it off. Unchecking is allowed, not recommended.
+function StepSshLockdown({ t, page, checked, onChecked, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const buttonLabel = isApplying ? 'Verifying'
+    : page.state === 'unverified' ? 'Try again' : (checked ? 'Turn off & verify' : 'Keep & finish');
+  return (
+    <StepShellW t={t} title="SSH lockdown" blurb="your key works, so password login can go. From here on, SSH to this box is by key only.">
+      {!isDone && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: SPACE[3], marginBottom: SPACE[5], cursor: 'pointer' }}>
+          <input type="checkbox" checked={checked} disabled={isApplying}
+            onChange={e => onChecked(e.target.checked)}/>
+          <span>Disable SSH password login</span>
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+            padding: '2px 6px', borderRadius: 4, background: t.accent + '12', color: t.accent }}>Recommended</span>
+        </label>
+      )}
+      {!isDone && (
+        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
+          style={primaryBtnStyle(t, isApplying)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}

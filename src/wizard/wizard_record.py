@@ -286,3 +286,9 @@ class DeviceApiSecrets(BaseModel):
     def password_meets_complexity(cls, value: str) -> str:
         """Same policy as the daemon passwords."""
         return check_complexity(value)
+
+
+class SshLockdownRequest(BaseModel):
+    """The last on-prem page: key-only SSH. Checked by default; unchecking is allowed."""
+
+    disable_password_login: bool = True

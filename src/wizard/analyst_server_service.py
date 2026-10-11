@@ -87,15 +87,20 @@ class AnalystServerService:
     def ensure_startable(self) -> None:
         """Refuse a start that can't happen, before the response begins streaming."""
         if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError("no analyst server page in the cloud")
+            raise AnalystServerStepNotAvailableError(
+                "no analyst server page in the cloud"
+            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
 
     def start_stream(self, request: AnalystServerKeys) -> Iterator[str]:
         """Start the analyst and stream its stages as JSON lines while it seeds, then one
-        verdict line. Streaming keeps the request alive; the page reads it like Ollama's pull."""
+        verdict line. Streaming keeps the request alive; the page reads it like Ollama's pull.
+        """
         if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError("no analyst server page in the cloud")
+            raise AnalystServerStepNotAvailableError(
+                "no analyst server page in the cloud"
+            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
         save_secrets(
@@ -109,11 +114,17 @@ class AnalystServerService:
         # Reason: a stage update per poll, and the loop ends on the ready line or a dead container.
         while True:
             stages = self.progress()
-            yield json.dumps({"stages": [stage.model_dump() for stage in stages]}) + "\n"
+            yield json.dumps(
+                {"stages": [stage.model_dump() for stage in stages]}
+            ) + "\n"
             if stages[-1].done or not self._running_check().ok:
                 break
             time.sleep(POLL_SECONDS)
-        checks = [self._running_check(), self._health_check(), saved_check(self._secrets_env_path, SAVED_NAMES)]
+        checks = [
+            self._running_check(),
+            self._health_check(),
+            saved_check(self._secrets_env_path, SAVED_NAMES),
+        ]
         verified = all(check.ok for check in checks)
         if verified:
             self._tracker.mark_done("analyst_server")

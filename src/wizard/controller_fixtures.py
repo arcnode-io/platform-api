@@ -40,6 +40,7 @@ def wizard_client(
             run=runner or FakeRunner(),
             stream=FakeStream(),
             setup_token=setup_token,
+            sshd_config_dir=tmp_path / "sshd_config.d",
         ).router
     )
     return TestClient(app)

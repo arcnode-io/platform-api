@@ -32,6 +32,8 @@ STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
         "analyst_server",
         "prometheus",
         "grafana",
+        # Last on purpose: password SSH stays as the recovery path until everything else is in.
+        "ssh_lockdown",
     ),
     # EC2 set SSH + Docker up; databases are managed services in the cloud,
     # the LLM is Bedrock.
