@@ -272,14 +272,14 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             assert template_url in html
 
 
-# All 7 deployment-profile combinations the resolver supports today.
+# All 4 deployment-profile combinations the resolver supports today.
+# Federal sites are AC only: edp-api 422s sovereign + dc_external_pcs once 92bfbaa is live.
 # (deployment_context, bess_coupling, aws_partition, expected_delivery_path)
 PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
     ("commercial", "ac_coupled", "standard", "cfn_standard"),
     ("commercial", "dc_external_pcs", "standard", "cfn_standard"),
     ("commercial", "dc_integrated_pcs", "standard", "cfn_standard"),
     ("sovereign_government", "ac_coupled", "govcloud", "cfn_govcloud"),
-    ("sovereign_government", "dc_external_pcs", "govcloud", "cfn_govcloud"),
 ]
 
 
