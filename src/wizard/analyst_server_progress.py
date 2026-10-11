@@ -9,7 +9,9 @@ from typing import Final
 
 from pydantic import BaseModel
 
-SEED_PROGRESS: Final[re.Pattern[str]] = re.compile(r"seed progress: (vector|graph) (\d+)%")
+SEED_PROGRESS: Final[re.Pattern[str]] = re.compile(
+    r"seed progress: (vector|graph) (\d+)%"
+)
 # The analyst's own timestamp leads each line; fractional seconds may be longer than datetime takes.
 LOG_TIME: Final[re.Pattern[str]] = re.compile(r"(\d{4}-\d{2}-\d{2}T[\d:.]+)Z")
 
@@ -34,7 +36,9 @@ STAGES: Final[tuple[tuple[str, str, str | None], ...]] = (
 
 def latest_percent(logs: str, seed: str) -> int | None:
     """The newest percentage the analyst logged for this seed, or None if it hasn't started."""
-    matches = [int(m.group(2)) for m in SEED_PROGRESS.finditer(logs) if m.group(1) == seed]
+    matches = [
+        int(m.group(2)) for m in SEED_PROGRESS.finditer(logs) if m.group(1) == seed
+    ]
     return matches[-1] if matches else None
 
 
@@ -66,5 +70,7 @@ def stage_status(logs: str) -> list[StageProgress]:
         running = seed is not None and not done
         percent = latest_percent(logs, seed) if running else None
         eta = eta_seconds(logs, seed) if running else None
-        stages.append(StageProgress(label=label, done=done, percent=percent, eta_seconds=eta))
+        stages.append(
+            StageProgress(label=label, done=done, percent=percent, eta_seconds=eta)
+        )
     return stages

@@ -34,5 +34,7 @@ def token_for(deployment: Deployment, secrets_env_path: Path) -> str | None:
         return None
     token = setup_token_from_env_file(secrets_env_path)
     if token is None:
-        raise RuntimeError("cloud wizard has no SETUP_TOKEN in secrets.env; refusing to run an open wizard")
+        raise RuntimeError(
+            "cloud wizard has no SETUP_TOKEN in secrets.env; refusing to run an open wizard"
+        )
     return token

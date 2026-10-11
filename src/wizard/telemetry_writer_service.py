@@ -6,7 +6,11 @@ from pathlib import Path
 
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.system_runner import Runner
-from src.wizard.telemetry_writer_verify import SUBSCRIBED_LINE, TELEMETRY_SERVICE, verify_telemetry
+from src.wizard.telemetry_writer_verify import (
+    SUBSCRIBED_LINE,
+    TELEMETRY_SERVICE,
+    verify_telemetry,
+)
 from src.wizard.wizard_record import Deployment, StepResult
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
@@ -36,7 +40,9 @@ class TelemetryWriterService:
     def apply(self) -> StepResult:
         """Start, wait for the subscription, verify — done only when every check passes."""
         if self._deployment == Deployment.CLOUD:
-            raise TelemetryWriterStepNotAvailableError("no Telemetry writer page in the cloud")
+            raise TelemetryWriterStepNotAvailableError(
+                "no Telemetry writer page in the cloud"
+            )
         if self._tracker.is_done("telemetry"):
             raise StepAlreadyDoneError("Telemetry writer is already set up")
         self._run(compose_command(self._ems_dir, "up", "-d", TELEMETRY_SERVICE))

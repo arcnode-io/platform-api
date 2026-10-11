@@ -62,4 +62,9 @@ def test_grafana_data_dir_is_owned_by_the_grafana_user(tmp_path: Path) -> None:
 
     # Assert
     chowns = [c.args for c in runner.calls if c.args[:1] == ["chown"]]
-    assert ["chown", "-R", "472:472", str(tmp_path / "opt" / "observability" / "grafana-data")] in chowns
+    assert [
+        "chown",
+        "-R",
+        "472:472",
+        str(tmp_path / "opt" / "observability" / "grafana-data"),
+    ] in chowns

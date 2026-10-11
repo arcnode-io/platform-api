@@ -209,8 +209,12 @@ class DerControlRequest(BaseModel):
     gives. Optional: blank means the utility isn't connected yet."""
 
     utility_mirror_url: str | None = None
-    lfdi_allowlist: str = ""  # the DERMS certificate's LFDIs; empty refuses every DER control
-    device_cert_pem: str = ""  # the box's client certificate, as the utility registered it
+    lfdi_allowlist: str = (
+        ""  # the DERMS certificate's LFDIs; empty refuses every DER control
+    )
+    device_cert_pem: str = (
+        ""  # the box's client certificate, as the utility registered it
+    )
     device_key_pem: str = ""  # its private key; cert and key go together or not at all
     utility_ca_pem: str = ""  # the CA bundle that verifies the utility's server
 
@@ -226,12 +230,27 @@ class DerControlRequest(BaseModel):
     def utility_identity_is_well_formed(self) -> "DerControlRequest":
         """A half identity, a non-PKCS#8 key, or a non-PEM file would fail der-control-api at boot."""
         if bool(self.device_cert_pem) != bool(self.device_key_pem):
-            raise ValueError("the device certificate and its private key must be given together")
-        if self.device_cert_pem and "-----BEGIN CERTIFICATE-----" not in self.device_cert_pem:
-            raise ValueError("the device certificate must be PEM (-----BEGIN CERTIFICATE-----)")
-        if self.device_key_pem and "-----BEGIN PRIVATE KEY-----" not in self.device_key_pem:
-            raise ValueError("the device key must be PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)")
-        if self.utility_ca_pem and "-----BEGIN CERTIFICATE-----" not in self.utility_ca_pem:
+            raise ValueError(
+                "the device certificate and its private key must be given together"
+            )
+        if (
+            self.device_cert_pem
+            and "-----BEGIN CERTIFICATE-----" not in self.device_cert_pem
+        ):
+            raise ValueError(
+                "the device certificate must be PEM (-----BEGIN CERTIFICATE-----)"
+            )
+        if (
+            self.device_key_pem
+            and "-----BEGIN PRIVATE KEY-----" not in self.device_key_pem
+        ):
+            raise ValueError(
+                "the device key must be PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)"
+            )
+        if (
+            self.utility_ca_pem
+            and "-----BEGIN CERTIFICATE-----" not in self.utility_ca_pem
+        ):
             raise ValueError("the utility CA bundle must be PEM certificates")
         return self
 

@@ -8,7 +8,9 @@ from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import Deployment
 
 
-def make_telemetry_service(tmp_path: Path, runner: FakeRunner) -> TelemetryWriterService:
+def make_telemetry_service(
+    tmp_path: Path, runner: FakeRunner
+) -> TelemetryWriterService:
     """A service on tmp_path with the Postgres URL already saved by its page."""
     (tmp_path / "secrets.env").write_text("TIMESERIES_URL=postgres://x\n")
     return TelemetryWriterService(

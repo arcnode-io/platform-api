@@ -14,7 +14,9 @@ GATEWAY_SERVICE: Final[str] = "industrial-gateway"
 # The gateway logs these, in order, once it has the topology and is subscribed.
 SUBSCRIBED_LINE: Final[str] = "MQTT subscriptions established"
 SPEC_LINE: Final[str] = "initial spec fetched"
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs industrial-gateway"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs industrial-gateway"
+)
 
 
 class IndustrialGatewayStepNotAvailableError(Exception):
@@ -42,7 +44,9 @@ class IndustrialGatewayService:
     def apply(self) -> StepResult:
         """Start, wait for its subscriptions, verify — done only when every check passes."""
         if self._deployment == Deployment.CLOUD:
-            raise IndustrialGatewayStepNotAvailableError("no Industrial gateway page in the cloud")
+            raise IndustrialGatewayStepNotAvailableError(
+                "no Industrial gateway page in the cloud"
+            )
         if self._tracker.is_done("industrial_gateway"):
             raise StepAlreadyDoneError("Industrial gateway is already set up")
         self._run(compose_command(self._ems_dir, "up", "-d", GATEWAY_SERVICE))
@@ -54,7 +58,11 @@ class IndustrialGatewayService:
         return StepResult(verified=verified, checks=checks)
 
     def _checks(self) -> list[VerifyCheck]:
-        running = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", GATEWAY_SERVICE))
+        running = self._run(
+            compose_command(
+                self._ems_dir, "ps", "-q", "--status", "running", GATEWAY_SERVICE
+            )
+        )
         logs = self._run(compose_command(self._ems_dir, "logs", GATEWAY_SERVICE)).stdout
         return [
             VerifyCheck(
@@ -66,13 +74,21 @@ class IndustrialGatewayService:
             VerifyCheck(
                 name="Loaded the device spec",
                 ok=SPEC_LINE in logs,
-                detail="spec fetched from the Device API" if SPEC_LINE in logs else "no spec in the log",
+                detail=(
+                    "spec fetched from the Device API"
+                    if SPEC_LINE in logs
+                    else "no spec in the log"
+                ),
                 hint=LOG_HINT,
             ),
             VerifyCheck(
                 name="Subscribed to the broker",
                 ok=SUBSCRIBED_LINE in logs,
-                detail="subscriptions established" if SUBSCRIBED_LINE in logs else "no subscriptions in the log",
+                detail=(
+                    "subscriptions established"
+                    if SUBSCRIBED_LINE in logs
+                    else "no subscriptions in the log"
+                ),
                 hint=LOG_HINT,
             ),
         ]

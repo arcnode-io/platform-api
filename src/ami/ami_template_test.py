@@ -30,7 +30,7 @@ def test_names_the_ami_by_release_so_each_build_is_findable() -> None:
     text = TEMPLATE.read_text()
 
     # Assert
-    assert 'ami_name' in text
+    assert "ami_name" in text
     assert "arcnode-ems-base-" in text
 
 

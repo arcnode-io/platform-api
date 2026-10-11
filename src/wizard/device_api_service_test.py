@@ -67,5 +67,9 @@ def test_no_secret_reaches_argv(tmp_path: Path) -> None:
 
     # Assert — the login body travels on stdin, the rest through the env file
     for command in runner.calls:
-        for secret in (SECRETS.jwt_secret, SECRETS.operator_password, SECRETS.viewer_password):
+        for secret in (
+            SECRETS.jwt_secret,
+            SECRETS.operator_password,
+            SECRETS.viewer_password,
+        ):
             assert secret not in " ".join(command.args)

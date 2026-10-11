@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from src.wizard.cloud_secrets_service import CloudSecretsService, CloudSecretsStepNotAvailableError
+from src.wizard.cloud_secrets_service import (
+    CloudSecretsService,
+    CloudSecretsStepNotAvailableError,
+)
 from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import CloudSecrets, Deployment
 
@@ -54,7 +57,9 @@ def test_on_prem_has_no_cloud_password_page(tmp_path: Path) -> None:
         service.apply(SECRETS)
 
 
-def test_saving_the_passwords_starts_the_containers_without_the_onprem_override(tmp_path: Path) -> None:
+def test_saving_the_passwords_starts_the_containers_without_the_onprem_override(
+    tmp_path: Path,
+) -> None:
     # Arrange — the containers wait for these passwords; the cloud compose has no on-prem network
     runner = FakeRunner()
     service = CloudSecretsService(

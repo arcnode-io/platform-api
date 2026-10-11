@@ -17,7 +17,13 @@ from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE, DerControlCfg, write_yaml
 from src.wizard.order_record import SITE_FILE, OrderSite
 from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Command, Deployment, DerControlRequest, StepResult, VerifyCheck
+from src.wizard.wizard_record import (
+    Command,
+    Deployment,
+    DerControlRequest,
+    StepResult,
+    VerifyCheck,
+)
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 DER_CONTROL_SERVICE: Final[str] = "der-control-api"
@@ -35,7 +41,9 @@ PROBE_IMAGE: Final[str] = "curlimages/curl"
 # The DER ingress's public port on the box; the utility reaches it there.
 INGRESS_PORT: Final[int] = 8443
 ROUTE_COMMAND: Final[list[str]] = ["ip", "-4", "route", "get", "1.1.1.1"]
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs der-control-api"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs der-control-api"
+)
 SOURCE_ADDRESS: Final[re.Pattern[str]] = re.compile(r"\bsrc (\S+)")
 
 
@@ -66,10 +74,14 @@ class DerControlService:
     def apply(self, request: DerControlRequest) -> StepResult:
         """Write the overlay, start, wait for the allowlist line, verify health — done only when every check passes."""
         if self._deployment == Deployment.CLOUD:
-            raise DerControlStepNotAvailableError("no DER control API page in the cloud")
+            raise DerControlStepNotAvailableError(
+                "no DER control API page in the cloud"
+            )
         if self._tracker.is_done("der_control_api"):
             raise StepAlreadyDoneError("the DER control API is already set up")
-        site = OrderSite.model_validate(yaml.safe_load((self._order_dir / SITE_FILE).read_text()))
+        site = OrderSite.model_validate(
+            yaml.safe_load((self._order_dir / SITE_FILE).read_text())
+        )
         expected = DerControlCfg(
             site_id=site.site_id,
             public_base_url=f"https://{self._box_address()}:{INGRESS_PORT}",
@@ -77,11 +89,21 @@ class DerControlService:
         )
         write_yaml(self._ems_dir / DER_CONTROL_CFG_FILE, expected)
         # Reason: the allowlist is read once at boot, so the container is recreated to pick it up.
-        save_secrets(self._secrets_env_path, {LFDI_ALLOWLIST_NAME: request.lfdi_allowlist})
+        save_secrets(
+            self._secrets_env_path, {LFDI_ALLOWLIST_NAME: request.lfdi_allowlist}
+        )
         self._write_utility_identity(request)
-        self._run(compose_command(self._ems_dir, "up", "-d", "--force-recreate", DER_CONTROL_SERVICE))
+        self._run(
+            compose_command(
+                self._ems_dir, "up", "-d", "--force-recreate", DER_CONTROL_SERVICE
+            )
+        )
         wait_for_log(self._run, self._ems_dir, DER_CONTROL_SERVICE, READY_LINE)
-        checks = [self._running_check(), self._health_check(), self._saved_check(expected)]
+        checks = [
+            self._running_check(),
+            self._health_check(),
+            self._saved_check(expected),
+        ]
         if request.device_cert_pem:
             checks.append(self._identity_check(request.device_cert_pem))
         # Reason: the utility identity is informational. A customer without it finishes setup, and a
@@ -109,13 +131,23 @@ class DerControlService:
 
     def skip(self) -> StepResult:
         """Mark the page done without starting the service: the utility isn't connected yet.
-        The customer adds the link later, so nothing here can block the rest of setup."""
+        The customer adds the link later, so nothing here can block the rest of setup.
+        """
         if self._deployment == Deployment.CLOUD:
-            raise DerControlStepNotAvailableError("no DER control API page in the cloud")
+            raise DerControlStepNotAvailableError(
+                "no DER control API page in the cloud"
+            )
         self._tracker.mark_done("der_control_api")
         return StepResult(
             verified=True,
-            checks=[VerifyCheck(name="Skipped for now", ok=True, detail="add the utility link later", hint="")],
+            checks=[
+                VerifyCheck(
+                    name="Skipped for now",
+                    ok=True,
+                    detail="add the utility link later",
+                    hint="",
+                )
+            ],
         )
 
     def _box_address(self) -> str:
@@ -129,17 +161,29 @@ class DerControlService:
     def _identity_check(self, cert_pem: str) -> VerifyCheck:
         """The LFDI the utility must register, and whether der-control-api loaded that same identity."""
         lfdi = lfdi_from_cert_pem(cert_pem)
-        logs = self._run(compose_command(self._ems_dir, "logs", DER_CONTROL_SERVICE)).stdout
-        loaded = f"utility TLS identity loaded from /app/tls/utility: LFDI {lfdi}" in logs
+        logs = self._run(
+            compose_command(self._ems_dir, "logs", DER_CONTROL_SERVICE)
+        ).stdout
+        loaded = (
+            f"utility TLS identity loaded from /app/tls/utility: LFDI {lfdi}" in logs
+        )
         return VerifyCheck(
             name=IDENTITY_CHECK,
             ok=loaded,
-            detail=f"LFDI {lfdi}" if loaded else f"register LFDI {lfdi} with the utility; not loaded yet",
+            detail=(
+                f"LFDI {lfdi}"
+                if loaded
+                else f"register LFDI {lfdi} with the utility; not loaded yet"
+            ),
             hint=LOG_HINT,
         )
 
     def _running_check(self) -> VerifyCheck:
-        out = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", DER_CONTROL_SERVICE))
+        out = self._run(
+            compose_command(
+                self._ems_dir, "ps", "-q", "--status", "running", DER_CONTROL_SERVICE
+            )
+        )
         running = bool(out.stdout.strip())
         return VerifyCheck(
             name="DER control API running",
@@ -150,20 +194,37 @@ class DerControlService:
 
     def _health_check(self) -> VerifyCheck:
         out = self._run(
-            Command(args=["docker", "run", "--rm", "--network", DOCKER_NETWORK, PROBE_IMAGE, "-fsS", HEALTH_URL])
+            Command(
+                args=[
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    DOCKER_NETWORK,
+                    PROBE_IMAGE,
+                    "-fsS",
+                    HEALTH_URL,
+                ]
+            )
         )
         ok = out.returncode == 0 and '"status":"UP"' in out.stdout.replace(" ", "")
         return VerifyCheck(
             name="DER control API healthy",
             ok=ok,
-            detail="actuator reports UP" if ok else f"health not UP (curl exit {out.returncode})",
+            detail=(
+                "actuator reports UP"
+                if ok
+                else f"health not UP (curl exit {out.returncode})"
+            ),
             hint=LOG_HINT,
         )
 
     def _saved_check(self, expected: DerControlCfg) -> VerifyCheck:
         """Read the overlay back — what the container will actually mount."""
         path = self._ems_dir / DER_CONTROL_CFG_FILE
-        saved = DerControlCfg.model_validate(yaml.safe_load(path.read_text())) == expected
+        saved = (
+            DerControlCfg.model_validate(yaml.safe_load(path.read_text())) == expected
+        )
         return VerifyCheck(
             name="Saved for the DER control API",
             ok=saved,

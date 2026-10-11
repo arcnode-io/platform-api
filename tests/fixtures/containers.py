@@ -156,7 +156,9 @@ def start_localstack(
         yield Container(host="localhost", port=port, url=url)
 
 
-def seed_edp_manifest(localstack_url: str, manifest_path: Path, assets_dir: Path) -> None:
+def seed_edp_manifest(
+    localstack_url: str, manifest_path: Path, assets_dir: Path
+) -> None:
     """Upload edp-module-assemblies/manifest.yaml + every asset it references.
 
     edp-api's ManifestService.from_client eagerly fetches the manifest at
@@ -186,7 +188,9 @@ def seed_edp_manifest(localstack_url: str, manifest_path: Path, assets_dir: Path
         if real.is_file():
             s3.put_object(Bucket=EDP_MANIFEST_BUCKET, Key=key, Body=real.read_bytes())
         elif key.endswith("topology.yaml"):
-            raise FileNotFoundError(f"topology {key} not fetched; run tests/fixtures/edp_assets.py")
+            raise FileNotFoundError(
+                f"topology {key} not fetched; run tests/fixtures/edp_assets.py"
+            )
         else:
             s3.put_object(Bucket=EDP_MANIFEST_BUCKET, Key=key, Body=b"{}\n")
 

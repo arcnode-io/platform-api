@@ -90,7 +90,10 @@ class HivemqService:
 
     def _env_values(self, request: BrokerPasswords) -> dict[str, str]:
         """The six MQTT_*_PASSWORD names the cloud's secrets.env uses."""
-        return {env: getattr(request, password_field) for _, _, env, password_field in ACCOUNTS}
+        return {
+            env: getattr(request, password_field)
+            for _, _, env, password_field in ACCOUNTS
+        }
 
     def _wait_for_started(self) -> bool:
         return wait_for_log(self._run, self._ems_dir, HIVEMQ_SERVICE, STARTED_LINE)

@@ -11,11 +11,15 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 PROMETHEUS_SERVICE: Final[str] = "prometheus"
 # Same file the cloud's UserData fetches from arcnode-public.
-CONFIG_URL: Final[str] = "https://arcnode-public.s3.us-east-1.amazonaws.com/observability/prometheus.yml"
+CONFIG_URL: Final[str] = (
+    "https://arcnode-public.s3.us-east-1.amazonaws.com/observability/prometheus.yml"
+)
 CONFIG_FILE: Final[str] = "observability/prometheus.yml"
 DATA_DIR: Final[str] = "observability/prometheus-data"
 READY_LINE: Final[str] = "Server is ready to receive web requests."
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs prometheus"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs prometheus"
+)
 
 
 class PrometheusStepNotAvailableError(Exception):
@@ -25,7 +29,14 @@ class PrometheusStepNotAvailableError(Exception):
 class PrometheusService:
     """Starts Prometheus with the cloud's scrape config."""
 
-    def __init__(self, *, deployment: Deployment, tracker: StepTracker, ems_dir: Path, run: Runner) -> None:
+    def __init__(
+        self,
+        *,
+        deployment: Deployment,
+        tracker: StepTracker,
+        ems_dir: Path,
+        run: Runner,
+    ) -> None:
         self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
@@ -39,9 +50,21 @@ class PrometheusService:
             raise StepAlreadyDoneError("Prometheus is already set up")
         (self._ems_dir / DATA_DIR).mkdir(parents=True, exist_ok=True)
         # Reason: the image runs as uid 65534; a root-owned data dir makes it crash-loop.
-        self._run(Command(args=["chown", "-R", "65534:65534", str(self._ems_dir / DATA_DIR)]))
+        self._run(
+            Command(args=["chown", "-R", "65534:65534", str(self._ems_dir / DATA_DIR)])
+        )
         (self._ems_dir / "observability").mkdir(parents=True, exist_ok=True)
-        self._run(Command(args=["curl", "-fsSL", CONFIG_URL, "-o", str(self._ems_dir / CONFIG_FILE)]))
+        self._run(
+            Command(
+                args=[
+                    "curl",
+                    "-fsSL",
+                    CONFIG_URL,
+                    "-o",
+                    str(self._ems_dir / CONFIG_FILE),
+                ]
+            )
+        )
         self._run(compose_command(self._ems_dir, "up", "-d", PROMETHEUS_SERVICE))
         wait_for_log(self._run, self._ems_dir, PROMETHEUS_SERVICE, READY_LINE)
         checks = [self._ready_check()]
@@ -51,7 +74,9 @@ class PrometheusService:
         return StepResult(verified=verified, checks=checks)
 
     def _ready_check(self) -> VerifyCheck:
-        logs = self._run(compose_command(self._ems_dir, "logs", PROMETHEUS_SERVICE)).stdout
+        logs = self._run(
+            compose_command(self._ems_dir, "logs", PROMETHEUS_SERVICE)
+        ).stdout
         ready = READY_LINE in logs
         return VerifyCheck(
             name="Prometheus ready",

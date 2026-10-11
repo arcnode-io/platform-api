@@ -22,7 +22,11 @@ def test_every_shared_module_the_wizard_imports_is_in_the_iso() -> None:
                 shared.add(module)
 
     # Act
-    missing = [m for m in sorted(shared) if f"/wizard-src/{m.replace('.', '/')}.py" not in build_script]
+    missing = [
+        m
+        for m in sorted(shared)
+        if f"/wizard-src/{m.replace('.', '/')}.py" not in build_script
+    ]
 
     # Assert
     assert missing == []

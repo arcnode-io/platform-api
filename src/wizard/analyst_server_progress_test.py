@@ -35,7 +35,10 @@ def test_a_finished_seed_stage_is_done() -> None:
 
 def test_all_stages_done_once_uvicorn_is_listening() -> None:
     # Arrange
-    logs = LOG + "INFO: graph slice seeded\nINFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)\n"
+    logs = (
+        LOG
+        + "INFO: graph slice seeded\nINFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)\n"
+    )
 
     # Act
     stages = stage_status(logs)
@@ -61,7 +64,9 @@ def test_a_seed_in_progress_reports_its_latest_percentage() -> None:
 
 def test_a_finished_seed_has_no_percentage() -> None:
     # Arrange
-    logs = "seed progress: vector 100% (300 MiB of 300 MiB)\nINFO: vector slice seeded\n"
+    logs = (
+        "seed progress: vector 100% (300 MiB of 300 MiB)\nINFO: vector slice seeded\n"
+    )
 
     # Act
     stages = stage_status(logs)

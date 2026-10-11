@@ -13,7 +13,9 @@ MLFLOW_SERVICE: Final[str] = "mlflow"
 # The line the current mlflow image prints once uvicorn is serving (the old
 # "Listening at:" line never appears on ghcr.io/mlflow/mlflow:latest).
 LISTENING_LINE: Final[str] = "Uvicorn running on http://0.0.0.0:5000"
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs mlflow"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs mlflow"
+)
 DATA_DIRS: Final[tuple[str, ...]] = ("mlflow/mlflow-data", "mlflow/mlflow-artifacts")
 
 
@@ -24,7 +26,14 @@ class MlflowStepNotAvailableError(Exception):
 class MlflowService:
     """Starts the experiment tracker the analyst model logs its forecasts to."""
 
-    def __init__(self, *, deployment: Deployment, tracker: StepTracker, ems_dir: Path, run: Runner) -> None:
+    def __init__(
+        self,
+        *,
+        deployment: Deployment,
+        tracker: StepTracker,
+        ems_dir: Path,
+        run: Runner,
+    ) -> None:
         self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir

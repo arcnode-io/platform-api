@@ -56,7 +56,9 @@ class DeviceApiService:
         )
         self._run(compose_command(self._ems_dir, "up", "-d", DEVICE_API_SERVICE))
         wait_for_log(self._run, self._ems_dir, DEVICE_API_SERVICE, CONNECTED_LINE)
-        checks = verify_device_api(self._run, request, self._secrets_env_path, self._ems_dir)
+        checks = verify_device_api(
+            self._run, request, self._secrets_env_path, self._ems_dir
+        )
         verified = all(check.ok for check in checks)
         if verified:
             self._tracker.mark_done("device_api")

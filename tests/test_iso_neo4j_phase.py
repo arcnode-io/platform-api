@@ -16,6 +16,7 @@ from typing import Final
 import pytest
 from testcontainers.core.container import DockerContainer
 
+from src.wizard.wizard_record import SshAccount
 from src.wizard.docker_service import DockerService
 from src.wizard.neo4j_service import Neo4jService
 from src.wizard.system_runner import Runner
@@ -115,7 +116,12 @@ def test_real_neo4j_on_dockers_gateway_passes_every_check(
     # Arrange: the Docker page first — it creates the network Neo4j listens on
     run = _container_runner(installed)
     tracker = StepTracker(steps_dir=tmp_path / "steps", deployment=Deployment.ON_PREM)
-    docker_page = DockerService(deployment=Deployment.ON_PREM, tracker=tracker, run=run)
+    docker_page = DockerService(
+        deployment=Deployment.ON_PREM,
+        tracker=tracker,
+        account=SshAccount(name="joe", home=Path("/home/joe"), uid=1000, gid=1000),
+        run=run,
+    )
     assert docker_page.apply().verified
     service = Neo4jService(
         deployment=Deployment.ON_PREM,

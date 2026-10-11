@@ -54,7 +54,9 @@ def wait_for_log(run: Runner, ems_dir: Path, service: str, line: str) -> bool:
     False as soon as the container stops running, so a crash ends the wait.
     Reason: these images have no healthcheck, so the log line is the event."""
     while line not in run(compose_command(ems_dir, "logs", service)).stdout:
-        running = run(compose_command(ems_dir, "ps", "-q", "--status", "running", service))
+        running = run(
+            compose_command(ems_dir, "ps", "-q", "--status", "running", service)
+        )
         if not running.stdout.strip():
             return False
         time.sleep(POLL_SECONDS)

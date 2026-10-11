@@ -41,7 +41,10 @@ def test_der_control_writes_its_overlay_and_verifies(tmp_path: Path) -> None:
     assert result.verified
     assert tracker(tmp_path).is_done("der_control_api")
     written = yaml.safe_load((tmp_path / "opt" / DER_CONTROL_CFG_FILE).read_text())
-    assert written == {"siteId": "test_site", "publicBaseUrl": "https://10.0.0.209:8443"}
+    assert written == {
+        "siteId": "test_site",
+        "publicBaseUrl": "https://10.0.0.209:8443",
+    }
 
 
 def test_utility_url_is_written_when_the_customer_gives_one(tmp_path: Path) -> None:
@@ -104,12 +107,18 @@ KEY_PEM = "-----BEGIN PRIVATE KEY-----\nMIIBkey\n-----END PRIVATE KEY-----\n"
 CA_PEM = "-----BEGIN CERTIFICATE-----\nMIIBca\n-----END CERTIFICATE-----\n"
 
 
-def test_utility_identity_files_are_written_with_the_key_private(tmp_path: Path) -> None:
+def test_utility_identity_files_are_written_with_the_key_private(
+    tmp_path: Path,
+) -> None:
     # Arrange
     service = make_der_control(tmp_path)
 
     # Act
-    service.apply(DerControlRequest(device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM, utility_ca_pem=CA_PEM))
+    service.apply(
+        DerControlRequest(
+            device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM, utility_ca_pem=CA_PEM
+        )
+    )
 
     # Assert — the mount sources der-control-api reads, key readable by owner only
     ems = tmp_path / "opt"
@@ -125,7 +134,9 @@ def test_a_certificate_without_its_key_is_refused() -> None:
         DerControlRequest(device_cert_pem=CERT_PEM)
 
 
-def test_no_identity_removes_the_files_so_the_service_boots_without_one(tmp_path: Path) -> None:
+def test_no_identity_removes_the_files_so_the_service_boots_without_one(
+    tmp_path: Path,
+) -> None:
     # Arrange — a previous run left files behind
     ems = tmp_path / "opt"
     ems.mkdir()
@@ -165,7 +176,9 @@ def test_lfdi_is_the_first_20_bytes_of_the_certificate_sha256() -> None:
     assert lfdi == hashlib.sha256(b"hello").hexdigest()[:40]
 
 
-def test_the_box_confirms_the_lfdi_it_loaded_matches_its_certificate(tmp_path: Path) -> None:
+def test_the_box_confirms_the_lfdi_it_loaded_matches_its_certificate(
+    tmp_path: Path,
+) -> None:
     # Arrange — der-control-api logs the LFDI it loaded from the mounted certificate
     lfdi = lfdi_from_cert_pem(CERT_PEM)
     runner = FakeRunner()
@@ -182,7 +195,9 @@ def test_the_box_confirms_the_lfdi_it_loaded_matches_its_certificate(tmp_path: P
     )
 
     # Act
-    result = service.apply(DerControlRequest(device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM))
+    result = service.apply(
+        DerControlRequest(device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM)
+    )
 
     # Assert — the check names the LFDI the utility must have registered
     identity = [c for c in result.checks if c.name == "Utility identity loaded"]

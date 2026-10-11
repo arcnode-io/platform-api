@@ -27,7 +27,13 @@ def referenced_keys(manifest_path: Path) -> list[str]:
     """Every S3 key under the artifacts bucket that the manifest points at."""
     manifest = yaml.safe_load(manifest_path.read_text())
     prefix = f"s3://{BUCKET}/"
-    return sorted({url.removeprefix(prefix) for url in walk_s3_urls(manifest) if url.startswith(prefix)})
+    return sorted(
+        {
+            url.removeprefix(prefix)
+            for url in walk_s3_urls(manifest)
+            if url.startswith(prefix)
+        }
+    )
 
 
 def walk_s3_urls(node: object) -> Generator[str]:
@@ -60,12 +66,18 @@ def fetch(sha: str, keys: list[str], dest: Path) -> list[str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--sha", required=True, help="edp-module-assemblies commit to fetch from")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--sha", required=True, help="edp-module-assemblies commit to fetch from"
+    )
     args = parser.parse_args()
     keys = referenced_keys(MANIFEST_PATH)
     missing = fetch(args.sha, keys, ASSETS_DIR)
-    print(f"fetched {len(keys) - len(missing)} of {len(keys)}; not in repo: {len(missing)}")
+    print(
+        f"fetched {len(keys) - len(missing)} of {len(keys)}; not in repo: {len(missing)}"
+    )
     for key in missing:
         print(f"  not in repo: {key}")
 

@@ -14,6 +14,7 @@ from typing import Final
 import pytest
 from testcontainers.core.container import DockerContainer
 
+from src.wizard.wizard_record import SshAccount
 from src.wizard.docker_service import DockerService
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import Command, CommandOutput, Deployment
@@ -82,6 +83,7 @@ def _service(container: DockerContainer, tmp_path: Path) -> DockerService:
         tracker=StepTracker(
             steps_dir=tmp_path / "steps", deployment=Deployment.ON_PREM
         ),
+        account=SshAccount(name="joe", home=Path("/home/joe"), uid=1000, gid=1000),
         run=_container_runner(container),
     )
 

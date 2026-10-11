@@ -10,7 +10,13 @@ from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import save_secrets, saved_check
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import AnalystServerKeys, Command, Deployment, StepResult, VerifyCheck
+from src.wizard.wizard_record import (
+    AnalystServerKeys,
+    Command,
+    Deployment,
+    StepResult,
+    VerifyCheck,
+)
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 ANALYST_SERVER_SERVICE: Final[str] = "analyst-server"
@@ -20,7 +26,9 @@ HEALTH_URL: Final[str] = "http://analyst-server:8000/health"
 # Same curl image the other pages probe with.
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 SAVED_NAMES: Final[list[str]] = ["OPENWEATHERMAP_API_KEY", "GRIDSTATUS_API_KEY"]
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs analyst-server"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs analyst-server"
+)
 
 
 class AnalystServerStepNotAvailableError(Exception):
@@ -48,7 +56,9 @@ class AnalystServerService:
     def apply(self, request: AnalystServerKeys) -> StepResult:
         """Save the keys, start, wait for uvicorn, verify — done only when every check passes."""
         if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError("no analyst server page in the cloud")
+            raise AnalystServerStepNotAvailableError(
+                "no analyst server page in the cloud"
+            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
         # Reason: compose reads the env file itself, so the keys go in before `up`.
@@ -73,11 +83,17 @@ class AnalystServerService:
 
     def progress(self) -> list[StageProgress]:
         """Each startup stage, read from the container's own log lines."""
-        logs = self._run(compose_command(self._ems_dir, "logs", ANALYST_SERVER_SERVICE)).stdout
+        logs = self._run(
+            compose_command(self._ems_dir, "logs", ANALYST_SERVER_SERVICE)
+        ).stdout
         return stage_status(logs)
 
     def _running_check(self) -> VerifyCheck:
-        out = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", ANALYST_SERVER_SERVICE))
+        out = self._run(
+            compose_command(
+                self._ems_dir, "ps", "-q", "--status", "running", ANALYST_SERVER_SERVICE
+            )
+        )
         running = bool(out.stdout.strip())
         return VerifyCheck(
             name="Analyst server running",
@@ -88,12 +104,29 @@ class AnalystServerService:
 
     def _health_check(self) -> VerifyCheck:
         out = self._run(
-            Command(args=["docker", "run", "--rm", "--network", DOCKER_NETWORK, PROBE_IMAGE, "-fsS", "-o", "/dev/null", HEALTH_URL])
+            Command(
+                args=[
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    DOCKER_NETWORK,
+                    PROBE_IMAGE,
+                    "-fsS",
+                    "-o",
+                    "/dev/null",
+                    HEALTH_URL,
+                ]
+            )
         )
         ok = out.returncode == 0
         return VerifyCheck(
             name="Analyst server health",
             ok=ok,
-            detail="/health answers" if ok else f"/health failed (curl exit {out.returncode})",
+            detail=(
+                "/health answers"
+                if ok
+                else f"/health failed (curl exit {out.returncode})"
+            ),
             hint=LOG_HINT,
         )

@@ -158,7 +158,10 @@ def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
     # Assert — docker install + compose up wire the EMS stack onto the EC2
     assert "dnf install -y docker" in rendered
     assert "systemctl enable --now docker" in rendered
-    assert "docker compose -f docker-compose.yaml -f docker-compose.fixtures.yaml up -d" in rendered
+    assert (
+        "docker compose -f docker-compose.yaml -f docker-compose.fixtures.yaml up -d"
+        in rendered
+    )
     # No reference to the old private registry — images come from ECR Public
     assert "registry.gitlab.com" not in rendered
 
@@ -654,7 +657,9 @@ def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> Non
     # Assert — the unit runs the baked source, and starts after the token is written
     assert "ExecStart=/usr/bin/python3 -m src.wizard.main" in rendered
     assert "systemctl enable --now arcnode-wizard" in rendered
-    assert rendered.index("SETUP_TOKEN=$(") < rendered.index("systemctl enable --now arcnode-wizard")
+    assert rendered.index("SETUP_TOKEN=$(") < rendered.index(
+        "systemctl enable --now arcnode-wizard"
+    )
 
 
 def test_commercial_userdata_leaves_the_containers_to_the_wizard() -> None:
@@ -667,7 +672,9 @@ def test_commercial_userdata_leaves_the_containers_to_the_wizard() -> None:
     assert "docker-compose.yaml up -d" not in rendered
 
 
-def test_defense_userdata_leaves_the_containers_to_the_wizard_and_names_its_variant() -> None:
+def test_defense_userdata_leaves_the_containers_to_the_wizard_and_names_its_variant() -> (
+    None
+):
     """Defense waits for the wizard like commercial does, and its wizard config
     says it's defense so the header badge reads Defense."""
     # Arrange + Act

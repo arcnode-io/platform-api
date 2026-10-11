@@ -19,7 +19,9 @@ BROKER_PORT: Final[int] = 1883
 PROBE_IMAGE: Final[str] = "eclipse-mosquitto:2"
 # Any topic a gateway-style account may read; only the login is checked.
 PROBE_TOPIC: Final[str] = "sites/+/devices/+/measurements/#"
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs hivemq"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs hivemq"
+)
 # (BrokerPasswords field, broker username, secrets.env name) — one row per account.
 # (account, username, env name, which BrokerPasswords field holds its password).
 ACCOUNTS: Final[tuple[tuple[str, str, str, str], ...]] = (
@@ -27,8 +29,18 @@ ACCOUNTS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("operator", "arcnode_operator", "MQTT_OPERATOR_PASSWORD", "operator"),
     ("viewer", "arcnode_viewer", "MQTT_VIEWER_PASSWORD", "viewer"),
     ("device_api", "arcnode_device_api", "MQTT_DEVICE_API_PASSWORD", "service"),
-    ("telemetry_writer", "arcnode_telemetry_writer", "MQTT_TELEMETRY_WRITER_PASSWORD", "service"),
-    ("der_control_api", "arcnode_der_control_api", "MQTT_DER_CONTROL_API_PASSWORD", "service"),
+    (
+        "telemetry_writer",
+        "arcnode_telemetry_writer",
+        "MQTT_TELEMETRY_WRITER_PASSWORD",
+        "service",
+    ),
+    (
+        "der_control_api",
+        "arcnode_der_control_api",
+        "MQTT_DER_CONTROL_API_PASSWORD",
+        "service",
+    ),
 )
 
 
@@ -45,12 +57,16 @@ def verify_hivemq(
 
 
 def _container_running(run: Runner, ems_dir: Path) -> VerifyCheck:
-    out = run(compose_command(ems_dir, "ps", "-q", "--status", "running", HIVEMQ_SERVICE))
+    out = run(
+        compose_command(ems_dir, "ps", "-q", "--status", "running", HIVEMQ_SERVICE)
+    )
     running = bool(out.stdout.strip())
     return VerifyCheck(
         name="HiveMQ container running",
         ok=running,
-        detail="running" if running else (out.stdout.strip() or f"exit {out.returncode}"),
+        detail=(
+            "running" if running else (out.stdout.strip() or f"exit {out.returncode}")
+        ),
         hint=LOG_HINT,
     )
 
@@ -61,7 +77,11 @@ def _anonymous_refused(run: Runner) -> VerifyCheck:
     return VerifyCheck(
         name="Refuses anonymous logins",
         ok=refused,
-        detail="connection without a login was refused" if refused else "anonymous login accepted",
+        detail=(
+            "connection without a login was refused"
+            if refused
+            else "anonymous login accepted"
+        ),
         hint=LOG_HINT,
     )
 

@@ -18,8 +18,14 @@ BASE_URL: Final[str] = "http://device-api:3000"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 OPERATOR_USERNAME: Final[str] = "operator"
 DTM_FILE: Final[str] = "dtm.json"
-SAVED_NAMES: Final[list[str]] = ["AUTH_JWT_SECRET", OPERATOR_LOGIN.env_name, VIEWER_LOGIN.env_name]
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs device-api"
+SAVED_NAMES: Final[list[str]] = [
+    "AUTH_JWT_SECRET",
+    OPERATOR_LOGIN.env_name,
+    VIEWER_LOGIN.env_name,
+]
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs device-api"
+)
 
 
 def verify_device_api(
@@ -39,7 +45,16 @@ def verify_device_api(
 def _probe(curl_args: list[str], stdin: str | None = None) -> Command:
     """A curl on the arcnode network. A body goes in on stdin, never argv."""
     return Command(
-        args=["docker", "run", "--rm", "-i", "--network", DOCKER_NETWORK, PROBE_IMAGE, *curl_args],
+        args=[
+            "docker",
+            "run",
+            "--rm",
+            "-i",
+            "--network",
+            DOCKER_NETWORK,
+            PROBE_IMAGE,
+            *curl_args,
+        ],
         input=stdin,
     )
 
@@ -57,23 +72,36 @@ def _answers(run: Runner) -> VerifyCheck:
 
 def _spec_served(run: Runner) -> VerifyCheck:
     """The industrial gateway and HMI both fetch /asyncapi at boot. A 503 here means
-    the topology can't build a spec, so it shows on this page instead of the gateway's."""
+    the topology can't build a spec, so it shows on this page instead of the gateway's.
+    """
     out = run(_probe(["-fsS", "-o", "/dev/null", f"{BASE_URL}/asyncapi"]))
     ok = out.returncode == 0
     return VerifyCheck(
         name="Serves its message spec",
         ok=ok,
-        detail="/asyncapi answers 200" if ok else f"/asyncapi failed (curl exit {out.returncode})",
+        detail=(
+            "/asyncapi answers 200"
+            if ok
+            else f"/asyncapi failed (curl exit {out.returncode})"
+        ),
         hint=LOG_HINT,
     )
 
 
 def _operator_login(run: Runner, secrets: DeviceApiSecrets) -> VerifyCheck:
-    body = json.dumps({"username": OPERATOR_USERNAME, "password": secrets.operator_password})
+    body = json.dumps(
+        {"username": OPERATOR_USERNAME, "password": secrets.operator_password}
+    )
     out = run(
         _probe(
-            ["-fsS", "-H", "Content-Type: application/json", "--data-binary", "@-",
-             f"{BASE_URL}/auth/login"],
+            [
+                "-fsS",
+                "-H",
+                "Content-Type: application/json",
+                "--data-binary",
+                "@-",
+                f"{BASE_URL}/auth/login",
+            ],
             stdin=body,
         )
     )
@@ -81,7 +109,11 @@ def _operator_login(run: Runner, secrets: DeviceApiSecrets) -> VerifyCheck:
     return VerifyCheck(
         name="Operator can log in",
         ok=ok,
-        detail="token issued" if ok else "login refused — check the operator password you set",
+        detail=(
+            "token issued"
+            if ok
+            else "login refused — check the operator password you set"
+        ),
         hint=LOG_HINT,
     )
 

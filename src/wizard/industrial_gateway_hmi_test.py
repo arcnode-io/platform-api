@@ -34,13 +34,18 @@ def test_industrial_gateway_starts_and_verifies(tmp_path: Path) -> None:
 def test_hmi_starts_and_serves_the_app(tmp_path: Path) -> None:
     # Arrange
     service = HmiService(
-        deployment=Deployment.ON_PREM, tracker=tracker(tmp_path), ems_dir=tmp_path / "opt", run=FakeRunner()
+        deployment=Deployment.ON_PREM,
+        tracker=tracker(tmp_path),
+        ems_dir=tmp_path / "opt",
+        run=FakeRunner(),
     )
 
     # Act
     result = service.apply()
 
     # Assert
-    assert [(c.name, c.ok) for c in result.checks] == [("Serves the operator screen", True)]
+    assert [(c.name, c.ok) for c in result.checks] == [
+        ("Serves the operator screen", True)
+    ]
     assert result.verified
     assert tracker(tmp_path).is_done("hmi")

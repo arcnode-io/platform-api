@@ -20,7 +20,9 @@ MLFLOW_URI: Final[str] = "http://mlflow:5000"
 # Logged after the model's startup MLflow probe passes; a bad address exits the container before this.
 READY_LINE: Final[str] = f"MLflow healthy at {MLFLOW_URI}"
 SCHEDULER_LINE: Final[str] = "Scheduler started"
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs analyst-model"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs analyst-model"
+)
 
 
 class AnalystModelStepNotAvailableError(Exception):
@@ -48,10 +50,14 @@ class AnalystModelService:
     def apply(self) -> StepResult:
         """Write the overlay, start, wait for the scheduler, verify — done only when every check passes."""
         if self._deployment == Deployment.CLOUD:
-            raise AnalystModelStepNotAvailableError("no analyst model page in the cloud")
+            raise AnalystModelStepNotAvailableError(
+                "no analyst model page in the cloud"
+            )
         if self._tracker.is_done("analyst_model"):
             raise StepAlreadyDoneError("the analyst model is already set up")
-        site = OrderSite.model_validate(yaml.safe_load((self._order_dir / SITE_FILE).read_text()))
+        site = OrderSite.model_validate(
+            yaml.safe_load((self._order_dir / SITE_FILE).read_text())
+        )
         expected = AnalystModelCfg(site_id=site.site_id, mlflow_tracking_uri=MLFLOW_URI)
         write_yaml(self._ems_dir / ANALYST_MODEL_CFG_FILE, expected)
         self._run(compose_command(self._ems_dir, "up", "-d", ANALYST_MODEL_SERVICE))
@@ -68,7 +74,11 @@ class AnalystModelService:
         return StepResult(verified=verified, checks=checks)
 
     def _running_check(self) -> VerifyCheck:
-        out = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", ANALYST_MODEL_SERVICE))
+        out = self._run(
+            compose_command(
+                self._ems_dir, "ps", "-q", "--status", "running", ANALYST_MODEL_SERVICE
+            )
+        )
         running = bool(out.stdout.strip())
         return VerifyCheck(
             name="Analyst model container running",
@@ -78,7 +88,9 @@ class AnalystModelService:
         )
 
     def _scheduler_check(self) -> VerifyCheck:
-        logs = self._run(compose_command(self._ems_dir, "logs", ANALYST_MODEL_SERVICE)).stdout
+        logs = self._run(
+            compose_command(self._ems_dir, "logs", ANALYST_MODEL_SERVICE)
+        ).stdout
         started = SCHEDULER_LINE in logs
         return VerifyCheck(
             name="Scheduler started",
@@ -92,8 +104,16 @@ class AnalystModelService:
         analyst model will reach it. The file check only proves what was written."""
         out = self._run(
             Command(
-                args=["docker", "run", "--rm", "--network", DOCKER_NETWORK, "curlimages/curl",
-                      "-fsS", f"{MLFLOW_URI}/health"]
+                args=[
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    DOCKER_NETWORK,
+                    "curlimages/curl",
+                    "-fsS",
+                    f"{MLFLOW_URI}/health",
+                ]
             )
         )
         reachable = out.returncode == 0
@@ -107,7 +127,9 @@ class AnalystModelService:
     def _saved_check(self, expected: AnalystModelCfg) -> VerifyCheck:
         """Read the file back — what the container will actually mount."""
         path = self._ems_dir / ANALYST_MODEL_CFG_FILE
-        saved = AnalystModelCfg.model_validate(yaml.safe_load(path.read_text())) == expected
+        saved = (
+            AnalystModelCfg.model_validate(yaml.safe_load(path.read_text())) == expected
+        )
         return VerifyCheck(
             name="Saved for the analyst model",
             ok=saved,

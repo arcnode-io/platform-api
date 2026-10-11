@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 
 from src.wizard.controller_fixtures import wizard_client
-from src.wizard.setup_token import TOKEN_HEADER, read_or_create_token, setup_token_from_env_file, token_for
+from src.wizard.setup_token import (
+    TOKEN_HEADER,
+    read_or_create_token,
+    setup_token_from_env_file,
+    token_for,
+)
 from src.wizard.wizard_record import Deployment
 
 TOKEN = "stack-owner-token"
@@ -62,7 +67,9 @@ def test_page_loads_without_token(tmp_path: Path) -> None:
 def test_token_is_read_from_secrets_env(tmp_path: Path) -> None:
     # Arrange — the file UserData writes, with other secrets around it
     env_file = tmp_path / "secrets.env"
-    env_file.write_text("AUTH_JWT_SECRET=abc\nSETUP_TOKEN=stack-owner-token\nGRAFANA=x\n")
+    env_file.write_text(
+        "AUTH_JWT_SECRET=abc\nSETUP_TOKEN=stack-owner-token\nGRAFANA=x\n"
+    )
 
     # Act
     token = setup_token_from_env_file(env_file)

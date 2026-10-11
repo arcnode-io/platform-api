@@ -13,7 +13,10 @@ from typing import Annotated, Final
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
-from src.wizard.device_api_service import DeviceApiService, DeviceApiStepNotAvailableError
+from src.wizard.device_api_service import (
+    DeviceApiService,
+    DeviceApiStepNotAvailableError,
+)
 from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
 from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
 from src.wizard.industrial_gateway_service import (
@@ -29,15 +32,24 @@ from src.wizard.analyst_server_service import (
     AnalystServerService,
     AnalystServerStepNotAvailableError,
 )
-from src.wizard.cloud_secrets_service import CloudSecretsService, CloudSecretsStepNotAvailableError
-from src.wizard.der_control_service import DerControlService, DerControlStepNotAvailableError
+from src.wizard.cloud_secrets_service import (
+    CloudSecretsService,
+    CloudSecretsStepNotAvailableError,
+)
+from src.wizard.der_control_service import (
+    DerControlService,
+    DerControlStepNotAvailableError,
+)
 from src.wizard.analyst_model_service import (
     AnalystModelService,
     AnalystModelStepNotAvailableError,
 )
 from src.wizard.mlflow_service import MlflowService, MlflowStepNotAvailableError
 from src.wizard.preflight_service import PreflightService
-from src.wizard.prometheus_service import PrometheusService, PrometheusStepNotAvailableError
+from src.wizard.prometheus_service import (
+    PrometheusService,
+    PrometheusStepNotAvailableError,
+)
 from src.wizard.site_service import SiteService, SiteStepNotAvailableError
 from src.wizard.telemetry_writer_service import (
     TelemetryWriterService,
@@ -75,15 +87,19 @@ _STATIC_DIR: Final[Path] = Path(__file__).parent / "static"
 _NO_CACHE: Final[dict[str, str]] = {"Cache-Control": "no-cache"}
 
 
-
 def _require_setup_token(expected: str) -> Callable[[str | None], None]:
     """A dependency that refuses any change whose X-Setup-Token header isn't the stack owner's."""
 
-    def check(setup_token: Annotated[str | None, Header(alias=TOKEN_HEADER)] = None) -> None:
+    def check(
+        setup_token: Annotated[str | None, Header(alias=TOKEN_HEADER)] = None,
+    ) -> None:
         if setup_token != expected:
-            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="setup token missing or wrong")
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED, detail="setup token missing or wrong"
+            )
 
     return check
+
 
 class WizardController:
     """GET / (+ its static assets), GET /api/config, and one POST per page:
@@ -174,7 +190,9 @@ class WizardController:
         ]
         for method, path, handler in routes:
             self.router.add_api_route(
-                path, handler, methods=[method],
+                path,
+                handler,
+                methods=[method],
                 dependencies=token_deps if method == "POST" else [],
             )
 

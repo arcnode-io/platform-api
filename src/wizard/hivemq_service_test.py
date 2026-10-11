@@ -16,7 +16,6 @@ PASSWORDS = BrokerPasswords(
 )
 
 
-
 def make_hivemq_service(tmp_path: Path, runner: FakeRunner) -> HivemqService:
     """A HivemqService on tmp_path, with the template already on the box."""
     (tmp_path / "opt").mkdir(exist_ok=True)
@@ -75,7 +74,6 @@ def test_no_password_reaches_argv(tmp_path: Path) -> None:
     for command in runner.calls:
         for password in PASSWORDS.model_dump().values():
             assert password not in " ".join(command.args)
-
 
 
 def test_no_network_download_during_setup(tmp_path: Path) -> None:

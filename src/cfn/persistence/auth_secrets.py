@@ -69,7 +69,8 @@ def auth_machine_secrets() -> dict[str, dict]:
         ),
         # Gates the cloud setup wizard. Read back with the command in the stack Outputs.
         "SetupTokenSecret": _generated_secret(
-            "setup-token", "Setup wizard token. Paste into the setup page; the wizard refuses changes without it.",
+            "setup-token",
+            "Setup wizard token. Paste into the setup page; the wizard refuses changes without it.",
         ),
         "AuthJwtSecret": _generated_secret(
             "auth-jwt-secret", "device-api HS256 session-token signing key."
@@ -93,13 +94,19 @@ def auth_human_secrets() -> dict[str, dict]:
     """Two secrets sourced from the customer-set login-password params."""
     return {
         "AuthOperatorPwSecret": _param_secret(
-            OPERATOR_LOGIN.slot, OPERATOR_LOGIN.cfn_param, "Operator login password (plaintext)."
+            OPERATOR_LOGIN.slot,
+            OPERATOR_LOGIN.cfn_param,
+            "Operator login password (plaintext).",
         ),
         "AuthViewerPwSecret": _param_secret(
-            VIEWER_LOGIN.slot, VIEWER_LOGIN.cfn_param, "Viewer login password (plaintext)."
+            VIEWER_LOGIN.slot,
+            VIEWER_LOGIN.cfn_param,
+            "Viewer login password (plaintext).",
         ),
         "GrafanaAdminPwSecret": _param_secret(
-            GRAFANA_ADMIN.slot, GRAFANA_ADMIN.cfn_param, "Grafana admin password (plaintext)."
+            GRAFANA_ADMIN.slot,
+            GRAFANA_ADMIN.cfn_param,
+            "Grafana admin password (plaintext).",
         ),
     }
 

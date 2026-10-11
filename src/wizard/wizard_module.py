@@ -110,7 +110,9 @@ class WizardModule:
         self.prometheus = PrometheusService(
             deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
         )
-        self.mlflow = MlflowService(deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run)
+        self.mlflow = MlflowService(
+            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
+        )
         self.analyst_model = AnalystModelService(
             deployment=deployment,
             tracker=tracker,
@@ -132,7 +134,9 @@ class WizardModule:
             secrets_env_path=secrets_env_path,
             run=run,
         )
-        self.hmi = HmiService(deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run)
+        self.hmi = HmiService(
+            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
+        )
         self.grafana = GrafanaService(
             deployment=deployment,
             tracker=tracker,
@@ -156,8 +160,11 @@ class WizardModule:
             run=run,
         )
         self.cloud_secrets = CloudSecretsService(
-            deployment=deployment, tracker=tracker, secrets_env_path=secrets_env_path,
-            ems_dir=ems_dir, run=run,
+            deployment=deployment,
+            tracker=tracker,
+            secrets_env_path=secrets_env_path,
+            ems_dir=ems_dir,
+            run=run,
         )
         self.router = WizardController(
             preflight=self.preflight,

@@ -15,7 +15,9 @@ HMI_SERVICE: Final[str] = "hmi"
 READY_LINE: Final[str] = "start worker processes"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 HMI_URL: Final[str] = "http://hmi/"
-LOG_HINT: Final[str] = "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs hmi"
+LOG_HINT: Final[str] = (
+    "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs hmi"
+)
 
 
 class HmiStepNotAvailableError(Exception):
@@ -25,7 +27,14 @@ class HmiStepNotAvailableError(Exception):
 class HmiService:
     """Starts the operator screen that the box's browsers open."""
 
-    def __init__(self, *, deployment: Deployment, tracker: StepTracker, ems_dir: Path, run: Runner) -> None:
+    def __init__(
+        self,
+        *,
+        deployment: Deployment,
+        tracker: StepTracker,
+        ems_dir: Path,
+        run: Runner,
+    ) -> None:
         self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
@@ -47,12 +56,31 @@ class HmiService:
 
     def _serves_app(self) -> VerifyCheck:
         out = self._run(
-            Command(args=["docker", "run", "--rm", "--network", DOCKER_NETWORK, PROBE_IMAGE, "-fsS", "-o", "/dev/null", "-w", "%{http_code}", HMI_URL])
+            Command(
+                args=[
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--network",
+                    DOCKER_NETWORK,
+                    PROBE_IMAGE,
+                    "-fsS",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    HMI_URL,
+                ]
+            )
         )
         ok = out.returncode == 0 and out.stdout.strip() == "200"
         return VerifyCheck(
             name="Serves the operator screen",
             ok=ok,
-            detail="HTTP 200 on port 80" if ok else f"got {out.stdout.strip() or f'exit {out.returncode}'}",
+            detail=(
+                "HTTP 200 on port 80"
+                if ok
+                else f"got {out.stdout.strip() or f'exit {out.returncode}'}"
+            ),
             hint=LOG_HINT,
         )

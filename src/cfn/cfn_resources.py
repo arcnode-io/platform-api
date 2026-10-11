@@ -595,12 +595,14 @@ def build_userdata(
     # Commercial waits for the wizard: the containers start once the customer saves
     # their passwords. e2e has no wizard, and defense never had one, so both start here.
     compose_up_line = (
-        "" if (not e2e) else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
+        ""
+        if (not e2e)
+        else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
     )
     # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
     # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.
     lfdi_allowlist_line = (
-        "echo \"DER_CONTROL_LFDI_ALLOWLIST=$(aws secretsmanager get-secret-value "
+        'echo "DER_CONTROL_LFDI_ALLOWLIST=$(aws secretsmanager get-secret-value '
         "--secret-id arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist "
         "--query SecretString --output text | tr '\\n' ' ')\" >> /opt/arcnode/secrets.env\n"
     )
@@ -624,9 +626,9 @@ def build_userdata(
         # Cloud passwords exclude / & and \\, so they're safe as sed replacements.
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/credentials.template.xml "
         "-o /opt/arcnode/credentials.xml\n"
-        "sed -i -e \"s/__GATEWAY_PASSWORD__/$SVC_PW/\" -e \"s/__OPERATOR_PASSWORD__/$OP_PW/\" "
-        "-e \"s/__VIEWER_PASSWORD__/$VW_PW/\" -e \"s/__DEVICE_API_PASSWORD__/$SVC_PW/\" "
-        "-e \"s/__TELEMETRY_WRITER_PASSWORD__/$SVC_PW/\" -e \"s/__DER_CONTROL_API_PASSWORD__/$SVC_PW/\" "
+        'sed -i -e "s/__GATEWAY_PASSWORD__/$SVC_PW/" -e "s/__OPERATOR_PASSWORD__/$OP_PW/" '
+        '-e "s/__VIEWER_PASSWORD__/$VW_PW/" -e "s/__DEVICE_API_PASSWORD__/$SVC_PW/" '
+        '-e "s/__TELEMETRY_WRITER_PASSWORD__/$SVC_PW/" -e "s/__DER_CONTROL_API_PASSWORD__/$SVC_PW/" '
         "/opt/arcnode/credentials.xml\n"
         "chmod 600 /opt/arcnode/credentials.xml\n"
     )

@@ -15,7 +15,12 @@ class DockerService:
     """Create the network every EMS container and host daemon meets on."""
 
     def __init__(
-        self, *, deployment: Deployment, tracker: StepTracker, account: SshAccount, run: Runner
+        self,
+        *,
+        deployment: Deployment,
+        tracker: StepTracker,
+        account: SshAccount,
+        run: Runner,
     ) -> None:
         self._deployment = deployment
         self._tracker = tracker

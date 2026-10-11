@@ -10,7 +10,11 @@ from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import CloudSecrets, Deployment, StepResult
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
-SAVED_NAMES: list[str] = [OPERATOR_LOGIN.env_name, VIEWER_LOGIN.env_name, GRAFANA_ADMIN.env_name]
+SAVED_NAMES: list[str] = [
+    OPERATOR_LOGIN.env_name,
+    VIEWER_LOGIN.env_name,
+    GRAFANA_ADMIN.env_name,
+]
 
 
 class CloudSecretsStepNotAvailableError(Exception):

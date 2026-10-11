@@ -2,7 +2,7 @@
 storage and cost stay flat across frequent builds."""
 
 import argparse
-from typing import Final, Protocol
+from typing import Final, Protocol, cast
 
 import boto3
 
@@ -25,22 +25,30 @@ class Ec2Client(Protocol):
         ...
 
 
-def images_to_delete(images: list[dict[str, object]], keep: int) -> list[dict[str, object]]:
+def images_to_delete(
+    images: list[dict[str, object]], keep: int
+) -> list[dict[str, object]]:
     """Every base AMI older than the newest `keep`. ISO-8601 CreationDate sorts as text."""
-    newest_first = sorted(images, key=lambda image: str(image["CreationDate"]), reverse=True)
+    newest_first = sorted(
+        images, key=lambda image: str(image["CreationDate"]), reverse=True
+    )
     return newest_first[keep:]
 
 
 def prune(ec2: Ec2Client, keep: int) -> list[str]:
     """Deregister the old base AMIs and delete their snapshots. Returns the deleted image IDs."""
-    response = ec2.describe_images(Owners=["self"], Filters=[{"Name": "name", "Values": [f"{NAME_PREFIX}*"]}])
+    response = ec2.describe_images(
+        Owners=["self"], Filters=[{"Name": "name", "Values": [f"{NAME_PREFIX}*"]}]
+    )
     doomed = images_to_delete(response["Images"], keep)
     for image in doomed:
         ec2.deregister_image(ImageId=str(image["ImageId"]))
-        for mapping in image.get("BlockDeviceMappings", []):
-            ebs = mapping.get("Ebs")
-            if isinstance(ebs, dict):
-                ec2.delete_snapshot(SnapshotId=str(ebs["SnapshotId"]))
+        # Reason: describe_images returns EBS mappings for our AMIs; the cast gives the checker that shape.
+        mappings = cast(
+            list[dict[str, dict[str, object]]], image.get("BlockDeviceMappings", [])
+        )
+        for mapping in mappings:
+            ec2.delete_snapshot(SnapshotId=str(mapping["Ebs"]["SnapshotId"]))
     return [str(image["ImageId"]) for image in doomed]
 
 

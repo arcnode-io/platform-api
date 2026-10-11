@@ -36,4 +36,7 @@ def test_analyst_model_writes_its_overlay_and_verifies(tmp_path: Path) -> None:
     assert result.verified
     assert tracker(tmp_path).is_done("analyst_model")
     written = yaml.safe_load((tmp_path / "opt" / ANALYST_MODEL_CFG_FILE).read_text())
-    assert written == {"site_id": "test_site", "mlflow_tracking_uri": "http://mlflow:5000"}
+    assert written == {
+        "site_id": "test_site",
+        "mlflow_tracking_uri": "http://mlflow:5000",
+    }

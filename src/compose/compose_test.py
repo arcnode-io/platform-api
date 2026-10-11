@@ -117,7 +117,6 @@ def test_der_control_ingress_terminates_mtls_in_front_of_der_control_api(
     assert any(v.endswith(":/etc/nginx/conf.d/default.conf:ro") for v in volumes)
 
 
-
 def test_defense_ships_broker_leg_plus_the_analyst_stack() -> None:
     """Defense ships the broker leg and the analyst stack, the same services as
     commercial. No init containers (consumers self-seed)."""
@@ -216,7 +215,9 @@ def test_analyst_model_runs_beta_stage_as_a_daily_daemon() -> None:
     anyway so a future default flip can't turn this into a run-once-and-exit loop.
     """
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["analyst-model"]
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
+        "analyst-model"
+    ]
 
     # Assert
     assert service["environment"] == {
@@ -237,7 +238,9 @@ def test_analyst_server_points_at_itself_and_the_device_api() -> None:
     reaches it. The Device API is its compose service name.
     """
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["analyst-server"]
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
+        "analyst-server"
+    ]
 
     # Assert
     assert service["environment"]["SERVER_URL"] == "http://localhost:8000"
@@ -252,7 +255,9 @@ def test_analyst_server_is_not_published_to_the_host() -> None:
     Reason: a published analyst port is an internet-facing chat API with no auth.
     """
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["analyst-server"]
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
+        "analyst-server"
+    ]
 
     # Assert
     assert "ports" not in service
@@ -276,20 +281,36 @@ def test_der_control_api_reads_its_customer_config() -> None:
     """der-control-api merges its per-deployment keys (siteId, utilityMirrorUrl,
     publicBaseUrl) over its ENV block from a file mounted read-only."""
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]["der-control-api"]
+    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
+        "der-control-api"
+    ]
 
     # Assert
     assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
-    assert "/opt/arcnode/der-control-cfg.customer.yml:/app/cfg.customer.yml:ro" in service["volumes"]
+    assert (
+        "/opt/arcnode/der-control-cfg.customer.yml:/app/cfg.customer.yml:ro"
+        in service["volumes"]
+    )
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
-def test_der_control_api_mounts_the_utility_identity_read_only(variant_path: Path) -> None:
+def test_der_control_api_mounts_the_utility_identity_read_only(
+    variant_path: Path,
+) -> None:
     """The outbound client identity and utility CA are mounted where the cfg keys point."""
     # Arrange + Act
-    volumes = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"]["volumes"]
+    volumes = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"][
+        "volumes"
+    ]
 
     # Assert
-    assert "/opt/arcnode/der-control-client.pem:/app/tls/utility/client.pem:ro" in volumes
-    assert "/opt/arcnode/der-control-client-key.pem:/app/tls/utility/client-key.pem:ro" in volumes
-    assert "/opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro" in volumes
+    assert (
+        "/opt/arcnode/der-control-client.pem:/app/tls/utility/client.pem:ro" in volumes
+    )
+    assert (
+        "/opt/arcnode/der-control-client-key.pem:/app/tls/utility/client-key.pem:ro"
+        in volumes
+    )
+    assert (
+        "/opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro" in volumes
+    )
