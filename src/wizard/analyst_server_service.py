@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Final
 
 from src.wizard.analyst_server_progress import StageProgress, stage_status
-from src.wizard.containers_compose import POLL_SECONDS, compose_command, wait_for_log
+from src.wizard.containers_compose import (
+    POLL_SECONDS,
+    compose_command,
+    container_alive,
+    wait_for_log,
+)
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import save_secrets, saved_check
 from src.wizard.system_runner import Runner
@@ -111,13 +116,15 @@ class AnalystServerService:
             },
         )
         self._run(compose_command(self._ems_dir, "up", "-d", ANALYST_SERVER_SERVICE))
-        # Reason: a stage update per poll, and the loop ends on the ready line or a dead container.
+        # Reason: a stage update per poll; the loop ends on the ready line or an exited container (a restart is not the end).
         while True:
             stages = self.progress()
             yield json.dumps(
                 {"stages": [stage.model_dump() for stage in stages]}
             ) + "\n"
-            if stages[-1].done or not self._running_check().ok:
+            if stages[-1].done or not container_alive(
+                self._run, self._ems_dir, ANALYST_SERVER_SERVICE
+            ):
                 break
             time.sleep(POLL_SECONDS)
         checks = [

@@ -359,6 +359,24 @@ const ANALYST_SERVER_FIELDS = [
   { key: 'gridstatus_api_key', label: 'GridStatus API key' },
 ];
 
+// What one analyst stage's row shows. Seeds download a dump, then import it; the
+// analyst reports the download, and the import only if it logs `seed import:` lines.
+// With no number to quote the bar sweeps and the text says so, rather than sit at 100%.
+function seedRow(stage, isCurrent) {
+  const left = stage.eta_seconds != null ? ` · about ${formatDuration(stage.eta_seconds)} left` : '';
+  if (stage.phase === 'done') return { detail: 'Done', fraction: 1 };
+  if (stage.phase === 'downloading') {
+    const sizes = stage.mib_total != null ? `${stage.mib_done} of ${stage.mib_total} MB · ` : '';
+    return { detail: `Downloading · ${sizes}${stage.percent}%${left}`, fraction: stage.percent / 100 };
+  }
+  if (stage.phase === 'importing') {
+    return stage.percent != null
+      ? { detail: `Importing · ${stage.percent}%${left}`, fraction: stage.percent / 100 }
+      : { detail: "Importing into the database — progress is not reported, this can take several minutes", fraction: null };
+  }
+  return isCurrent ? { detail: 'Working…', fraction: null } : { detail: 'Waiting', fraction: 0 };
+}
+
 function StepAnalystServer({ t, page, keys, onKey, onApply }) {
   const isApplying = page.state === 'applying';
   // Stage updates arrive on the apply request's stream.
@@ -387,12 +405,12 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
         </button>
       )}
       {isApplying && stages && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[2], marginTop: SPACE[4] }}>
-          {stages.map(stage => (
-            <div key={stage.label} style={{ fontSize: 13, color: stage.done ? t.statusOk : t.textSoft }}>
-              {stage.done ? '✓' : '…'} {stage.label}{stage.percent != null ? ` — ${stage.percent}%` : ''}{stage.eta_seconds != null ? ` · about ${Math.max(1, Math.round(stage.eta_seconds / 60))} min left` : ''}
-            </div>
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {stages.map((stage, i) => {
+            const row = seedRow(stage, i === stages.findIndex(s => !s.done));
+            return <ProgressRowW key={stage.label} t={t} id={stage.label} label={stage.label}
+              detail={row.detail} fraction={row.fraction} finished={stage.done}/>;
+          })}
         </div>
       )}
       {page.state === 'error' && (

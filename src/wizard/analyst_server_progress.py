@@ -1,28 +1,47 @@
 """The analyst server's startup stages, read from its own log lines. The
-analyst prints each line when that stage finishes, so the page shows real
-progress instead of a timer. The seed stages also carry the newest percentage
-the analyst logs while it downloads."""
+analyst prints a line when each stage finishes, so the page shows real progress
+instead of a timer. A seed stage has two phases the analyst reports separately:
+it downloads a dump (`seed progress: <seed> N% (X MiB of Y MiB)`), then imports
+it (`seed import: <seed> N% (A of B statements)`). Between the two the analyst
+used to log nothing, so the page sat at "100%" for the whole import."""
 
 import re
 from datetime import datetime
+from enum import StrEnum
 from typing import Final
 
 from pydantic import BaseModel
 
+# Optional sizes: older analyst images log only the percentage.
 SEED_PROGRESS: Final[re.Pattern[str]] = re.compile(
-    r"seed progress: (vector|graph) (\d+)%"
+    r"seed progress: (vector|graph) (\d+)%(?: \((\d+) MiB of (\d+) MiB\))?"
 )
+SEED_IMPORT: Final[re.Pattern[str]] = re.compile(r"seed import: (vector|graph) (\d+)%")
 # The analyst's own timestamp leads each line; fractional seconds may be longer than datetime takes.
 LOG_TIME: Final[re.Pattern[str]] = re.compile(r"(\d{4}-\d{2}-\d{2}T[\d:.]+)Z")
 
 
+class StagePhase(StrEnum):
+    """Where a stage is: not started, downloading its dump, importing it, or finished."""
+
+    WAITING = "waiting"
+    DOWNLOADING = "downloading"
+    IMPORTING = "importing"
+    DONE = "done"
+
+
 class StageProgress(BaseModel):
-    """One startup stage: whether its finish line appeared, and the latest download percentage if it's still running."""
+    """One startup stage. `percent` is the current phase's percentage (None when the
+    phase has no number to quote, e.g. an import the analyst doesn't report on);
+    sizes are the download's, in MiB."""
 
     label: str
     done: bool
+    phase: StagePhase
     percent: int | None = None
     eta_seconds: int | None = None
+    mib_done: int | None = None
+    mib_total: int | None = None
 
 
 # (label, the log text the analyst prints when the stage finishes, which seed it reports on if any)
@@ -34,43 +53,76 @@ STAGES: Final[tuple[tuple[str, str, str | None], ...]] = (
 )
 
 
-def latest_percent(logs: str, seed: str) -> int | None:
-    """The newest percentage the analyst logged for this seed, or None if it hasn't started."""
-    matches = [
-        int(m.group(2)) for m in SEED_PROGRESS.finditer(logs) if m.group(1) == seed
-    ]
-    return matches[-1] if matches else None
-
-
-def eta_seconds(logs: str, seed: str) -> int | None:
-    """Seconds left for this seed, from its first and newest progress lines. None until the
-    percentage has moved between two timestamped lines."""
-    samples = []
+def _samples(
+    logs: str, pattern: re.Pattern[str], seed: str
+) -> list[tuple[datetime | None, int, re.Match[str]]]:
+    """Every line of this seed matching `pattern`: its timestamp (if any), percent, match."""
+    found = []
     for line in logs.splitlines():
-        match = SEED_PROGRESS.search(line)
+        match = pattern.search(line)
+        if match is None or match.group(1) != seed:
+            continue
         stamp = LOG_TIME.search(line)
-        if match and stamp and match.group(1) == seed:
-            when = datetime.fromisoformat(stamp.group(1)[:26])
-            samples.append((when, int(match.group(2))))
-    if len(samples) < 2:
+        when = datetime.fromisoformat(stamp.group(1)[:26]) if stamp else None
+        found.append((when, int(match.group(2)), match))
+    return found
+
+
+def _eta(samples: list[tuple[datetime | None, int, re.Match[str]]]) -> int | None:
+    """Seconds left, from the first and newest timestamped samples. None until the
+    percentage has moved between two timestamped lines."""
+    stamped = [(when, pct) for when, pct, _ in samples if when is not None]
+    if len(stamped) < 2:
         return None
-    (first_at, first_pct), (last_at, last_pct) = samples[0], samples[-1]
+    (first_at, first_pct), (last_at, last_pct) = stamped[0], stamped[-1]
     if last_pct <= first_pct:
         return None
-    elapsed = (last_at - first_at).total_seconds()
-    rate = (last_pct - first_pct) / elapsed
+    rate = (last_pct - first_pct) / (last_at - first_at).total_seconds()
     return round((100 - last_pct) / rate)
 
 
+def _seed_stage(label: str, logs: str, seed: str) -> StageProgress:
+    """A seed stage that hasn't printed its finish line: waiting, downloading or importing."""
+    imports = _samples(logs, SEED_IMPORT, seed)
+    downloads = _samples(logs, SEED_PROGRESS, seed)
+    if imports:
+        # Reason: the analyst reports the import itself, so quote its own percentage.
+        return StageProgress(
+            label=label,
+            done=False,
+            phase=StagePhase.IMPORTING,
+            percent=imports[-1][1],
+            eta_seconds=_eta(imports),
+        )
+    if downloads and downloads[-1][1] >= 100:
+        # Reason: the download is finished and the analyst reports nothing while it
+        # applies the dump, so there is no honest percentage or estimate to show.
+        return StageProgress(label=label, done=False, phase=StagePhase.IMPORTING)
+    if downloads:
+        newest = downloads[-1][2]
+        done_mib, total_mib = newest.group(3), newest.group(4)
+        return StageProgress(
+            label=label,
+            done=False,
+            phase=StagePhase.DOWNLOADING,
+            percent=downloads[-1][1],
+            eta_seconds=_eta(downloads),
+            mib_done=int(done_mib) if done_mib else None,
+            mib_total=int(total_mib) if total_mib else None,
+        )
+    return StageProgress(label=label, done=False, phase=StagePhase.WAITING)
+
+
 def stage_status(logs: str) -> list[StageProgress]:
-    """Each stage, done when its finish line appears; a running seed carries its latest percentage and time left."""
+    """Each stage: done when its finish line appears, else where its seed has got to."""
     stages = []
     for label, finish, seed in STAGES:
-        done = finish in logs
-        running = seed is not None and not done
-        percent = latest_percent(logs, seed) if running else None
-        eta = eta_seconds(logs, seed) if running else None
-        stages.append(
-            StageProgress(label=label, done=done, percent=percent, eta_seconds=eta)
-        )
+        if finish in logs:
+            stages.append(StageProgress(label=label, done=True, phase=StagePhase.DONE))
+        elif seed is not None:
+            stages.append(_seed_stage(label, logs, seed))
+        else:
+            stages.append(
+                StageProgress(label=label, done=False, phase=StagePhase.WAITING)
+            )
     return stages

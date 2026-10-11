@@ -1,7 +1,7 @@
 """Unit tests for the analyst server's progress stages — each stage is done
 when the log line the analyst code prints for it appears."""
 
-from src.wizard.analyst_server_progress import stage_status
+from src.wizard.analyst_server_progress import StagePhase, stage_status
 
 LOG = (
     "Installed 42 packages in 37ms\n"
@@ -98,3 +98,89 @@ def test_one_progress_line_gives_no_estimate_yet() -> None:
 
     # Assert
     assert graph.eta_seconds is None
+
+
+def test_a_download_in_progress_reports_its_phase_percent_and_sizes() -> None:
+    # Arrange
+    logs = "seed progress: graph 40% (40 MiB of 100 MiB)\n"
+
+    # Act
+    graph = stage_status(logs)[2]
+
+    # Assert
+    assert (graph.phase, graph.percent, graph.mib_done, graph.mib_total) == (
+        StagePhase.DOWNLOADING,
+        40,
+        40,
+        100,
+    )
+
+
+def test_a_finished_download_is_importing_with_no_percent_and_no_stale_estimate() -> (
+    None
+):
+    """The analyst logs nothing while it applies the dump, so 100% downloaded is not
+    'about 1 min left': it is 'importing', with no number to quote (seen on the box:
+    the page sat at '100% · about 1 min left' for as long as the import ran)."""
+    # Arrange — two download samples would give an ETA if it were still downloading
+    logs = (
+        "2026-10-10T10:00:00.000000Z  INFO: seed progress: graph 50% (50 MiB of 100 MiB)\n"
+        "2026-10-10T10:01:00.000000Z  INFO: seed progress: graph 100% (100 MiB of 100 MiB)\n"
+    )
+
+    # Act
+    graph = stage_status(logs)[2]
+
+    # Assert
+    assert (graph.done, graph.phase) == (False, StagePhase.IMPORTING)
+    assert (graph.percent, graph.eta_seconds) == (None, None)
+
+
+def test_import_progress_lines_give_an_import_percent_and_estimate() -> None:
+    # Arrange — the analyst reports statements applied: 10% then 20% a minute apart
+    logs = (
+        "seed progress: graph 100% (100 MiB of 100 MiB)\n"
+        "2026-10-10T10:00:00.000000Z  INFO: seed import: graph 10% (1000 of 10000 statements)\n"
+        "2026-10-10T10:01:00.000000Z  INFO: seed import: graph 20% (2000 of 10000 statements)\n"
+    )
+
+    # Act
+    graph = stage_status(logs)[2]
+
+    # Assert
+    assert (graph.phase, graph.percent, graph.eta_seconds) == (
+        StagePhase.IMPORTING,
+        20,
+        480,
+    )
+
+
+def test_stage_phases_run_waiting_then_done_for_plain_stages() -> None:
+    # Arrange + Act
+    before = stage_status("")
+    after = stage_status("Installed 42 packages in 37ms\n")
+
+    # Assert
+    assert before[0].phase == StagePhase.WAITING
+    assert after[0].phase == StagePhase.DONE
+    assert before[1].phase == StagePhase.WAITING
+
+
+def test_a_done_stage_clears_every_progress_number() -> None:
+    # Arrange
+    logs = (
+        "seed progress: vector 100% (300 MiB of 300 MiB)\n"
+        "seed import: vector 90% (9 of 10 statements)\n"
+        "INFO: vector slice seeded\n"
+    )
+
+    # Act
+    vector = stage_status(logs)[1]
+
+    # Assert
+    assert (vector.phase, vector.percent, vector.eta_seconds) == (
+        StagePhase.DONE,
+        None,
+        None,
+    )
+    assert (vector.mib_done, vector.mib_total) == (None, None)

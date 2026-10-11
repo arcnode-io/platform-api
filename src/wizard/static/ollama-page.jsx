@@ -52,11 +52,38 @@ function formatDuration(seconds) {
   return `${(seconds / 3600).toFixed(1)} h`;
 }
 
+// One progress row — label, detail text, bar. The Ollama downloads and the analyst's
+// seed stages both render through this, so the two pages look and behave alike.
+// `fraction` null = no honest number to show: the bar sweeps instead of filling.
+function ProgressRowW({ t, id, label, detail, fraction, failed, finished }) {
+  const sweeping = fraction == null && !failed && !finished;
+  return (
+    <div data-download={id} style={{
+      padding: `${SPACE[3]}px ${SPACE[4]}px`, background: t.panel,
+      border: `1px solid ${failed ? t.statusAlarm : t.border}`, borderRadius: RADIUS[2],
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: SPACE[3] }}>
+        <span style={{ fontFamily: t.fontLabel, fontSize: 13, fontWeight: 600, color: t.text }}>{label}</span>
+        <span style={{ fontFamily: t.fontLabel, fontSize: 12, color: failed ? t.statusAlarm : t.textMid }}>{detail}</span>
+      </div>
+      <div style={{ height: 6, marginTop: SPACE[2], background: t.bg, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+        <div style={{
+          height: '100%', position: sweeping ? 'absolute' : 'static',
+          width: sweeping ? '35%' : `${Math.round((finished ? 1 : fraction || 0) * 100)}%`,
+          background: failed ? t.statusAlarm : finished ? t.statusOk : t.accent,
+          animation: sweeping ? 'wizSweep 1.4s ease-in-out infinite' : 'none',
+          transition: 'width 0.3s',
+        }}/>
+      </div>
+    </div>
+  );
+}
+
 function DownloadRowW({ t, model, download }) {
   const { status, completed, total, start, now } = download;
   const failed = status.startsWith('error');
   const finished = status === 'success';
-  const fraction = finished ? 1 : total ? completed / total : 0;
+  const fraction = total ? completed / total : 0;
   const seconds = (now - start.at) / 1000;
   const speed = seconds > 1 ? (completed - start.bytes) / seconds : 0;
   const detail = failed ? status
@@ -64,24 +91,8 @@ function DownloadRowW({ t, model, download }) {
     : total ? `${formatBytes(completed)} of ${formatBytes(total)}`
       + (speed > 0 ? ` · ${formatBytes(speed)}/s · about ${formatDuration((total - completed) / speed)} left` : '')
     : status;
-  return (
-    <div data-download={model} style={{
-      padding: `${SPACE[3]}px ${SPACE[4]}px`, background: t.panel,
-      border: `1px solid ${failed ? t.statusAlarm : t.border}`, borderRadius: RADIUS[2],
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: SPACE[3] }}>
-        <span style={{ fontFamily: t.fontLabel, fontSize: 13, fontWeight: 600, color: t.text }}>{model}</span>
-        <span style={{ fontFamily: t.fontLabel, fontSize: 12, color: failed ? t.statusAlarm : t.textMid }}>{detail}</span>
-      </div>
-      <div style={{ height: 6, marginTop: SPACE[2], background: t.bg, borderRadius: 3, overflow: 'hidden' }}>
-        <div style={{
-          height: '100%', width: `${Math.round(fraction * 100)}%`,
-          background: failed ? t.statusAlarm : finished ? t.statusOk : t.accent,
-          transition: 'width 0.3s',
-        }}/>
-      </div>
-    </div>
-  );
+  return <ProgressRowW t={t} id={model} label={model} detail={detail}
+    fraction={fraction} failed={failed} finished={finished}/>;
 }
 
 function StepOllama({ t, page, downloads, onApply }) {
@@ -122,4 +133,6 @@ function StepOllama({ t, page, downloads, onApply }) {
 
 window.streamOllama = streamOllama;
 window.nextDownload = nextDownload;
+window.ProgressRowW = ProgressRowW;
+window.formatDuration = formatDuration;
 window.StepOllama = StepOllama;

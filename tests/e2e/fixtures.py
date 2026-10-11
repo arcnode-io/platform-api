@@ -28,6 +28,7 @@ from mypy_boto3_cloudformation import CloudFormationClient
 from mypy_boto3_cloudformation.type_defs import ParameterTypeDef
 
 from src.cfn.cfn_service import CfnService
+from tests.e2e.template_url import REGION, delete_template, upload_template
 from src.cfn.persistence.persistence_service import PersistenceService
 from src.orders.configurator_payload import DeploymentContext
 
@@ -36,6 +37,7 @@ DTM_URL: Final[str] = (
     "https://arcnode-public.s3.us-east-1.amazonaws.com/seed/industrial-fixtures.json"
 )
 # 25min covers Aurora ~5min + Lambda CR ~30s + EC2 boot + image pulls.
+S3 = boto3.client("s3", region_name=REGION)
 STACK_READY_TIMEOUT_S: Final[int] = 1500
 STACK_DELETE_TIMEOUT_S: Final[int] = 1800
 POLL_INTERVAL_S: Final[int] = 30
@@ -115,9 +117,10 @@ def defense_stack(
         e2e=True,
     )
 
+    template_url = upload_template(S3, stack_name=stack_name, template=template)
     cfn.create_stack(
         StackName=stack_name,
-        TemplateBody=template,
+        TemplateURL=template_url,
         Capabilities=["CAPABILITY_IAM", "CAPABILITY_AUTO_EXPAND"],
         Parameters=[
             {
@@ -134,6 +137,7 @@ def defense_stack(
         ],
         OnFailure="ROLLBACK",
     )
+    delete_template(S3, stack_name=stack_name)
     try:
         # Defense ~30min: Aurora ~5min + Neptune ~5min + AOSS ~2min +
         # EC2 boot + docker pulls + mcp-server seed (Neptune bulk load).
@@ -179,9 +183,10 @@ def commercial_stack(
         e2e=True,
     )
 
+    template_url = upload_template(S3, stack_name=stack_name, template=template)
     cfn.create_stack(
         StackName=stack_name,
-        TemplateBody=template,
+        TemplateURL=template_url,
         Capabilities=["CAPABILITY_IAM", "CAPABILITY_AUTO_EXPAND"],
         Parameters=[
             {
@@ -200,6 +205,7 @@ def commercial_stack(
         ],
         OnFailure="ROLLBACK",
     )
+    delete_template(S3, stack_name=stack_name)
     try:
         # *2 like defense_stack — real-AWS CFN creates have hit 25-30 min
         # on Aurora alone (verified by pipeline 2562482036). Doubling gives

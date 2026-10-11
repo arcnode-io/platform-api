@@ -8,7 +8,12 @@ from pathlib import Path
 from src.wizard.analyst_server_service import AnalystServerService
 from src.wizard.controller_fixtures import wizard_client
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import AnalystServerKeys, Deployment
+from src.wizard.wizard_record import (
+    AnalystServerKeys,
+    Command,
+    CommandOutput,
+    Deployment,
+)
 
 KEYS = AnalystServerKeys(
     openweathermap_api_key="owm-key-1234",
@@ -72,14 +77,22 @@ def test_progress_reports_each_stage_from_the_container_logs(tmp_path: Path) -> 
 
 
 def test_progress_route_returns_each_stage_as_an_object(tmp_path: Path) -> None:
-    # Arrange — the page reads stage.label and stage.done, so each stage must be a JSON object
+    # Arrange — the page reads stage.label, stage.done and stage.phase, so each stage must be a JSON object
     client = wizard_client(tmp_path, runner=FakeRunner())
 
     # Act
     stages = client.get("/api/analyst-server/progress").json()
 
     # Assert
-    assert set(stages[0]) == {"label", "done", "percent", "eta_seconds"}
+    assert set(stages[0]) == {
+        "label",
+        "done",
+        "phase",
+        "percent",
+        "eta_seconds",
+        "mib_done",
+        "mib_total",
+    }
     assert stages[0]["label"] == "Packages installed"
 
 
@@ -97,3 +110,47 @@ def test_start_streams_stage_updates_then_the_verdict(tmp_path: Path) -> None:
     assert '"stages"' in lines[0]
     final = json.loads(lines[-1])
     assert final["result"]["verified"] is True
+
+
+class RestartingThenReady(FakeRunner):
+    """The analyst container is mid-restart while its logs are still short, then comes up:
+    the first progress read sees 'restarting', later ones see the full log."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._log_reads = 0
+
+    def __call__(self, command: Command) -> CommandOutput:
+        text = " ".join(command.args)
+        if "logs analyst-server" in text:
+            self.calls.append(command)
+            self._log_reads += 1
+            if self._log_reads == 1:
+                return CommandOutput(returncode=0, stdout="Installed 42 packages\n")
+            return CommandOutput(
+                returncode=0,
+                stdout="vector slice seeded\ngraph slice seeded\n"
+                "Uvicorn running on http://0.0.0.0:8000\n",
+            )
+        if "--status running" in text and self._log_reads <= 1:
+            # What real docker prints for the moment a restart takes: nothing.
+            self.calls.append(command)
+            return CommandOutput(returncode=0, stdout="")
+        if "inspect --format" in text and self._log_reads <= 1:
+            self.calls.append(command)
+            return CommandOutput(returncode=0, stdout="restarting\n")
+        return super().__call__(command)
+
+
+def test_start_keeps_streaming_while_the_container_restarts(tmp_path: Path) -> None:
+    """A restart is not a crash: the stream goes on until the ready line, instead of
+    ending in a false 'not running' failure halfway through the seed."""
+    # Arrange
+    service = make_analyst_server(tmp_path, RestartingThenReady())
+
+    # Act
+    lines = [json.loads(line) for line in service.start_stream(KEYS)]
+
+    # Assert — more than one stage update, and the verdict is the success
+    assert len([line for line in lines if "stages" in line]) >= 2
+    assert lines[-1]["result"]["verified"] is True
