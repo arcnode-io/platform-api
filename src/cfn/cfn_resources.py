@@ -708,6 +708,18 @@ def build_userdata(
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/der-control-ingress/nginx.conf "
         "-o /opt/arcnode/der-control-ingress.conf\n"
     )
+    # https-ingress: the static TLS terminator in front of the HMI (same file as
+    # the ISO installs) and a self-signed cert for the Elastic IP, so port 443
+    # serves the HMI from first boot. A real cert for <site-id>.arcnode.io comes later.
+    https_ingress_block = (
+        "openssl req -x509 -newkey rsa:2048 -nodes "
+        "-keyout /opt/arcnode/tls/server-key.pem "
+        "-out /opt/arcnode/tls/server.pem -days 3650 "
+        '-subj "/CN=${EmsEip}" -addext "subjectAltName=IP:${EmsEip}"\n'
+        "chmod 600 /opt/arcnode/tls/server-key.pem\n"
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/https-ingress.conf "
+        "-o /opt/arcnode/https-ingress.conf\n"
+    )
     # CFN signaling — without cfn-signal the stack reports CREATE_COMPLETE
     # the instant the AMI boots, even if every curl in UserData fails. Both
     # Phase 5 smokes (2026-05-15, 2026-05-16) hit silent UserData failures
@@ -745,7 +757,7 @@ def build_userdata(
         "mkdir -p /opt/arcnode/observability/prometheus-data "
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
         "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts "
-        "/opt/arcnode/der-control-tls\n"
+        "/opt/arcnode/der-control-tls /opt/arcnode/tls\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         "AWS_REGION=${AWS::Region}\n"
@@ -806,6 +818,8 @@ def build_userdata(
         f"{credentials_block}"
         "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"
         f"{der_control_ingress_block}"
+        "# https-ingress TLS assets (self-signed cert for the Elastic IP) and config.\n"
+        f"{https_ingress_block}"
         "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"

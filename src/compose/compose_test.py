@@ -263,18 +263,25 @@ def test_analyst_server_is_not_published_to_the_host() -> None:
     assert "ports" not in service
 
 
-def test_hmi_is_only_reached_through_the_https_ingress() -> None:
-    """Port 80 on the host is the https-ingress: it redirects to HTTPS and
-    serves the Let's Encrypt challenge. The HMI publishes nothing.
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_hmi_is_only_reached_through_the_https_ingress(variant_path: Path) -> None:
+    """Port 80 on the host is the https-ingress: it redirects to HTTPS. The HMI
+    publishes nothing. Both variants, same ingress config and cert paths.
 
     Reason: an operator must never see the HMI over plain HTTP.
     """
     # Arrange + Act
-    services = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"]
+    services = yaml.safe_load(variant_path.read_text())["services"]
+    ingress = services["https-ingress"]
 
     # Assert
     assert "ports" not in services["hmi"]
-    assert services["https-ingress"]["ports"] == ["80:80", "443:443"]
+    assert ingress["ports"] == ["80:80", "443:443"]
+    assert (
+        "/opt/arcnode/https-ingress.conf:/etc/nginx/conf.d/default.conf:ro"
+        in ingress["volumes"]
+    )
+    assert "/opt/arcnode/tls:/etc/nginx/tls:ro" in ingress["volumes"]
 
 
 def test_der_control_api_reads_its_customer_config() -> None:

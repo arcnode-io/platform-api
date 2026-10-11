@@ -172,7 +172,7 @@ class CfnService:
             "Outputs": {
                 "PublicIp": {
                     "Value": {"Ref": "EmsEip"},
-                    "Description": "EMS HMI is reachable on http://<PublicIp>/",
+                    "Description": "EMS HMI is reachable on https://<PublicIp>/ (self-signed cert until the site name is issued one)",
                 },
                 "SetupToken": {
                     "Value": {

@@ -715,3 +715,19 @@ def test_hmi_overlay_routes_chat_through_the_same_origin_api() -> None:
     # Assert
     assert "chatApiUri:" in rendered
     assert "/api" in rendered
+
+
+def test_userdata_prepares_the_https_ingress_with_a_self_signed_cert_for_the_eip() -> (
+    None
+):
+    """Port 443 serves the HMI from first boot: the static ingress config is fetched
+    and a self-signed cert for the Elastic IP is written where the ingress mounts it."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert f"{ARCNODE_PUBLIC_BASE_URL}/compose/https-ingress.conf" in rendered
+    assert "-o /opt/arcnode/https-ingress.conf" in rendered
+    assert "-out /opt/arcnode/tls/server.pem" in rendered
+    assert "-keyout /opt/arcnode/tls/server-key.pem" in rendered
+    assert "subjectAltName=IP:${EmsEip}" in rendered

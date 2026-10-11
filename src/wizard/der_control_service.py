@@ -5,12 +5,12 @@ it is a separate page."""
 
 import base64
 import hashlib
-import re
 from pathlib import Path
 from typing import Final
 
 import yaml
 
+from src.wizard.box_address import box_address
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE, DerControlCfg, write_yaml
@@ -40,11 +40,9 @@ HEALTH_URL: Final[str] = "http://der-control-api:8080/actuator/health"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 # The DER ingress's public port on the box; the utility reaches it there.
 INGRESS_PORT: Final[int] = 8443
-ROUTE_COMMAND: Final[list[str]] = ["ip", "-4", "route", "get", "1.1.1.1"]
 LOG_HINT: Final[str] = (
     "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs der-control-api"
 )
-SOURCE_ADDRESS: Final[re.Pattern[str]] = re.compile(r"\bsrc (\S+)")
 
 
 class DerControlStepNotAvailableError(Exception):
@@ -84,7 +82,7 @@ class DerControlService:
         )
         expected = DerControlCfg(
             site_id=site.site_id,
-            public_base_url=f"https://{self._box_address()}:{INGRESS_PORT}",
+            public_base_url=f"https://{box_address(self._run)}:{INGRESS_PORT}",
             utility_mirror_url=request.utility_mirror_url,
         )
         write_yaml(self._ems_dir / DER_CONTROL_CFG_FILE, expected)
@@ -149,14 +147,6 @@ class DerControlService:
                 )
             ],
         )
-
-    def _box_address(self) -> str:
-        """The address the box uses to reach the internet — the one the utility sees."""
-        out = self._run(Command(args=ROUTE_COMMAND))
-        match = SOURCE_ADDRESS.search(out.stdout)
-        if match is None:
-            raise RuntimeError(f"no source address in: {out.stdout!r}")
-        return match.group(1)
 
     def _identity_check(self, cert_pem: str) -> VerifyCheck:
         """The LFDI the utility must register, and whether der-control-api loaded that same identity."""
