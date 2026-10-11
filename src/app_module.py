@@ -25,6 +25,7 @@ from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
 from src.orders.orders_module import OrdersModule
 from src.portal.portal_module import PortalModule
+from src.sites.sites_module import SitesModule
 from src.sizing.sizing_module import SizingModule
 
 
@@ -46,6 +47,20 @@ class AppModule:
         )
         self.portal_module = PortalModule()
         self.manifest_module = ManifestModule()
+        # Both secrets come from the environment, like the DB password; off where there is no zone.
+        site_token_secret = (
+            os.environ["SITE_TOKEN_SECRET"] if self.config.site_dns else None
+        )
+        self.sites_module = (
+            SitesModule(
+                dns_api_user=self.config.dns_api_user,
+                dns_client_ip=self.config.dns_client_ip,
+                namecheap_api_key=os.environ["NAMECHEAP_API_KEY"],
+                token_secret=os.environ["SITE_TOKEN_SECRET"],
+            )
+            if self.config.site_dns
+            else None
+        )
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,
@@ -58,6 +73,8 @@ class AppModule:
             ems_industrial_gateway_tarball_url=(
                 self.config.ems_industrial_gateway_tarball_url
             ),
+            site_token_secret=site_token_secret,
+            platform_public_url=self.config.platform_public_url,
         )
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self.sizing_module = SizingModule(edp_api_url=self.config.edp_api_url)
@@ -80,6 +97,8 @@ class AppModule:
         app.include_router(app_controller.router)
         app.include_router(self.orders_module.router)
         app.include_router(self.sizing_module.router)
+        if self.sites_module is not None:
+            app.include_router(self.sites_module.router)
 
     def register_database(self) -> None:
         """Enable Tortoise ORM init in the FastAPI lifespan. Call before `create_app`.

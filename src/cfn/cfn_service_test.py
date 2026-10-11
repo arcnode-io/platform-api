@@ -15,6 +15,7 @@ from cfnlint import api as cfnlint_api
 
 from src.cfn.cfn_resources import ARCNODE_PUBLIC_BASE_URL
 from src.cfn.cfn_service import CfnService
+from src.cfn.site_callback import SiteCallback
 from src.cfn.persistence.persistence_service import PersistenceService
 from src.orders.configurator_payload import DeploymentContext
 
@@ -29,6 +30,7 @@ def _render(
     e2e: bool = False,
     market_region: str | None = "ercot",
     settlement_point: str | None = "HB_NORTH",
+    site_callback: SiteCallback | None = None,
 ) -> str:
     return CfnService(persistence=PersistenceService()).render_template(
         deployment_uuid=DEPLOYMENT_UUID,
@@ -38,6 +40,7 @@ def _render(
         settlement_point=settlement_point,
         deployment_context=deployment_context,
         e2e=e2e,
+        site_callback=site_callback,
     )
 
 
@@ -549,8 +552,8 @@ def test_stack_exposes_gateway_bootstrap_contract() -> None:
     # Assert — the outputs the bootstrap reads
     for out in ("SiteId", "BrokerWsUrl", "DeviceApiUrl", "GatewaySecretName"):
         assert out in rendered, f"missing output {out}"
-    assert "ws://${EmsEip}/mqtt" in rendered
-    assert "http://${EmsEip}/api" in rendered
+    assert "wss://${EmsEip}/mqtt" in rendered
+    assert "https://${EmsEip}/api" in rendered
     assert f"SiteId:\n    Value: {SITE_ID}" in rendered or SITE_ID in rendered
 
 
@@ -759,5 +762,100 @@ def test_the_instance_firewall_opens_https_for_the_ingress() -> None:
     ]
 
     # Assert
-    assert sorted(rule["FromPort"] for rule in ingress) == [80, 443, 8443]
+    assert sorted(rule["FromPort"] for rule in ingress) == [80, 443, 8080, 8443]
     assert all(rule["CidrIp"] == "0.0.0.0/0" for rule in ingress)
+
+
+CALLBACK = SiteCallback(
+    url="https://platform.arcnode.io/platform-api/sites/abc/address",
+    token="tok-123",
+    hostname="nevada-facility-2-abc123.arcnode.io",
+)
+
+
+def test_userdata_registers_the_box_and_gets_a_real_certificate_in_the_background() -> (
+    None
+):
+    """With a callback the box tells platform-api its Elastic IP, waits for its DNS name to
+    resolve, and gets a Let's Encrypt certificate: all from a background service, so a slow DNS
+    or ACME step never holds the stack's CreationPolicy."""
+    # Arrange + Act
+    rendered = _render(site_callback=CALLBACK)
+
+    # Assert — its settings, its script, and the service that runs it
+    assert "SITE_HOST=nevada-facility-2-abc123.arcnode.io" in rendered
+    assert "SITE_ADDRESS=${EmsEip}" in rendered
+    assert (
+        "SITE_CALLBACK_URL=https://platform.arcnode.io/platform-api/sites/abc/address"
+        in rendered
+    )
+    assert "SITE_TOKEN=tok-123" in rendered
+    assert f"{ARCNODE_PUBLIC_BASE_URL}/compose/site-cert.sh" in rendered
+    assert "arcnode-site-cert.service" in rendered
+    assert "systemctl enable --now arcnode-site-cert" in rendered
+    assert "chmod 600 /etc/arcnode/site-cert.env" in rendered
+
+
+def test_without_a_callback_the_stack_keeps_the_self_signed_certificate_only() -> None:
+    """e2e stacks and local renders have no zone to write: no callback, no cert service."""
+    # Arrange + Act
+    rendered = _render()
+
+    # Assert
+    assert "site-cert" not in rendered
+    assert "SITE_TOKEN" not in rendered
+
+
+def test_the_certificate_is_written_before_the_wizard_starts() -> None:
+    """The cloud wizard serves HTTPS from the box's certificate, so the self-signed one has to
+    exist before its service starts (it crash-looped otherwise)."""
+    # Arrange + Act
+    rendered = _render(site_callback=CALLBACK)
+
+    # Assert
+    assert rendered.index("-out /opt/arcnode/tls/server.pem") < rendered.index(
+        "systemctl enable --now arcnode-wizard"
+    )
+
+
+def test_the_outputs_point_at_the_dns_name_when_there_is_one() -> None:
+    # Arrange + Act
+    outputs = yaml.safe_load(_render(site_callback=CALLBACK))["Outputs"]
+
+    # Assert
+    assert (
+        outputs["SetupUrl"]["Value"]
+        == "https://nevada-facility-2-abc123.arcnode.io:8080/"
+    )
+    assert (
+        outputs["BrokerWsUrl"]["Value"]
+        == "wss://nevada-facility-2-abc123.arcnode.io/mqtt"
+    )
+    assert (
+        outputs["DeviceApiUrl"]["Value"]
+        == "https://nevada-facility-2-abc123.arcnode.io/api"
+    )
+
+
+def test_the_outputs_fall_back_to_the_elastic_ip_over_tls_without_one() -> None:
+    # Arrange + Act
+    outputs = yaml.safe_load(_render())["Outputs"]
+
+    # Assert — still TLS, never the plain ws:// / http:// the stack used to print
+    assert outputs["SetupUrl"]["Value"] == {"Fn::Sub": "https://${EmsEip}:8080/"}
+    assert outputs["BrokerWsUrl"]["Value"] == {"Fn::Sub": "wss://${EmsEip}/mqtt"}
+    assert outputs["DeviceApiUrl"]["Value"] == {"Fn::Sub": "https://${EmsEip}/api"}
+
+
+def test_the_firewall_lets_the_customer_reach_the_wizard_over_tls() -> None:
+    """The wizard listens on 8080 and was never opened: a customer could not reach it at all."""
+    # Arrange
+    ingress = yaml.safe_load(_render())["Resources"]["EmsSecurityGroup"]["Properties"][
+        "SecurityGroupIngress"
+    ]
+
+    # Act
+    ports = sorted(rule["FromPort"] for rule in ingress)
+
+    # Assert
+    assert ports == [80, 443, 8080, 8443]

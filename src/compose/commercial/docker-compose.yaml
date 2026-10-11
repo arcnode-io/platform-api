@@ -136,6 +136,7 @@ services:
     volumes:
       - /opt/arcnode/https-ingress.conf:/etc/nginx/conf.d/default.conf:ro
       - /opt/arcnode/tls:/etc/nginx/tls:ro
+      - /opt/arcnode/acme:/var/www/acme:ro
     depends_on:
       hmi:
         condition: service_started

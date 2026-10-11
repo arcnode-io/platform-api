@@ -28,6 +28,7 @@ from src.cfn.persistence.bedrock_preflight_resources import (
     bedrock_preflight_resources,
 )
 from src.cfn.persistence.persistence_service import PersistenceService
+from src.cfn.site_callback import SiteCallback
 from src.orders.configurator_payload import DeploymentContext
 
 
@@ -47,6 +48,7 @@ class CfnService:
         settlement_point: str | None,
         deployment_context: DeploymentContext,
         e2e: bool = False,
+        site_callback: SiteCallback | None = None,
     ) -> str:
         """Return the per-order CFN template (yaml) with all inputs baked in.
 
@@ -70,6 +72,7 @@ class CfnService:
             settlement_point=settlement_point,
             deployment_context=deployment_context,
             e2e=e2e,
+            site_callback=site_callback,
         )
         persistence = self._persistence.build(
             deployment_context=deployment_context,
@@ -174,6 +177,18 @@ class CfnService:
                     "Value": {"Ref": "EmsEip"},
                     "Description": "EMS HMI is reachable on https://<PublicIp>/ (self-signed cert until the site name is issued one)",
                 },
+                "SetupUrl": {
+                    "Value": (
+                        f"https://{site_callback.hostname}:8080/"
+                        if site_callback
+                        else {"Fn::Sub": "https://${EmsEip}:8080/"}
+                    ),
+                    "Description": (
+                        "The setup page. Open it, paste the setup token, and configure the box. "
+                        "The DNS name can take a few minutes to start working; until its "
+                        "certificate is issued your browser warns about a self-signed one."
+                    ),
+                },
                 "SetupToken": {
                     "Value": {
                         "Fn::Sub": (
@@ -183,7 +198,7 @@ class CfnService:
                     },
                     "Description": (
                         "Setup token. Run the command shown in this output, then paste the value "
-                        "into the setup page at https://<site-id>.arcnode.io/ before you configure anything."
+                        "into the SetupUrl page before you configure anything."
                     ),
                 },
                 "SiteId": {
@@ -191,14 +206,22 @@ class CfnService:
                     "Description": "MQTT topic scope: sites/<SiteId>/...",
                 },
                 "BrokerWsUrl": {
-                    "Value": {"Fn::Sub": "ws://${EmsEip}/mqtt"},
+                    "Value": (
+                        f"wss://{site_callback.hostname}/mqtt"
+                        if site_callback
+                        else {"Fn::Sub": "wss://${EmsEip}/mqtt"}
+                    ),
                     "Description": (
                         "MQTT-over-WebSocket endpoint (nginx-proxied) the "
                         "on-prem gateway connects to."
                     ),
                 },
                 "DeviceApiUrl": {
-                    "Value": {"Fn::Sub": "http://${EmsEip}/api"},
+                    "Value": (
+                        f"https://{site_callback.hostname}/api"
+                        if site_callback
+                        else {"Fn::Sub": "https://${EmsEip}/api"}
+                    ),
                     "Description": (
                         "device-api base URL (nginx-proxied) the on-prem "
                         "gateway fetches its device spec from."

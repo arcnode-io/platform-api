@@ -42,6 +42,13 @@ class Config(BaseModel):  # noqa: D101
     ses_endpoint_url: str | None
     ses_sender_email: str  # the From address for either provider
     email_provider: EmailProvider  # resend needs RESEND_API_KEY in the environment
+    # Cloud sites get a DNS name + real certificate: boxes call back here, and the platform
+    # writes the record through Namecheap (NAMECHEAP_API_KEY and SITE_TOKEN_SECRET come from
+    # the environment). Off for local dev and tests, which have no zone to write.
+    site_dns: bool
+    platform_public_url: str  # where a customer's stack reaches this API
+    dns_api_user: str  # Namecheap API user
+    dns_client_ip: str  # this host's public IP, whitelisted at Namecheap
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
     # S3 URL of the on-prem industrial-gateway docker-save tarball (cloud orders)
     ems_industrial_gateway_tarball_url: str

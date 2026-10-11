@@ -7,6 +7,7 @@ out keeps the service file thin and lets unit tests target each block.
 from typing import Final
 
 from src.customer_inputs import GRAFANA_ADMIN, OPERATOR_LOGIN, VIEWER_LOGIN
+from src.cfn.site_callback import SiteCallback
 from src.cfn.bedrock_models import all_invoke_resources
 from src.orders.configurator_payload import DeploymentContext
 
@@ -223,6 +224,14 @@ def network_resources() -> dict[str, object]:
                         "IpProtocol": "tcp",
                         "FromPort": 443,
                         "ToPort": 443,
+                        "CidrIp": "0.0.0.0/0",
+                    },
+                    # The setup wizard, over TLS (token-gated). Never opened before, so a
+                    # cloud customer could not reach it at all.
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 8080,
+                        "ToPort": 8080,
                         "CidrIp": "0.0.0.0/0",
                     },
                     # der-control-ingress — mTLS terminator for the utility/
@@ -489,6 +498,7 @@ def build_userdata(
     settlement_point: str | None,
     deployment_context: DeploymentContext,
     e2e: bool = False,
+    site_callback: SiteCallback | None = None,
 ) -> str:
     """Build EC2 UserData. Threads cross-cutting env into config.env and
     writes per-service cfg.customer.yml files (cardinal rule from CLAUDE.md).
@@ -728,6 +738,57 @@ def build_userdata(
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/https-ingress.conf "
         "-o /opt/arcnode/https-ingress.conf\n"
     )
+    # A real DNS name + Let's Encrypt certificate for this box. The stack runs in the customer's
+    # account, so it can't write our zone: a background service tells platform-api the Elastic IP
+    # (token-gated), waits for the name to resolve, and gets the certificate. It runs as a service
+    # so slow DNS or ACME never holds up CFN's CreationPolicy; until it succeeds the self-signed
+    # certificate serves. A weekly timer renews.
+    site_cert_block = ""
+    if site_callback is not None:
+        site_cert_block = (
+            "# Real DNS name + Let's Encrypt certificate (background service).\n"
+            f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/site-cert.sh "
+            "-o /opt/arcnode/site-cert.sh\n"
+            "chmod +x /opt/arcnode/site-cert.sh\n"
+            "cat > /etc/arcnode/site-cert.env <<ENV\n"
+            f"SITE_HOST={site_callback.hostname}\n"
+            "SITE_ADDRESS=${EmsEip}\n"
+            f"SITE_CALLBACK_URL={site_callback.url}\n"
+            f"SITE_TOKEN={site_callback.token}\n"
+            "ENV\n"
+            "chmod 600 /etc/arcnode/site-cert.env\n"
+            "cat > /etc/systemd/system/arcnode-site-cert.service <<UNIT\n"
+            "[Unit]\n"
+            "Description=arcnode site DNS name and certificate\n"
+            "After=network-online.target docker.service\n"
+            "Wants=network-online.target\n"
+            "[Service]\n"
+            "ExecStart=/opt/arcnode/site-cert.sh issue\n"
+            "Restart=on-failure\n"
+            "RestartSec=30\n"
+            "[Install]\n"
+            "WantedBy=multi-user.target\n"
+            "UNIT\n"
+            "cat > /etc/systemd/system/arcnode-site-cert-renew.service <<UNIT\n"
+            "[Unit]\n"
+            "Description=arcnode certificate renewal\n"
+            "[Service]\n"
+            "Type=oneshot\n"
+            "ExecStart=/opt/arcnode/site-cert.sh renew\n"
+            "UNIT\n"
+            "cat > /etc/systemd/system/arcnode-site-cert-renew.timer <<UNIT\n"
+            "[Unit]\n"
+            "Description=arcnode certificate renewal, weekly\n"
+            "[Timer]\n"
+            "OnCalendar=weekly\n"
+            "Persistent=true\n"
+            "[Install]\n"
+            "WantedBy=timers.target\n"
+            "UNIT\n"
+            "systemctl daemon-reload\n"
+            "systemctl enable --now arcnode-site-cert\n"
+            "systemctl enable --now arcnode-site-cert-renew.timer\n"
+        )
     # CFN signaling — without cfn-signal the stack reports CREATE_COMPLETE
     # the instant the AMI boots, even if every curl in UserData fails. Both
     # Phase 5 smokes (2026-05-15, 2026-05-16) hit silent UserData failures
@@ -765,7 +826,8 @@ def build_userdata(
         "mkdir -p /opt/arcnode/observability/prometheus-data "
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
         "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts "
-        "/opt/arcnode/der-control-tls /opt/arcnode/tls\n"
+        "/opt/arcnode/der-control-tls /opt/arcnode/tls "
+        "/opt/arcnode/acme /opt/arcnode/letsencrypt\n"
         # Prometheus runs as nobody (65534) and Grafana as 472; a root-owned data dir
         # crash-loops both with "permission denied". Same ids the on-prem wizard uses.
         "chown -R 65534:65534 /opt/arcnode/observability/prometheus-data\n"
@@ -825,13 +887,13 @@ def build_userdata(
         ": > /opt/arcnode/secrets.env\n"
         f"{secret_lines}\n"
         f"{lfdi_allowlist_line}"
+        "# https-ingress TLS assets (self-signed cert for the Elastic IP) and config.\n"
+        f"{https_ingress_block}"
         f"{wizard_block}"
         "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
         f"{credentials_block}"
         "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"
         f"{der_control_ingress_block}"
-        "# https-ingress TLS assets (self-signed cert for the Elastic IP) and config.\n"
-        f"{https_ingress_block}"
         "# Fetch arcnode-public artifacts (compose + observability config).\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/{variant}/docker-compose.yaml "
         "-o /opt/arcnode/docker-compose.yaml\n"
@@ -851,6 +913,7 @@ def build_userdata(
         "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 "
         "-o $DOCKER_CLI_PLUGINS/docker-compose\n"
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"
+        f"{site_cert_block}"
         "# Start the EMS stack — init containers seed DBs\n"
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
         f"{compose_up_line}"

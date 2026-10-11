@@ -281,6 +281,8 @@ def test_hmi_is_only_reached_through_the_https_ingress(variant_path: Path) -> No
         in ingress["volumes"]
     )
     assert "/opt/arcnode/tls:/etc/nginx/tls:ro" in ingress["volumes"]
+    # Let's Encrypt's HTTP-01 challenge files, so a cloud box can renew while the ingress runs.
+    assert "/opt/arcnode/acme:/var/www/acme:ro" in ingress["volumes"]
 
 
 def test_der_control_api_reads_its_customer_config() -> None:
@@ -320,3 +322,16 @@ def test_der_control_api_mounts_the_utility_identity_read_only(
     assert (
         "/opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro" in volumes
     )
+
+
+def test_the_ingress_serves_acme_challenges_on_80_before_redirecting() -> None:
+    """Certificate renewal needs /.well-known/acme-challenge over plain HTTP; everything else
+    still redirects to HTTPS."""
+    # Arrange + Act
+    conf = (COMPOSE_DIR / "https-ingress.conf").read_text()
+    port_80 = conf.split("listen 443")[0]
+
+    # Assert
+    assert "location /.well-known/acme-challenge/" in port_80
+    assert "root /var/www/acme;" in port_80
+    assert "return 301 https://$host$request_uri;" in port_80

@@ -4,13 +4,14 @@ Standalone — not part of platform-api's own running service. Baked into
 the appliance ISO and started by setup.sh's systemd unit, as root (it
 writes into another account's ~/.ssh).
 
-Plain HTTP: a one-time, local-network setup window, and there's no cert
-to serve yet. Revisit if that stops being an acceptable tradeoff.
+On-prem it is plain HTTP: a one-time setup window on the customer's LAN. In the cloud the
+wizard serves HTTPS from the box's certificate (self-signed at boot, replaced by a Let's
+Encrypt one), because the customer's passwords cross the internet to reach it.
 """
 
 import pwd
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import uvicorn
 from fastapi import FastAPI
@@ -19,7 +20,7 @@ from src.wizard.system_runner import run_system_command, stream_system_command
 from src.wizard.wizard_config import load_wizard_config
 from src.wizard.setup_token import token_for
 from src.wizard.wizard_module import WizardModule
-from src.wizard.wizard_record import SshAccount
+from src.wizard.wizard_record import Deployment, SshAccount
 
 BASE_DIR: Final[Path] = Path("/etc/arcnode")
 # Written by the provisioning path: setup.sh on-prem, EC2 UserData in the cloud.
@@ -36,9 +37,31 @@ BIND_HOST: Final[str] = "0.0.0.0"  # noqa: S104  # nosec B104
 # Idle browser connections stay open this long, so a step clicked after reading
 # a page doesn't hit a connection uvicorn already closed (its default is 5s).
 KEEP_ALIVE_SECONDS: Final[int] = 75
+TLS_DIR: Final[Path] = EMS_DIR / "tls"
+TLS_CERT_FILE: Final[str] = "server.pem"
+TLS_KEY_FILE: Final[str] = "server-key.pem"
 # Debian's adduser gives the first account created in the installer
 # FIRST_UID=1000 (/etc/adduser.conf) — that's the customer's login.
 INSTALLER_ACCOUNT_UID: Final[int] = 1000
+
+
+class TlsFiles(NamedTuple):
+    """The certificate and key the wizard serves HTTPS with."""
+
+    certfile: Path
+    keyfile: Path
+
+
+def tls_files(deployment: Deployment, tls_dir: Path = TLS_DIR) -> TlsFiles | None:
+    """HTTPS in the cloud, plain HTTP on-prem. A cloud box without its certificate fails to
+    start (FileNotFoundError) rather than serving customer passwords in the clear."""
+    if deployment != Deployment.CLOUD:
+        return None
+    files = TlsFiles(tls_dir / TLS_CERT_FILE, tls_dir / TLS_KEY_FILE)
+    for path in files:
+        if not path.is_file():
+            raise FileNotFoundError(f"cloud wizard needs its certificate: {path}")
+    return files
 
 
 def installer_account() -> SshAccount:
@@ -67,7 +90,15 @@ def main() -> None:
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.
-    uvicorn.run(app, host=BIND_HOST, port=PORT, timeout_keep_alive=KEEP_ALIVE_SECONDS)
+    tls = tls_files(config.deployment)
+    uvicorn.run(
+        app,
+        host=BIND_HOST,
+        port=PORT,
+        timeout_keep_alive=KEEP_ALIVE_SECONDS,
+        ssl_certfile=str(tls.certfile) if tls else None,
+        ssl_keyfile=str(tls.keyfile) if tls else None,
+    )
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
 from src.aws.ses_service import SesService
+from src.cfn.site_callback import SiteCallback
+from src.dns.site_identity import site_hostname, site_token
 from src.email.resend_service import ResendService
 from src.cfn.cfn_service import CfnService
 from src.edp_client.edp_artifacts import (
@@ -62,6 +64,8 @@ class OrchestratorService:
         manifest: ManifestService,
         ems_hmi_apk_url: str,
         ems_industrial_gateway_tarball_url: str,
+        site_token_secret: str | None = None,
+        platform_public_url: str = "",
     ) -> None:
         self._edp = edp_client
         self._s3 = s3
@@ -72,6 +76,9 @@ class OrchestratorService:
         self._manifest = manifest
         self._ems_hmi_apk_url = ems_hmi_apk_url
         self._ems_industrial_gateway_tarball_url = ems_industrial_gateway_tarball_url
+        # None (local dev, tests): templates carry no DNS callback and keep the self-signed IP cert.
+        self._site_token_secret = site_token_secret
+        self._platform_public_url = platform_public_url
 
     # Public — business intent
 
@@ -175,6 +182,16 @@ class OrchestratorService:
             market_region=site.market_region,
             settlement_point=site.settlement_point,
             deployment_context=payload.deployment_context,
+            site_callback=(
+                _site_callback(
+                    secret=self._site_token_secret,
+                    platform_url=self._platform_public_url,
+                    order_id=order_id,
+                    site_id=site.site_id,
+                )
+                if self._site_token_secret
+                else None
+            ),
         )
         template_url = await self._s3.upload_yaml(
             f"orders/{order_id}/ems-stack.yaml", template
@@ -373,6 +390,17 @@ def _order_site(payload: ConfiguratorPayload, *, order_id: str) -> OrderSite:
         customer=payload.operator_org,
         site_name=payload.deployment_site_name,
         order_id=order_id,
+    )
+
+
+def _site_callback(
+    *, secret: str, platform_url: str, order_id: str, site_id: str
+) -> SiteCallback:
+    """What this order's stack calls to get its DNS name: URL, HMAC token, hostname."""
+    return SiteCallback(
+        url=f"{platform_url}/platform-api/sites/{order_id}/address",
+        token=site_token(secret, order_id),
+        hostname=site_hostname(site_id, order_id),
     )
 
 

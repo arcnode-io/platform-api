@@ -4,6 +4,7 @@ the domain, so an upsert must send the records already there plus the new one.
 Uses `httpx.MockTransport` (httpx's own public API) injected via the constructor.
 """
 
+import asyncio
 from collections.abc import Callable
 from urllib.parse import parse_qs
 
@@ -189,3 +190,55 @@ async def test_an_mx_record_carries_its_priority_and_switches_the_domain_to_cust
     assert set_hosts["MXPref3"] == "10"
     assert set_hosts["EmailType"] == "MX"
     assert "EmailType" not in sent[0]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_upserts_do_not_lose_each_others_records() -> None:
+    """setHosts replaces every record, so two read-modify-writes that interleave would
+    drop one site's record. Two orders can register their boxes at the same moment."""
+    # Arrange — a fake Namecheap that keeps the record set and replaces it on setHosts
+    stored: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        # Reason: yield like a real network call, so interleaving can happen.
+        await asyncio.sleep(0)
+        form = _form(request)
+        if form["Command"] == "namecheap.domains.dns.getHosts":
+            hosts = "".join(
+                f'<host Name="{name}" Type="A" Address="{addr}" MXPref="10" TTL="60" />'
+                for name, addr in stored.items()
+            )
+            return httpx.Response(
+                200,
+                text=f'<ApiResponse Status="OK" xmlns="{NS}"><CommandResponse>'
+                f"<DomainDNSGetHostsResult>{hosts}</DomainDNSGetHostsResult>"
+                "</CommandResponse></ApiResponse>",
+            )
+        stored.clear()
+        n = 1
+        while f"HostName{n}" in form:
+            stored[form[f"HostName{n}"]] = form[f"Address{n}"]
+            n += 1
+        return httpx.Response(200, text=SET_HOSTS_OK)
+
+    client = DnsClient(
+        api_user=API_USER,
+        api_key=API_KEY,
+        client_ip=CLIENT_IP,
+        transport=httpx.MockTransport(handler),
+    )
+
+    # Act
+    await asyncio.gather(
+        client.upsert_record(
+            "arcnode.io",
+            DnsRecord(host="a", type=RecordType.A, address="3.3.3.3", ttl=60),
+        ),
+        client.upsert_record(
+            "arcnode.io",
+            DnsRecord(host="b", type=RecordType.A, address="4.4.4.4", ttl=60),
+        ),
+    )
+
+    # Assert
+    assert stored == {"a": "3.3.3.3", "b": "4.4.4.4"}

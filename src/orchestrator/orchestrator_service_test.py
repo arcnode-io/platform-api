@@ -54,3 +54,29 @@ def test_the_order_site_carries_the_identity_the_configurator_submitted() -> Non
     assert site.customer == payload.operator_org
     assert site.site_name == payload.deployment_site_name
     assert site.order_id == "6f1c2a9e-0000-4000-8000-000000000042"
+
+
+def test_the_site_callback_points_the_box_at_its_own_order_and_dns_name() -> None:
+    """The stack's UserData gets this order's callback URL, its HMAC token and the hostname the
+    platform will write for it; nothing is stored per order."""
+    # Arrange
+    from src.dns.site_identity import site_hostname, token_matches
+    from src.orchestrator.orchestrator_service import _site_callback
+
+    order_id = "6f1c2a9e-0000-4000-8000-000000000042"
+
+    # Act
+    callback = _site_callback(
+        secret="s3cret",
+        platform_url="https://platform.arcnode.io",
+        order_id=order_id,
+        site_id="nevada_facility_2",
+    )
+
+    # Assert
+    assert (
+        callback.url
+        == f"https://platform.arcnode.io/platform-api/sites/{order_id}/address"
+    )
+    assert callback.hostname == site_hostname("nevada_facility_2", order_id)
+    assert token_matches("s3cret", order_id, callback.token)

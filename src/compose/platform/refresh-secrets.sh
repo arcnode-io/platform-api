@@ -10,7 +10,9 @@ umask 077
 : > secrets.env.new
 for pair in \
   POSTGRES_PASSWORD=arcnode-platform/postgres-password \
-  RESEND_API_KEY=arcnode-platform/resend-api-key; do
+  RESEND_API_KEY=arcnode-platform/resend-api-key \
+  NAMECHEAP_API_KEY=arcnode-platform/namecheap-api-key \
+  SITE_TOKEN_SECRET=arcnode-platform/site-token-secret; do
   name="${pair%%=*}"
   secret="${pair#*=}"
   value=$(aws secretsmanager get-secret-value --region "$REGION" \

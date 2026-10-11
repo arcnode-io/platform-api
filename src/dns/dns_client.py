@@ -5,6 +5,7 @@ domain. So an upsert reads the current records, swaps or appends the one given,
 and writes the whole set back. Credentials go in the POST body, never the URL.
 """
 
+import asyncio
 import xml.etree.ElementTree as ET  # nosec B405 — parsing Namecheap's own response
 from enum import StrEnum
 from typing import Final
@@ -56,6 +57,9 @@ class DnsClient:
         }
         # Reason: `transport` is test-only DI (httpx.MockTransport); None lets httpx use the network.
         self._transport = transport
+        # Reason: setHosts replaces every record, so two overlapping read-modify-writes
+        # would drop one of them. One writer at a time within this process.
+        self._write_lock = asyncio.Lock()
 
     async def list_records(self, domain: str) -> list[DnsRecord]:
         """Every host record on the domain."""
@@ -73,9 +77,12 @@ class DnsClient:
 
     async def upsert_record(self, domain: str, record: DnsRecord) -> None:
         """Set `record`, replacing one with the same host and type, keeping the rest."""
-        current = await self.list_records(domain)
-        kept = [r for r in current if (r.host, r.type) != (record.host, record.type)]
-        await self._set_records(domain, [*kept, record])
+        async with self._write_lock:
+            current = await self.list_records(domain)
+            kept = [
+                r for r in current if (r.host, r.type) != (record.host, record.type)
+            ]
+            await self._set_records(domain, [*kept, record])
 
     async def _set_records(self, domain: str, records: list[DnsRecord]) -> None:
         fields = _domain_fields(domain)

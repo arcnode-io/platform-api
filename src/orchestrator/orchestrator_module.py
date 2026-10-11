@@ -31,6 +31,8 @@ class OrchestratorModule:
         manifest: ManifestModule,
         ems_hmi_apk_url: str,
         ems_industrial_gateway_tarball_url: str,
+        site_token_secret: str | None = None,
+        platform_public_url: str = "",
     ) -> None:
         self.service = OrchestratorService(
             edp_client=edp.service,
@@ -42,4 +44,6 @@ class OrchestratorModule:
             manifest=manifest.service,
             ems_hmi_apk_url=ems_hmi_apk_url,
             ems_industrial_gateway_tarball_url=ems_industrial_gateway_tarball_url,
+            site_token_secret=site_token_secret,
+            platform_public_url=platform_public_url,
         )

@@ -30,7 +30,7 @@ checks:
 shell:
   stage: check
   script:
-    - docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable src/iso/build.sh src/iso/setup.sh src/iso/phases/*.sh src/compose/platform/refresh-secrets.sh
+    - docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:stable src/iso/build.sh src/iso/setup.sh src/iso/phases/*.sh src/compose/platform/refresh-secrets.sh src/compose/site-cert.sh
 
 build:
   stage: publish
@@ -76,6 +76,7 @@ publish_compose:
     - aws s3 sync src/compose/commercial/    s3://arcnode-public/compose/commercial/    --delete --exclude "__pycache__/*" --exclude "*.pyc"
     - aws s3 cp src/compose/credentials.template.xml s3://arcnode-public/compose/credentials.template.xml
     - aws s3 cp src/compose/https-ingress.conf s3://arcnode-public/compose/https-ingress.conf
+    - aws s3 cp src/compose/site-cert.sh s3://arcnode-public/compose/site-cert.sh
     - aws s3 sync src/compose/defense/       s3://arcnode-public/compose/defense/       --delete --exclude "__pycache__/*" --exclude "*.pyc"
     - aws s3 sync src/compose/init-scripts/  s3://arcnode-public/init-scripts/          --delete --exclude "__pycache__/*" --exclude "*.pyc" --exclude "*_test.py"
     - aws s3 sync src/compose/observability/ s3://arcnode-public/observability/         --delete
