@@ -1,15 +1,16 @@
 """Unit tests for the on-prem DER control API page — its overlay carries the
 order's site and the box's address, the service starts, and its health answers."""
 
+import hashlib
 from pathlib import Path
 
 import pytest
 import yaml
 
-from src.wizard.der_control_service import DerControlService
+from src.wizard.der_control_service import DerControlService, lfdi_from_cert_pem
 from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE
 from src.wizard.site_fixtures import TEST_ORDER
-from src.wizard.wizard_fixtures import FakeRunner, tracker
+from src.wizard.wizard_fixtures import FakeRunner, ok, tracker
 from src.wizard.wizard_record import Deployment, DerControlRequest
 
 
@@ -150,3 +151,40 @@ def test_a_cert_that_is_not_pem_is_refused() -> None:
     # Arrange + Act / Assert
     with pytest.raises(ValueError):
         DerControlRequest(device_cert_pem="not a certificate", device_key_pem=KEY_PEM)
+
+
+def test_lfdi_is_the_first_20_bytes_of_the_certificate_sha256() -> None:
+    """The LFDI the utility registers is the client cert's SHA-256, first 40 hex characters."""
+    # Arrange — a PEM whose DER body is the bytes b"hello" (base64 of b"hello" is aGVsbG8=)
+    pem = "-----BEGIN CERTIFICATE-----\naGVsbG8=\n-----END CERTIFICATE-----\n"
+
+    # Act
+    lfdi = lfdi_from_cert_pem(pem)
+
+    # Assert
+    assert lfdi == hashlib.sha256(b"hello").hexdigest()[:40]
+
+
+def test_the_box_confirms_the_lfdi_it_loaded_matches_its_certificate(tmp_path: Path) -> None:
+    # Arrange — der-control-api logs the LFDI it loaded from the mounted certificate
+    lfdi = lfdi_from_cert_pem(CERT_PEM)
+    runner = FakeRunner()
+    runner.queries["logs der-control-api"] = ok(
+        f"Started Application in 13 seconds\nutility TLS identity loaded from /app/tls/utility: LFDI {lfdi}\n"
+    )
+    service = DerControlService(
+        deployment=Deployment.ON_PREM,
+        tracker=tracker(tmp_path),
+        order_dir=TEST_ORDER,
+        ems_dir=tmp_path / "opt",
+        secrets_env_path=tmp_path / "secrets.env",
+        run=runner,
+    )
+
+    # Act
+    result = service.apply(DerControlRequest(device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM))
+
+    # Assert — the check names the LFDI the utility must have registered
+    identity = [c for c in result.checks if c.name == "Utility identity loaded"]
+    assert identity and identity[0].ok
+    assert lfdi in identity[0].detail

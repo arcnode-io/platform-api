@@ -3,6 +3,8 @@ site, the box's address for the utility, and the DERMS URL if the customer
 gives one), start the service, verify its health. The DER ingress in front of
 it is a separate page."""
 
+import base64
+import hashlib
 import re
 from pathlib import Path
 from typing import Final
@@ -20,6 +22,7 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 DER_CONTROL_SERVICE: Final[str] = "der-control-api"
 LFDI_ALLOWLIST_NAME: Final[str] = "DER_CONTROL_LFDI_ALLOWLIST"
+IDENTITY_CHECK: Final[str] = "Utility identity loaded"
 # The utility identity files; der-control-api mounts these read-only at /app/tls/utility/.
 CLIENT_CERT_FILE: Final[str] = "der-control-client.pem"
 CLIENT_KEY_FILE: Final[str] = "der-control-client-key.pem"
@@ -79,7 +82,11 @@ class DerControlService:
         self._run(compose_command(self._ems_dir, "up", "-d", "--force-recreate", DER_CONTROL_SERVICE))
         wait_for_log(self._run, self._ems_dir, DER_CONTROL_SERVICE, READY_LINE)
         checks = [self._running_check(), self._health_check(), self._saved_check(expected)]
-        verified = all(check.ok for check in checks)
+        if request.device_cert_pem:
+            checks.append(self._identity_check(request.device_cert_pem))
+        # Reason: the utility identity is informational. A customer without it finishes setup, and a
+        # mismatch shows on the page without holding Continue.
+        verified = all(check.ok for check in checks if check.name != IDENTITY_CHECK)
         if verified:
             self._tracker.mark_done("der_control_api")
         return StepResult(verified=verified, checks=checks)
@@ -119,6 +126,18 @@ class DerControlService:
             raise RuntimeError(f"no source address in: {out.stdout!r}")
         return match.group(1)
 
+    def _identity_check(self, cert_pem: str) -> VerifyCheck:
+        """The LFDI the utility must register, and whether der-control-api loaded that same identity."""
+        lfdi = lfdi_from_cert_pem(cert_pem)
+        logs = self._run(compose_command(self._ems_dir, "logs", DER_CONTROL_SERVICE)).stdout
+        loaded = f"utility TLS identity loaded from /app/tls/utility: LFDI {lfdi}" in logs
+        return VerifyCheck(
+            name=IDENTITY_CHECK,
+            ok=loaded,
+            detail=f"LFDI {lfdi}" if loaded else f"register LFDI {lfdi} with the utility; not loaded yet",
+            hint=LOG_HINT,
+        )
+
     def _running_check(self) -> VerifyCheck:
         out = self._run(compose_command(self._ems_dir, "ps", "-q", "--status", "running", DER_CONTROL_SERVICE))
         running = bool(out.stdout.strip())
@@ -151,3 +170,12 @@ class DerControlService:
             detail=str(path) if saved else "missing or different",
             hint=f"sudo cat {path}",
         )
+
+
+def lfdi_from_cert_pem(pem: str) -> str:
+    """The LFDI for a certificate: the first 20 bytes of its DER SHA-256, as 40 hex characters."""
+    body = "".join(
+        line for line in pem.splitlines() if line and not line.startswith("-----")
+    )
+    der = base64.b64decode(body)
+    return hashlib.sha256(der).hexdigest()[:40]
