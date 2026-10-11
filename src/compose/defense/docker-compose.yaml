@@ -156,6 +156,20 @@ services:
     ports:
       - "8000:8000"
 
+  analyst-model:
+    image: public.ecr.aws/y1d2j6a8/ems-analyst-model:latest
+    restart: unless-stopped
+    <<: *env-files
+    environment:
+      ENV: beta
+      # Same overlay pattern as analyst-server: UserData writes the file with
+      # the MLflow address and site_id; the loader merges it over cfg.yml.
+      CFG_CUSTOMER_PATH: /app/cfg.customer.yml
+    volumes:
+      - /opt/arcnode/analyst-model-cfg.customer.yml:/app/cfg.customer.yml:ro
+    # Long-running daemon: runs the pipeline daily at schedule_time.
+    command: ["uv", "run", "-m", "src.main", "--mode", "schedule"]
+
   # Observability + ML tracking — same set as commercial. Defense gets
   # them too so behavior matches across deployment shapes. Customer can
   # ignore if they have their own observability stack.

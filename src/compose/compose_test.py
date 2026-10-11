@@ -118,17 +118,17 @@ def test_der_control_ingress_terminates_mtls_in_front_of_der_control_api(
 
 
 
-def test_defense_ships_broker_leg_plus_analyst_server() -> None:
-    """Defense ships broker leg + analyst-server (Phase 1 smoke). No init
-    containers (consumers self-seed). analyst-model lands in Phase 3."""
+def test_defense_ships_broker_leg_plus_the_analyst_stack() -> None:
+    """Defense ships the broker leg and the analyst stack, the same services as
+    commercial. No init containers (consumers self-seed)."""
     # Arrange + Act
     services = yaml.safe_load(DEFENSE_COMPOSE.read_text())["services"]
 
-    # Assert — broker leg + analyst-server present
-    for svc in (*BROKER_LEG, "analyst-server"):
+    # Assert — broker leg + both analyst services present
+    for svc in (*BROKER_LEG, *COMMERCIAL_ANALYST):
         assert svc in services, f"defense missing {svc}"
-    # Assert — no init containers, no analyst-model yet
-    for absent in (*COMMERCIAL_INITS, "analyst-model"):
+    # Assert — no init containers
+    for absent in COMMERCIAL_INITS:
         assert absent not in services, f"defense should not ship {absent}"
 
 
