@@ -107,7 +107,6 @@ def test_configurator_js_payload_covers_every_select_enum_value() -> None:
             "ac_coupled",
             "dc_integrated_pcs",
             "dc_external_pcs",
-            "none",
         },
         "climate_zone": {"subarctic", "temperate", "arid_hot", "tropical"},
         "deployment_context": {

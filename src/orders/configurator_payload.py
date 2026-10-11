@@ -39,7 +39,6 @@ class BessCoupling(StrEnum):
     AC_COUPLED = "ac_coupled"
     DC_INTEGRATED_PCS = "dc_integrated_pcs"
     DC_EXTERNAL_PCS = "dc_external_pcs"
-    NONE = "none"
 
 
 class ClimateZone(StrEnum):
@@ -92,7 +91,8 @@ class ConfiguratorPayload(BaseModel):
     gpu_variant: GpuVariant
     target_gpu_count: int = Field(ge=1)
     bess_coupling: BessCoupling
-    bess_capacity_mwh: float = Field(ge=0)
+    # Every order includes a BESS: capacity must be positive.
+    bess_capacity_mwh: float = Field(gt=0)
     # [A1] hours of compute the BESS must sustain stand-alone. Sibling of
     # bess_capacity_mwh, independent of grid.path. Required (>0) iff
     # grid.intentional_islanding — edp-api's V10, not duplicated here.

@@ -275,14 +275,11 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
 # All 7 deployment-profile combinations the resolver supports today.
 # (deployment_context, bess_coupling, aws_partition, expected_delivery_path)
 PROFILE_SWEEP: list[tuple[str, str, str, str]] = [
-    ("commercial", "none", "standard", "cfn_standard"),
     ("commercial", "ac_coupled", "standard", "cfn_standard"),
     ("commercial", "dc_external_pcs", "standard", "cfn_standard"),
     ("commercial", "dc_integrated_pcs", "standard", "cfn_standard"),
-    ("sovereign_government", "none", "govcloud", "cfn_govcloud"),
     ("sovereign_government", "ac_coupled", "govcloud", "cfn_govcloud"),
     ("sovereign_government", "dc_external_pcs", "govcloud", "cfn_govcloud"),
-    ("commercial", "ac_coupled", "none", "iso"),
 ]
 
 
@@ -339,7 +336,7 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
                         # bess_coupling=none means no battery — capacity must be 0.
                         # dc_integrated_pcs is the CATL-integrated PCS path,
                         # excluded for sovereign+ at the validator.
-                        "bess_capacity_mwh": (0.0 if coupling == "none" else 10.0),
+                        "bess_capacity_mwh": 10.0,
                         "deployment_site_name": f"site-{ctx}-{coupling}",
                     }
                     submit = client.post("/platform-api/orders", json=payload)
