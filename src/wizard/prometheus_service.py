@@ -38,6 +38,8 @@ class PrometheusService:
         if self._tracker.is_done("prometheus"):
             raise StepAlreadyDoneError("Prometheus is already set up")
         (self._ems_dir / DATA_DIR).mkdir(parents=True, exist_ok=True)
+        # Reason: the image runs as uid 65534; a root-owned data dir makes it crash-loop.
+        self._run(Command(args=["chown", "-R", "65534:65534", str(self._ems_dir / DATA_DIR)]))
         (self._ems_dir / "observability").mkdir(parents=True, exist_ok=True)
         self._run(Command(args=["curl", "-fsSL", CONFIG_URL, "-o", str(self._ems_dir / CONFIG_FILE)]))
         self._run(compose_command(self._ems_dir, "up", "-d", PROMETHEUS_SERVICE))
