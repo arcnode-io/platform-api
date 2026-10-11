@@ -49,3 +49,17 @@ def test_password_never_reaches_argv(tmp_path: Path) -> None:
     # Assert
     for command in runner.calls:
         assert PASSWORD not in " ".join(command.args)
+
+
+def test_grafana_data_dir_is_owned_by_the_grafana_user(tmp_path: Path) -> None:
+    """The Grafana image runs as uid 472; a root-owned data dir fails its startup."""
+    # Arrange
+    runner = FakeRunner()
+    service = make_grafana_service(tmp_path, runner)
+
+    # Act
+    service.apply(PasswordRequest(password=PASSWORD))
+
+    # Assert
+    chowns = [c.args for c in runner.calls if c.args[:1] == ["chown"]]
+    assert ["chown", "-R", "472:472", str(tmp_path / "opt" / "observability" / "grafana-data")] in chowns

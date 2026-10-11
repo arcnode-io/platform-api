@@ -99,6 +99,7 @@ class FakeRunner:
             "der-control-api:8080/actuator/health": ok('{"status":"UP"}'),
             "logs der-control-api": ok("Started Application in 13.117 seconds\n"),
             "chown -R 65534:65534": ok(""),
+            "chown -R 472:472": ok(""),
             "logs analyst-model": ok("✅ MLflow healthy at http://mlflow:5000\nScheduler started. Will run daily at 14:00\n"),
             "logs industrial-gateway": ok("initial spec fetched\nMQTT subscriptions established\n"),
             "logs hmi": ok("start worker processes\n"),

@@ -17,6 +17,7 @@ GRAFANA_SERVICE: Final[str] = "grafana"
 # Grafana's own variable, read from the env file; the cloud sets the same name.
 # Reason: an env var name, not a secret value.
 PASSWORD_NAME: Final[str] = GRAFANA_ADMIN.env_name
+GRAFANA_DATA_DIR: Final[str] = "observability/grafana-data"
 LISTEN_LINE: Final[str] = "HTTP Server Listen"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 GRAFANA_URL: Final[str] = "http://grafana:3000"
@@ -53,6 +54,9 @@ class GrafanaService:
             raise StepAlreadyDoneError("Grafana is already set up")
         # Reason: compose reads the env file itself, so the password goes in before `up`.
         save_secrets(self._secrets_env_path, {PASSWORD_NAME: request.password})
+        # Reason: the image runs as uid 472; a root-owned data dir fails Grafana at startup.
+        (self._ems_dir / GRAFANA_DATA_DIR).mkdir(parents=True, exist_ok=True)
+        self._run(Command(args=["chown", "-R", "472:472", str(self._ems_dir / GRAFANA_DATA_DIR)]))
         self._run(compose_command(self._ems_dir, "up", "-d", GRAFANA_SERVICE))
         wait_for_log(self._run, self._ems_dir, GRAFANA_SERVICE, LISTEN_LINE)
         checks = [self._health(), self._admin_login(request.password), self._saved()]
