@@ -31,6 +31,8 @@ SECRETS_ENV_PATH: Final[Path] = EMS_DIR / "secrets.env"
 # ems-analyst's overlay — two pages write it (Ollama, Site).
 ANALYST_CFG_PATH: Final[Path] = EMS_DIR / "analyst-cfg.customer.yml"
 PORT: Final[int] = 8080
+# All interfaces on purpose: the appliance's one-time setup window is reached from the LAN.
+BIND_HOST: Final[str] = "0.0.0.0"  # noqa: S104  # nosec B104
 # Idle browser connections stay open this long, so a step clicked after reading
 # a page doesn't hit a connection uvicorn already closed (its default is 5s).
 KEEP_ALIVE_SECONDS: Final[int] = 75
@@ -65,7 +67,7 @@ def main() -> None:
         ).router
     )
     # Appliance-local, one-time setup window — binding all interfaces is the point.
-    uvicorn.run(app, host="0.0.0.0", port=PORT, timeout_keep_alive=KEEP_ALIVE_SECONDS)  # noqa: S104  # nosec B104
+    uvicorn.run(app, host=BIND_HOST, port=PORT, timeout_keep_alive=KEEP_ALIVE_SECONDS)
 
 
 if __name__ == "__main__":
