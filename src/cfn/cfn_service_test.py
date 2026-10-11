@@ -158,7 +158,7 @@ def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
     # Assert — docker install + compose up wire the EMS stack onto the EC2
     assert "dnf install -y docker" in rendered
     assert "systemctl enable --now docker" in rendered
-    assert "docker compose -f docker-compose.yaml up -d" in rendered
+    assert "docker compose -f docker-compose.yaml -f docker-compose.fixtures.yaml up -d" in rendered
     # No reference to the old private registry — images come from ECR Public
     assert "registry.gitlab.com" not in rendered
 
