@@ -39,6 +39,12 @@ def compose_command(ems_dir: Path, *args: str) -> Command:
     )
 
 
+def cloud_compose_command(ems_dir: Path, *args: str) -> Command:
+    """`docker compose` with only the cloud compose file. The on-prem override
+    joins containers to a pre-made arcnode network, which the cloud box doesn't have."""
+    return Command(args=["docker", "compose", "-f", str(ems_dir / COMPOSE_FILE), *args])
+
+
 # Poll interval for the readiness gate below — not a timeout.
 POLL_SECONDS: Final[float] = 0.5
 

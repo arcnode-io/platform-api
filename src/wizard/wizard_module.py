@@ -154,6 +154,7 @@ class WizardModule:
         )
         self.cloud_secrets = CloudSecretsService(
             deployment=deployment, tracker=tracker, secrets_env_path=secrets_env_path,
+            ems_dir=ems_dir, run=run,
         )
         self.router = WizardController(
             preflight=self.preflight,

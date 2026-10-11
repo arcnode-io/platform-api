@@ -591,6 +591,11 @@ def build_userdata(
         "systemctl daemon-reload\n"
         "systemctl enable --now arcnode-wizard\n"
     )
+    # Commercial waits for the wizard: the containers start once the customer saves
+    # their passwords. e2e has no wizard, and defense never had one, so both start here.
+    compose_up_line = (
+        "" if (is_commercial and not e2e) else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
+    )
     # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
     # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.
     lfdi_allowlist_line = (
@@ -804,7 +809,7 @@ def build_userdata(
         "chmod +x $DOCKER_CLI_PLUGINS/docker-compose\n"
         "# Start the EMS stack — init containers seed DBs\n"
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
-        f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
+        f"{compose_up_line}"
         # Give services 60s to settle (or fail) before snapshotting state.
         # Without this, the snapshot catches every container as
         # "Created/Starting" — useless for diagnosis. With it, crashed

@@ -144,9 +144,10 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
 
 
 def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
-    """UserData bootstraps docker + compose, fetches artifacts, runs the stack."""
+    """UserData bootstraps docker + compose, fetches artifacts, and starts the stack.
+    Defense starts at boot; commercial waits for the wizard."""
     # Arrange + Act
-    rendered = _render()
+    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
 
     # Assert — bash shell + the expected file layout
     assert "#!/bin/bash" in rendered
@@ -173,7 +174,6 @@ def test_real_deploy_ships_no_industrial_fixtures() -> None:
 
     # Assert
     assert "docker-compose.fixtures.yaml" not in rendered
-    assert "-f docker-compose.yaml up -d" in rendered
 
 
 def test_e2e_deploy_fetches_and_merges_industrial_fixtures() -> None:
@@ -655,3 +655,13 @@ def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> Non
     assert "ExecStart=/usr/bin/python3 -m src.wizard.main" in rendered
     assert "systemctl enable --now arcnode-wizard" in rendered
     assert rendered.index("SETUP_TOKEN=$(") < rendered.index("systemctl enable --now arcnode-wizard")
+
+
+def test_commercial_userdata_leaves_the_containers_to_the_wizard() -> None:
+    """On cloud, the containers start after the customer saves their passwords
+    in the wizard, not at boot with the stack's values."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "docker-compose.yaml up -d" not in rendered

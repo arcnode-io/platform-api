@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from src.wizard.cloud_secrets_service import CloudSecretsService, CloudSecretsStepNotAvailableError
-from src.wizard.wizard_fixtures import tracker
+from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import CloudSecrets, Deployment
 
 SECRETS = CloudSecrets(
@@ -22,6 +22,8 @@ def test_passwords_are_saved_and_the_page_is_done(tmp_path: Path) -> None:
         deployment=Deployment.CLOUD,
         tracker=tracker(tmp_path),
         secrets_env_path=tmp_path / "secrets.env",
+        ems_dir=tmp_path / "opt",
+        run=FakeRunner(),
     )
 
     # Act
@@ -43,8 +45,31 @@ def test_on_prem_has_no_cloud_password_page(tmp_path: Path) -> None:
         deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         secrets_env_path=tmp_path / "secrets.env",
+        ems_dir=tmp_path / "opt",
+        run=FakeRunner(),
     )
 
     # Act / Assert
     with pytest.raises(CloudSecretsStepNotAvailableError):
         service.apply(SECRETS)
+
+
+def test_saving_the_passwords_starts_the_containers_without_the_onprem_override(tmp_path: Path) -> None:
+    # Arrange — the containers wait for these passwords; the cloud compose has no on-prem network
+    runner = FakeRunner()
+    service = CloudSecretsService(
+        deployment=Deployment.CLOUD,
+        tracker=tracker(tmp_path),
+        secrets_env_path=tmp_path / "secrets.env",
+        ems_dir=tmp_path / "opt",
+        run=runner,
+    )
+
+    # Act
+    service.apply(SECRETS)
+
+    # Assert
+    up = [c.args for c in runner.calls if "up" in c.args]
+    assert up, "the containers never started"
+    assert "-d" in up[0]
+    assert not any("docker-compose.onprem.yaml" in arg for arg in up[0])
