@@ -29,6 +29,7 @@ from src.wizard.analyst_server_service import (
     AnalystServerService,
     AnalystServerStepNotAvailableError,
 )
+from src.wizard.cloud_secrets_service import CloudSecretsService, CloudSecretsStepNotAvailableError
 from src.wizard.der_control_service import DerControlService, DerControlStepNotAvailableError
 from src.wizard.analyst_model_service import (
     AnalystModelService,
@@ -50,6 +51,7 @@ from src.wizard.ssh_service import (
 from src.wizard.analyst_server_progress import StageProgress
 from src.wizard.setup_token import TOKEN_HEADER
 from src.wizard.wizard_record import (
+    CloudSecrets,
     DerControlRequest,
     AnalystServerKeys,
     ApplyRequest,
@@ -104,6 +106,7 @@ class WizardController:
         analyst_model: AnalystModelService,
         analyst_server: AnalystServerService,
         der_control: DerControlService,
+        cloud_secrets: CloudSecretsService,
         device_api: DeviceApiService,
         industrial_gateway: IndustrialGatewayService,
         hmi: HmiService,
@@ -127,6 +130,7 @@ class WizardController:
         self._analyst_model = analyst_model
         self._analyst_server = analyst_server
         self._der_control = der_control
+        self._cloud_secrets = cloud_secrets
         self._device_api = device_api
         self._industrial_gateway = industrial_gateway
         self._hmi = hmi
@@ -157,6 +161,7 @@ class WizardController:
             ("POST", "/api/analyst-server", self.analyst_server),
             ("GET", "/api/analyst-server/progress", self.analyst_server_progress),
             ("POST", "/api/der-control", self.der_control),
+            ("POST", "/api/cloud-secrets", self.cloud_secrets),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
             ("POST", "/api/hmi", self.hmi),
@@ -291,6 +296,13 @@ class WizardController:
         try:
             return self._analyst_server.apply(request)
         except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def cloud_secrets(self, request: CloudSecrets) -> StepResult:
+        """The cloud password page — see CloudSecretsService.apply."""
+        try:
+            return self._cloud_secrets.apply(request)
+        except (StepAlreadyDoneError, CloudSecretsStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def der_control(self, request: DerControlRequest) -> StepResult:

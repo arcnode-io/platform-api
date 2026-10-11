@@ -69,6 +69,10 @@ def test_cloud_starts_with_the_hardware_check_too(tmp_path: Path) -> None:
 
     # Act
     tracker.mark_done("preflight")
+    assert not tracker.all_done()
+
+    # Act — the customer's passwords close the cloud wizard
+    tracker.mark_done("cloud_secrets")
 
     # Assert
-    assert (tracker.steps, tracker.all_done()) == (("preflight",), True)
+    assert (tracker.steps, tracker.all_done()) == (("preflight", "cloud_secrets"), True)

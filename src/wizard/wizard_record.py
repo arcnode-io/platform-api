@@ -165,6 +165,21 @@ class BrokerPasswords(BaseModel):
         return check_complexity(value)
 
 
+class CloudSecrets(BaseModel):
+    """POST /api/cloud-secrets body — the three passwords the cloud customer sets,
+    the same ones the on-prem box asks for on its own pages."""
+
+    operator_password: str = Field(min_length=8)
+    viewer_password: str = Field(min_length=8)
+    grafana_password: str = Field(min_length=8)
+
+    @field_validator("operator_password", "viewer_password", "grafana_password")
+    @classmethod
+    def password_meets_complexity(cls, value: str) -> str:
+        """Same policy as the daemon passwords."""
+        return check_complexity(value)
+
+
 class DerControlRequest(BaseModel):
     """POST /api/der-control body — the DERMS base URL the customer's utility
     gives. Optional: blank means the utility isn't connected yet."""

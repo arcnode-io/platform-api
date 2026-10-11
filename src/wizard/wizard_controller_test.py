@@ -50,15 +50,23 @@ def test_hardware_check_returns_every_row_with_its_debug_command(
     }
 
 
-def test_cloud_closes_once_the_hardware_check_passes(tmp_path: Path) -> None:
+def test_cloud_closes_once_the_passwords_are_set(tmp_path: Path) -> None:
     # Arrange
     client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
 
-    # Act
-    response = client.post("/api/preflight")
+    # Act — the hardware check alone doesn't close the cloud wizard
+    assert client.post("/api/preflight").json()["verified"] is True
+    still_open = client.get("/").status_code
+
+    # Act — the customer's passwords do
+    secrets = client.post(
+        "/api/cloud-secrets",
+        json={"operator_password": "Operator-pw-1!", "viewer_password": "Viewer-pw-1!", "grafana_password": "Grafana-pw-1!"},
+    )
 
     # Assert
-    assert response.json()["verified"] is True
+    assert still_open == 200
+    assert secrets.json()["verified"] is True
     assert client.get("/").status_code == 404
 
 

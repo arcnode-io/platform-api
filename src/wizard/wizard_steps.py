@@ -35,7 +35,7 @@ STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
     ),
     # EC2 set SSH + Docker up; databases are managed services in the cloud,
     # the LLM is Bedrock.
-    Deployment.CLOUD: ("preflight",),
+    Deployment.CLOUD: ("preflight", "cloud_secrets"),
 }
 
 
