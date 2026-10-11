@@ -10,6 +10,7 @@ local:
   s3_bucket: 'platform-api-artifacts'
   ses_endpoint_url: 'http://localhost:4566'
   ses_sender_email: 'noreply@arcnode.io'
+  email_provider: 'ses'  # LocalStack SES; no Resend key needed locally
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
   # CI overwrites this tarball on each ems-industrial-gateway release.
@@ -31,6 +32,7 @@ beta:
   s3_bucket: 'arcnode-platform-artifacts'
   ses_endpoint_url: null
   ses_sender_email: 'noreply@arcnode.io'
+  email_provider: 'resend'  # SES stays the backup until its production access is granted
   # CI overwrites latest.apk at this fixed key on each ems-hmi release.
   ems_hmi_apk_url: 'https://arcnode-public.s3.amazonaws.com/ems-hmi/latest.apk'
   # CI overwrites this tarball on each ems-industrial-gateway release.

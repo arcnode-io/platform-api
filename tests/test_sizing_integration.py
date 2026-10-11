@@ -11,7 +11,7 @@ from ipaddress import IPv4Address
 from fastapi.testclient import TestClient
 
 from src.app_module import AppModule
-from src.config import Config, LogLevel
+from src.config import Config, EmailProvider, LogLevel
 from tests.fixtures.containers import start_edp_api
 
 APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
@@ -44,6 +44,7 @@ def _client(edp_api_url: str) -> TestClient:
         s3_bucket="unused",
         ses_endpoint_url="http://localstack.invalid",
         ses_sender_email="noreply@arcnode.test",
+        email_provider=EmailProvider.SES,
         ems_hmi_apk_url=APK_URL,
         ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
         base_iso_url="https://arcnode-public.example/iso/arcnode-ems-amd64.iso",

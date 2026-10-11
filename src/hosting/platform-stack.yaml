@@ -122,9 +122,9 @@ Resources:
           cd /opt/arcnode-platform
           aws s3 cp s3://arcnode-public/platform/docker-compose.yaml docker-compose.yaml --region ${AWS::Region}
           aws s3 cp s3://arcnode-public/platform/Caddyfile Caddyfile --region ${AWS::Region}
-          : > secrets.env
-          chmod 600 secrets.env
-          echo "POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id arcnode-platform/postgres-password --query SecretString --output text --region ${AWS::Region})" >> secrets.env
+          aws s3 cp s3://arcnode-public/platform/refresh-secrets.sh refresh-secrets.sh --region ${AWS::Region}
+          chmod +x refresh-secrets.sh
+          ./refresh-secrets.sh ${AWS::Region}
           docker compose up -d
           /usr/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
 

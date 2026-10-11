@@ -6,8 +6,10 @@ Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `IsoModule`, `PortalModule`
 """
 
 from src.aws.aws_module import AwsModule
+from src.aws.ses_service import SesService
 from src.cfn.cfn_module import CfnModule
 from src.edp_client.edp_client_module import EdpClientModule
+from src.email.resend_service import ResendService
 from src.iso.iso_module import IsoModule
 from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_service import OrchestratorService
@@ -22,6 +24,7 @@ class OrchestratorModule:
         *,
         edp: EdpClientModule,
         aws: AwsModule,
+        email: SesService | ResendService,
         cfn: CfnModule,
         iso: IsoModule,
         portal: PortalModule,
@@ -32,7 +35,7 @@ class OrchestratorModule:
         self.service = OrchestratorService(
             edp_client=edp.service,
             s3=aws.s3,
-            ses=aws.ses,
+            ses=email,
             cfn=cfn.service,
             iso=iso.service,
             portal=portal.service,

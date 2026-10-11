@@ -17,6 +17,13 @@ class LogLevel(enum.StrEnum):
     DEBUG = "DEBUG"
 
 
+class EmailProvider(enum.StrEnum):
+    """Who sends the delivery email. SES is the backup until its production access lands."""
+
+    SES = "ses"
+    RESEND = "resend"
+
+
 class Config(BaseModel):  # noqa: D101
     log_level: LogLevel
     port: int
@@ -33,7 +40,8 @@ class Config(BaseModel):  # noqa: D101
     )  # None in prod (real AWS); URL in test/local (LocalStack)
     s3_bucket: str
     ses_endpoint_url: str | None
-    ses_sender_email: str
+    ses_sender_email: str  # the From address for either provider
+    email_provider: EmailProvider  # resend needs RESEND_API_KEY in the environment
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK
     # S3 URL of the on-prem industrial-gateway docker-save tarball (cloud orders)
     ems_industrial_gateway_tarball_url: str

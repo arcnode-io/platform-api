@@ -15,9 +15,11 @@ from tortoise.contrib.fastapi import RegisterTortoise
 
 from src.app_controller import AppController
 from src.aws.aws_module import AwsModule
+from src.aws.ses_service import SesService
 from src.cfn.cfn_module import CfnModule
-from src.config import Config, load_config
+from src.config import Config, EmailProvider, load_config
 from src.edp_client.edp_client_module import EdpClientModule
+from src.email.resend_service import ResendService
 from src.iso.iso_module import IsoModule
 from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
@@ -47,6 +49,7 @@ class AppModule:
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,
+            email=self._email_sender(),
             cfn=self.cfn_module,
             iso=self.iso_module,
             portal=self.portal_module,
@@ -59,6 +62,17 @@ class AppModule:
         self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
         self.sizing_module = SizingModule(edp_api_url=self.config.edp_api_url)
         self._db_lifespan_enabled = False
+
+    def _email_sender(self) -> SesService | ResendService:
+        """cfg.yml picks the provider; Resend's key comes from the environment, like the DB password."""
+        match self.config.email_provider:
+            case EmailProvider.RESEND:
+                return ResendService(
+                    api_key=os.environ["RESEND_API_KEY"],
+                    sender_email=self.config.ses_sender_email,
+                )
+            case EmailProvider.SES:
+                return self.aws_module.ses
 
     def import_module(self, app: FastAPI) -> None:
         """Register feature routers."""

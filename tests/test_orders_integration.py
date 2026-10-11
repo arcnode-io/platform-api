@@ -36,7 +36,7 @@ from fastapi.testclient import TestClient
 from testcontainers.core.network import Network
 
 from src.app_module import AppModule
-from src.config import Config, LogLevel
+from src.config import Config, EmailProvider, LogLevel
 from src.edp_client.edp_artifacts import ArtifactKind
 from src.orders.orders_record import GetOrderResponse
 from tests.fixtures.iso import extract, seed_base_iso
@@ -179,6 +179,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
                 s3_bucket=S3_BUCKET,
                 ses_endpoint_url=ls.url,
                 ses_sender_email=SENDER_EMAIL,
+                email_provider=EmailProvider.SES,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
                 base_iso_url=base_iso_url,
@@ -317,6 +318,7 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
                 s3_bucket=S3_BUCKET,
                 ses_endpoint_url=ls.url,
                 ses_sender_email=SENDER_EMAIL,
+                email_provider=EmailProvider.SES,
                 ems_hmi_apk_url=APK_URL,
                 ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
                 base_iso_url=base_iso_url,

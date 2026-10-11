@@ -37,6 +37,8 @@ def test_platform_stack_boots_stock_al2023_and_lets_containers_use_the_role() ->
         "HttpPutResponseHopLimit": 2,
     }
     assert instance["Tags"] == [{"Key": "Name", "Value": "arcnode-platform"}]
+    # Secrets come from Secrets Manager through one script, shared with the deploy job.
+    assert "./refresh-secrets.sh ${AWS::Region}" in str(instance["UserData"])
 
 
 class _CfnLoader(yaml.SafeLoader):

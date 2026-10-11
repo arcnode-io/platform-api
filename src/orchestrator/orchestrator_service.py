@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
 from src.aws.ses_service import SesService
+from src.email.resend_service import ResendService
 from src.cfn.cfn_service import CfnService
 from src.edp_client.edp_artifacts import (
     ArtifactKind,
@@ -54,7 +55,7 @@ class OrchestratorService:
         *,
         edp_client: EdpClientService,
         s3: S3Service,
-        ses: SesService,
+        ses: SesService | ResendService,
         cfn: CfnService,
         iso: IsoService,
         portal: PortalService,
