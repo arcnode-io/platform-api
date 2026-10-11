@@ -281,3 +281,15 @@ def test_der_control_api_reads_its_customer_config() -> None:
     # Assert
     assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
     assert "/opt/arcnode/der-control-cfg.customer.yml:/app/cfg.customer.yml:ro" in service["volumes"]
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_der_control_api_mounts_the_utility_identity_read_only(variant_path: Path) -> None:
+    """The outbound client identity and utility CA are mounted where the cfg keys point."""
+    # Arrange + Act
+    volumes = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"]["volumes"]
+
+    # Assert
+    assert "/opt/arcnode/der-control-client.pem:/app/tls/utility/client.pem:ro" in volumes
+    assert "/opt/arcnode/der-control-client-key.pem:/app/tls/utility/client-key.pem:ro" in volumes
+    assert "/opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro" in volumes

@@ -424,7 +424,13 @@ window.StepAnalystServer = StepAnalystServer;
 
 // ─── DER control API ────────────────────────────────────────────────────────────
 // Optional: the DERMS base URL the utility gives. Blank means the utility isn't connected yet.
-function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, onApply, onSkip }) {
+const DER_PEM_FIELDS = [
+  { key: 'device_cert_pem', label: 'DEVICE CERTIFICATE (PEM, OPTIONAL)' },
+  { key: 'device_key_pem', label: 'DEVICE PRIVATE KEY (PEM, OPTIONAL)' },
+  { key: 'utility_ca_pem', label: 'UTILITY CA BUNDLE (PEM, OPTIONAL)' },
+];
+
+function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, pems, onPem, onApply, onSkip }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
   const badUrl     = url !== '' && !url.startsWith('https://');
@@ -453,6 +459,17 @@ function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, onApply, onSkip }
           border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
           fontFamily: t.fontLabel, fontSize: 13,
         }}/>
+      {DER_PEM_FIELDS.map(f => (
+        <div key={f.key} style={{ marginBottom: SPACE[4] }}>
+          <FieldLabelW t={t}>{f.label}</FieldLabelW>
+          <textarea value={pems[f.key] || ''} disabled={isApplying || isDone} rows={4}
+            onChange={e => onPem(f.key, e.target.value)} aria-label={f.label}
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: 12, background: t.bg, color: t.text,
+              border: `1px solid ${t.border}`, borderRadius: RADIUS[2], fontFamily: t.fontLabel, fontSize: 12,
+            }}/>
+        </div>
+      ))}
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={{ ...primaryBtnStyle(t, !canApply), marginTop: SPACE[4] }}>

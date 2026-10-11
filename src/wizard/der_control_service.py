@@ -20,6 +20,10 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 DER_CONTROL_SERVICE: Final[str] = "der-control-api"
 LFDI_ALLOWLIST_NAME: Final[str] = "DER_CONTROL_LFDI_ALLOWLIST"
+# The utility identity files; der-control-api mounts these read-only at /app/tls/utility/.
+CLIENT_CERT_FILE: Final[str] = "der-control-client.pem"
+CLIENT_KEY_FILE: Final[str] = "der-control-client-key.pem"
+UTILITY_CA_FILE: Final[str] = "der-control-utility-ca.pem"
 # Spring Boot prints this once the app has started, whatever the allowlist holds.
 # (An empty allowlist logs a WARN instead of the LFDI count, so waiting on that line hangs.)
 READY_LINE: Final[str] = "Started Application in"
@@ -71,6 +75,7 @@ class DerControlService:
         write_yaml(self._ems_dir / DER_CONTROL_CFG_FILE, expected)
         # Reason: the allowlist is read once at boot, so the container is recreated to pick it up.
         save_secrets(self._secrets_env_path, {LFDI_ALLOWLIST_NAME: request.lfdi_allowlist})
+        self._write_utility_identity(request)
         self._run(compose_command(self._ems_dir, "up", "-d", "--force-recreate", DER_CONTROL_SERVICE))
         wait_for_log(self._run, self._ems_dir, DER_CONTROL_SERVICE, READY_LINE)
         checks = [self._running_check(), self._health_check(), self._saved_check(expected)]
@@ -78,6 +83,22 @@ class DerControlService:
         if verified:
             self._tracker.mark_done("der_control_api")
         return StepResult(verified=verified, checks=checks)
+
+    def _write_utility_identity(self, request: DerControlRequest) -> None:
+        """Write the utility files der-control-api mounts, or remove them when none are given."""
+        files = {
+            CLIENT_CERT_FILE: (request.device_cert_pem, 0o644),
+            CLIENT_KEY_FILE: (request.device_key_pem, 0o600),
+            UTILITY_CA_FILE: (request.utility_ca_pem, 0o644),
+        }
+        for name, (content, mode) in files.items():
+            path = self._ems_dir / name
+            if not content:
+                path.unlink(missing_ok=True)
+                continue
+            path.touch(mode=mode)
+            path.chmod(mode)
+            path.write_text(content)
 
     def skip(self) -> StepResult:
         """Mark the page done without starting the service: the utility isn't connected yet.

@@ -52,6 +52,9 @@ services:
       # Per-deployment keys (siteId, utilityMirrorUrl, publicBaseUrl), merged over ENV: beta.
       CFG_CUSTOMER_PATH: /app/cfg.customer.yml
     volumes:
+      - /opt/arcnode/der-control-client.pem:/app/tls/utility/client.pem:ro
+      - /opt/arcnode/der-control-client-key.pem:/app/tls/utility/client-key.pem:ro
+      - /opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro
       - /opt/arcnode/der-control-cfg.customer.yml:/app/cfg.customer.yml:ro
     depends_on:
       hivemq:

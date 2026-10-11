@@ -5,7 +5,7 @@ from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import model_validator, BaseModel, Field, field_validator
 
 
 class Deployment(StrEnum):
@@ -210,6 +210,9 @@ class DerControlRequest(BaseModel):
 
     utility_mirror_url: str | None = None
     lfdi_allowlist: str = ""  # the DERMS certificate's LFDIs; empty refuses every DER control
+    device_cert_pem: str = ""  # the box's client certificate, as the utility registered it
+    device_key_pem: str = ""  # its private key; cert and key go together or not at all
+    utility_ca_pem: str = ""  # the CA bundle that verifies the utility's server
 
     @field_validator("utility_mirror_url")
     @classmethod
@@ -218,6 +221,13 @@ class DerControlRequest(BaseModel):
         if value is not None and not value.startswith("https://"):
             raise ValueError("must be an https:// URL")
         return value
+
+    @model_validator(mode="after")
+    def cert_and_key_go_together(self) -> "DerControlRequest":
+        """A certificate without its key (or the reverse) would fail der-control-api at boot."""
+        if bool(self.device_cert_pem) != bool(self.device_key_pem):
+            raise ValueError("the device certificate and its private key must be given together")
+        return self
 
     @field_validator("lfdi_allowlist")
     @classmethod

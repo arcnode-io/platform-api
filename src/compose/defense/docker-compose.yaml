@@ -69,6 +69,12 @@ services:
   # generated at boot, truststore is an ops-populated Secrets Manager
   # placeholder (per-DERMS-integration CA bundle — not wired into customer
   # order intake yet, that's a separate decision).
+    volumes:
+      - /opt/arcnode/der-control-client.pem:/app/tls/utility/client.pem:ro
+      - /opt/arcnode/der-control-client-key.pem:/app/tls/utility/client-key.pem:ro
+      - /opt/arcnode/der-control-utility-ca.pem:/app/tls/utility/ca.pem:ro
+
+
   der-control-ingress:
     image: nginx:1.27-alpine
     restart: unless-stopped

@@ -96,3 +96,42 @@ def test_an_empty_allowlist_is_allowed_and_fails_closed(tmp_path: Path) -> None:
 
     # Assert — written empty; der-control-api refuses everyone until one is given
     assert "DER_CONTROL_LFDI_ALLOWLIST=\n" in (tmp_path / "secrets.env").read_text()
+
+
+CERT_PEM = "-----BEGIN CERTIFICATE-----\nMIIBcert\n-----END CERTIFICATE-----\n"
+KEY_PEM = "-----BEGIN PRIVATE KEY-----\nMIIBkey\n-----END PRIVATE KEY-----\n"
+CA_PEM = "-----BEGIN CERTIFICATE-----\nMIIBca\n-----END CERTIFICATE-----\n"
+
+
+def test_utility_identity_files_are_written_with_the_key_private(tmp_path: Path) -> None:
+    # Arrange
+    service = make_der_control(tmp_path)
+
+    # Act
+    service.apply(DerControlRequest(device_cert_pem=CERT_PEM, device_key_pem=KEY_PEM, utility_ca_pem=CA_PEM))
+
+    # Assert — the mount sources der-control-api reads, key readable by owner only
+    ems = tmp_path / "opt"
+    assert (ems / "der-control-client.pem").read_text() == CERT_PEM
+    assert (ems / "der-control-utility-ca.pem").read_text() == CA_PEM
+    assert (ems / "der-control-client-key.pem").read_text() == KEY_PEM
+    assert (ems / "der-control-client-key.pem").stat().st_mode & 0o777 == 0o600
+
+
+def test_a_certificate_without_its_key_is_refused() -> None:
+    # Arrange + Act / Assert — der-control-api would fail at boot on a half identity
+    with pytest.raises(ValueError):
+        DerControlRequest(device_cert_pem=CERT_PEM)
+
+
+def test_no_identity_removes_the_files_so_the_service_boots_without_one(tmp_path: Path) -> None:
+    # Arrange — a previous run left files behind
+    ems = tmp_path / "opt"
+    ems.mkdir()
+    (ems / "der-control-client.pem").write_text(CERT_PEM)
+
+    # Act
+    make_der_control(tmp_path).apply(DerControlRequest())
+
+    # Assert
+    assert not (ems / "der-control-client.pem").exists()
