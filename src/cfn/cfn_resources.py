@@ -772,12 +772,12 @@ def build_userdata(
         f"siteId: {site_id}\n"
         f"deploymentName: {site_id}\n"
         # deviceApiUri /api → nginx strips one segment (device-api routes are
-        # bare /auth/*, /topology/*). chatApiUri empty → HMI posts /analyst/chat
+        # bare /auth/*, /topology/*). chatApiUri /api → HMI posts /api/analyst/chat
         # which nginx passes through un-stripped (analyst route IS /analyst/chat).
         "deviceApiUri: /api\n"
         # derControlUri: same-origin reads of der-control-api's events history.
         'derControlUri: "/der-control"\n'
-        'chatApiUri: ""\n'
+        'chatApiUri: "/api"\n'
         'mqttUri: ""\n'
         f"{e2e_line}"
         "YML\n"

@@ -34,7 +34,7 @@ def test_saves_the_orders_site_for_every_ems_container(tmp_path: Path) -> None:
         "deploymentName": "test_site",
         "deviceApiUri": "/api",
         "derControlUri": "/der-control",
-        "chatApiUri": "",
+        "chatApiUri": "/api",
         "mqttUri": "",
     }
     assert _yaml(ems / "analyst-cfg.customer.yml") == {

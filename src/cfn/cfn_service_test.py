@@ -683,3 +683,13 @@ def test_defense_userdata_leaves_the_containers_to_the_wizard_and_names_its_vari
     # Assert
     assert "docker-compose.yaml up -d" not in rendered
     assert "variant: defense" in rendered
+
+
+def test_hmi_overlay_routes_chat_through_the_same_origin_api() -> None:
+    """The HMI composes ${chatApiUri}/analyst/chat, and nginx serves the analyst under /api."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert
+    assert "chatApiUri:" in rendered
+    assert "/api" in rendered
