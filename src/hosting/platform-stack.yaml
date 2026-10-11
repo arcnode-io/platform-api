@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  platform.arcnode.io: platform-api + edp-api on one stock Amazon Linux 2023 box
+  (Docker Compose, Caddy for TLS). Deploy with
+  aws cloudformation deploy --stack-name arcnode-platform --template-file src/hosting/platform-stack.yaml --capabilities CAPABILITY_IAM
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-08ed03cd1ac50733e
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-0a504e8128315fd56
+  InstanceType:
+    Type: String
+    Default: t3.medium
+  ImageId:
+    # Latest stock AL2023; the box installs Docker and pulls everything else at boot.
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: platform.arcnode.io - HTTP for ACME, HTTPS for the API
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        # SSM Session Manager and Run Command: CI deploys through it, no SSH.
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: platform
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # platform-api archives order artifacts; edp-api reads its manifest and writes BOM/DTM.
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - arn:aws:s3:::arcnode-platform-artifacts
+                  - arn:aws:s3:::arcnode-platform-artifacts/*
+                  - arn:aws:s3:::arcnode-artifacts
+                  - arn:aws:s3:::arcnode-artifacts/*
+              # Its own compose + Caddyfile, published by CI; fetched with the role, not public read.
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: arn:aws:s3:::arcnode-public/platform/*
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:arcnode-platform/*
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref Role
+
+  Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp3
+      MetadataOptions:
+        HttpTokens: required
+        # Containers sit one hop behind the host; the default of 1 hides IMDS from them.
+        HttpPutResponseHopLimit: 2
+      Tags:
+        - Key: Name
+          Value: arcnode-platform
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          trap '/usr/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}' ERR
+          dnf install -y aws-cfn-bootstrap docker
+          systemctl enable --now docker
+          mkdir -p /usr/libexec/docker/cli-plugins
+          curl -fsSL --retry 5 https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/libexec/docker/cli-plugins/docker-compose
+          chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+          mkdir -p /opt/arcnode-platform
+          cd /opt/arcnode-platform
+          aws s3 cp s3://arcnode-public/platform/docker-compose.yaml docker-compose.yaml --region ${AWS::Region}
+          aws s3 cp s3://arcnode-public/platform/Caddyfile Caddyfile --region ${AWS::Region}
+          : > secrets.env
+          chmod 600 secrets.env
+          echo "POSTGRES_PASSWORD=$(aws secretsmanager get-secret-value --secret-id arcnode-platform/postgres-password --query SecretString --output text --region ${AWS::Region})" >> secrets.env
+          docker compose up -d
+          /usr/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
+
+  Eip:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt Eip.AllocationId
+      InstanceId: !Ref Instance
+
+Outputs:
+  PublicIp:
+    Description: Point platform.arcnode.io at this address
+    Value: !Ref Eip
+  InstanceId:
+    Value: !Ref Instance

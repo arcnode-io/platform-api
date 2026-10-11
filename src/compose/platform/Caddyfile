@@ -1,0 +1,4 @@
+# platform.arcnode.io — Caddy fetches and renews the Let's Encrypt cert itself.
+platform.arcnode.io {
+	reverse_proxy platform-api:8000
+}

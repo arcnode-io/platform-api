@@ -1,6 +1,7 @@
 stages:
   - check
   - publish
+  - deploy
   - e2e
   - mirror
 
@@ -81,6 +82,8 @@ publish_compose:
     # e2e/test-stack-only overlay (system_adr §25) — UserData fetches this
     # only when e2e=True, merged in via a second `docker compose -f`.
     - aws s3 sync src/compose/industrial-fixtures/ s3://arcnode-public/compose/industrial-fixtures/ --delete
+    # platform.arcnode.io's own compose + Caddyfile (src/hosting/platform-stack.yaml fetches them at boot).
+    - aws s3 sync src/compose/platform/          s3://arcnode-public/platform/              --delete --exclude "__pycache__/*" --exclude "*.pyc" --exclude "*_test.py"
     - aws s3 cp src/compose/industrial-fixtures.json s3://arcnode-public/seed/industrial-fixtures.json
     - aws s3 rm s3://arcnode-public/seed/dtm-smoke.json || true
   only:
@@ -108,6 +111,27 @@ publish_iso:
     - cd iso-out && sha256sum arcnode-ems-amd64.iso > arcnode-ems-amd64.iso.sha256
     - aws s3 cp arcnode-ems-amd64.iso s3://arcnode-public/iso/arcnode-ems-amd64.iso
     - aws s3 cp arcnode-ems-amd64.iso.sha256 s3://arcnode-public/iso/arcnode-ems-amd64.iso.sha256
+  only:
+    - main
+
+deploy_platform:
+  # platform.arcnode.io re-pulls its compose file and images after every push to
+  # main. No SSH: the command runs through SSM on the box tagged Name=arcnode-platform
+  # (src/hosting/platform-stack.yaml). Skips cleanly while the stack doesn't exist.
+  stage: deploy
+  variables:
+    AWS_DEFAULT_REGION: us-east-1
+    PLATFORM_S3: s3://arcnode-public/platform
+  script:
+    - |
+      INSTANCE=$(aws ec2 describe-instances --filters Name=tag:Name,Values=arcnode-platform Name=instance-state-name,Values=running --query "Reservations[].Instances[].InstanceId" --output text)
+      if [ -z "$INSTANCE" ]; then echo "no arcnode-platform instance yet; nothing to deploy"; exit 0; fi
+      COMMAND_ID=$(aws ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript --comment "platform-api ${CI_COMMIT_SHORT_SHA}" \
+        --parameters "{\"commands\":[\"cd /opt/arcnode-platform && aws s3 cp ${PLATFORM_S3}/docker-compose.yaml docker-compose.yaml && aws s3 cp ${PLATFORM_S3}/Caddyfile Caddyfile && docker compose pull --quiet && docker compose up -d --remove-orphans\"]}" \
+        --query Command.CommandId --output text)
+      aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE"
+      aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE" --query "{Status:Status,Out:StandardOutputContent,Err:StandardErrorContent}" --output json
+      curl -fsS --retry 10 --retry-delay 6 --retry-all-errors https://platform.arcnode.io/
   only:
     - main
 

@@ -1,0 +1,50 @@
+# platform.arcnode.io — our own hosted platform-api + edp-api on one box.
+# EC2 UserData (src/hosting/platform-stack.yaml) fetches this from arcnode-public
+# at first boot; CI's deploy_platform job re-pulls it and the images on every
+# push to main. Caddy gets the Let's Encrypt cert and is the only thing on 80/443.
+# AWS credentials come from the instance role (IMDS), so secrets.env holds only
+# what no role can provide: the Postgres password.
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/arcnode-platform/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    restart: unless-stopped
+
+  platform-api:
+    image: public.ecr.aws/y1d2j6a8/platform-api:latest
+    environment:
+      ENV: beta
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+    env_file:
+      - /opt/arcnode-platform/secrets.env
+    depends_on:
+      - postgres
+      - edp-api
+    restart: unless-stopped
+
+  edp-api:
+    image: public.ecr.aws/y1d2j6a8/edp-api:latest
+    environment:
+      ENV: beta
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+    restart: unless-stopped
+
+  postgres:
+    # Same major as the integration tests (tests/fixtures/containers.py).
+    image: postgres:15
+    env_file:
+      - /opt/arcnode-platform/secrets.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  postgres-data:
