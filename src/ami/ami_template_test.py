@@ -48,7 +48,7 @@ def test_installs_the_wizard_python_dependencies_into_the_image() -> None:
     text = TEMPLATE.read_text()
 
     # Assert
-    assert "python3 -m pip install" in text
+    assert "/opt/arcnode-wizard-venv/bin/pip install" in text
     assert "fastapi" in text
     assert "uvicorn" in text
     assert "pydantic" in text

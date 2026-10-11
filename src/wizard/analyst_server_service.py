@@ -2,11 +2,14 @@
 start the server once uvicorn is listening, verify its health route. Nothing
 else to type; the Device API it reads from is already up."""
 
+import json
+import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Final
 
 from src.wizard.analyst_server_progress import StageProgress, stage_status
-from src.wizard.containers_compose import compose_command, wait_for_log
+from src.wizard.containers_compose import POLL_SECONDS, compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import save_secrets, saved_check
 from src.wizard.system_runner import Runner
@@ -80,6 +83,35 @@ class AnalystServerService:
         if verified:
             self._tracker.mark_done("analyst_server")
         return StepResult(verified=verified, checks=checks)
+
+    def start_stream(self, request: AnalystServerKeys) -> Iterator[str]:
+        """Start the analyst and stream its stages as JSON lines while it seeds, then one
+        verdict line. Streaming keeps the request alive; the page reads it like Ollama's pull."""
+        if self._deployment == Deployment.CLOUD:
+            raise AnalystServerStepNotAvailableError("no analyst server page in the cloud")
+        if self._tracker.is_done("analyst_server"):
+            raise StepAlreadyDoneError("the analyst server is already set up")
+        save_secrets(
+            self._secrets_env_path,
+            {
+                "OPENWEATHERMAP_API_KEY": request.openweathermap_api_key,
+                "GRIDSTATUS_API_KEY": request.gridstatus_api_key,
+            },
+        )
+        self._run(compose_command(self._ems_dir, "up", "-d", ANALYST_SERVER_SERVICE))
+        # Reason: a stage update per poll, and the loop ends on the ready line or a dead container.
+        while True:
+            stages = self.progress()
+            yield json.dumps({"stages": [stage.model_dump() for stage in stages]}) + "\n"
+            if stages[-1].done or not self._running_check().ok:
+                break
+            time.sleep(POLL_SECONDS)
+        checks = [self._running_check(), self._health_check(), saved_check(self._secrets_env_path, SAVED_NAMES)]
+        verified = all(check.ok for check in checks)
+        if verified:
+            self._tracker.mark_done("analyst_server")
+        result = StepResult(verified=verified, checks=checks)
+        yield json.dumps({"result": result.model_dump()}) + "\n"
 
     def progress(self) -> list[StageProgress]:
         """Each startup stage, read from the container's own log lines."""

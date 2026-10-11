@@ -62,7 +62,8 @@ build {
       "sudo mkdir -p /opt/arcnode-wizard-src/src",
       "sudo mv /tmp/wizard-src/src/wizard /opt/arcnode-wizard-src/src/wizard",
       "sudo touch /opt/arcnode-wizard-src/src/__init__.py",
-      "sudo python3 -m pip install --break-system-packages fastapi uvicorn pydantic pyyaml",
+      "sudo python3 -m venv /opt/arcnode-wizard-venv",
+      "sudo /opt/arcnode-wizard-venv/bin/pip install fastapi uvicorn pydantic pyyaml",
     ]
   }
 

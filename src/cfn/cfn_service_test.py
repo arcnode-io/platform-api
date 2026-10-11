@@ -655,7 +655,7 @@ def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> Non
     assert "vcpus: 8" in rendered
     assert "gpus: 0" in rendered
     # Assert — the unit runs the baked source, and starts after the token is written
-    assert "ExecStart=/usr/bin/python3 -m src.wizard.main" in rendered
+    assert "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main" in rendered
     assert "systemctl enable --now arcnode-wizard" in rendered
     assert rendered.index("SETUP_TOKEN=$(") < rendered.index(
         "systemctl enable --now arcnode-wizard"

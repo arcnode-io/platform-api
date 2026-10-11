@@ -2,6 +2,7 @@
 the server starts once its uvicorn line is in the log, and its health route
 answers from the arcnode network."""
 
+import json
 from pathlib import Path
 
 from src.wizard.analyst_server_service import AnalystServerService
@@ -80,3 +81,19 @@ def test_progress_route_returns_each_stage_as_an_object(tmp_path: Path) -> None:
     # Assert
     assert set(stages[0]) == {"label", "done", "percent", "eta_seconds"}
     assert stages[0]["label"] == "Packages installed"
+
+
+def test_start_streams_stage_updates_then_the_verdict(tmp_path: Path) -> None:
+    """The apply request streams progress as it runs, so the connection stays alive while the seed
+    downloads; the last line carries the verdict."""
+    # Arrange
+    service = make_analyst_server(tmp_path, FakeRunner())
+
+    # Act
+    lines = list(service.start_stream(KEYS))
+
+    # Assert — stage updates first, then one verdict line
+    assert len(lines) >= 2
+    assert '"stages"' in lines[0]
+    final = json.loads(lines[-1])
+    assert final["result"]["verified"] is True

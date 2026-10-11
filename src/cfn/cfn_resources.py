@@ -584,7 +584,7 @@ def build_userdata(
         "[Service]\n"
         "WorkingDirectory=/opt/arcnode-wizard-src\n"
         "Environment=PYTHONPATH=/opt/arcnode-wizard-src\n"
-        "ExecStart=/usr/bin/python3 -m src.wizard.main\n"
+        "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main\n"
         "Restart=on-failure\n"
         "[Install]\n"
         "WantedBy=multi-user.target\n"
