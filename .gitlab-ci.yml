@@ -103,7 +103,8 @@ build_base_ami:
   script:
     - packer init src/ami/ems-base.pkr.hcl
     - packer build -var "release=${CI_COMMIT_SHORT_SHA}" src/ami/ems-base.pkr.hcl
-    - AMI_ID=$(jq -r '.builds[-1].artifact_id' ami-manifest.json | cut -d: -f2)
+    - AMI_ID=$(jq -r '.builds[-1].artifact_id' ami-manifest.json)
+    - AMI_ID="${AMI_ID#*:}"
     - aws ssm put-parameter --name /arcnode/ems/base-ami-id --type String --value "$AMI_ID" --overwrite
     - python3 src/ami/prune_base_amis.py --keep 3
 
