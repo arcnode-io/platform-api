@@ -541,7 +541,7 @@ function primaryBtnStyle(t, disabled) {
 
 // ─── Main wizard body ───────────────────────────────────────────────
 function SetupWizardBody({ t, isDark, onToggleTheme }) {
-  // { deployment: 'cloud' | 'on-prem', account, completed } from GET /api/config
+  // { deployment, badge: 'On-Prem' | 'Commercial' | 'Defense', account, completed } from GET /api/config
   const [setup, setSetup] = useStateW(null);
   const [current, setCurrent] = useStateW(null);
   const [completed, setCompleted] = useStateW(new Set());
@@ -639,7 +639,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
       fontFamily: t.fontBody, color: t.text,
       minHeight: '100%',
     }}>
-      <HeaderW t={t} steps={steps} deployment={setup?.deployment} current={current}
+      <HeaderW t={t} steps={steps} deployment={setup?.badge} current={current}
         isDark={isDark} onToggleTheme={onToggleTheme}/>
       {setup && (
         <FooterW t={t} steps={steps} current={current} stepVerified={completed.has(current)}

@@ -36,10 +36,33 @@ class OllamaSettings(BaseModel):
     context_length: int
 
 
+class Variant(StrEnum):
+    """Which cloud product this box is: commercial or defense. Only cloud has one."""
+
+    COMMERCIAL = "commercial"
+    DEFENSE = "defense"
+
+
+class Badge(StrEnum):
+    """The label in the wizard header: where the box runs and which product it is."""
+
+    ON_PREM = "On-Prem"
+    COMMERCIAL = "Commercial"
+    DEFENSE = "Defense"
+
+
+def badge_for(deployment: Deployment, variant: Variant) -> Badge:
+    """On-prem is always On-Prem; cloud is Commercial or Defense by variant."""
+    if deployment == Deployment.ON_PREM:
+        return Badge.ON_PREM
+    return Badge.DEFENSE if variant == Variant.DEFENSE else Badge.COMMERCIAL
+
+
 class WizardConfig(BaseModel):
     """/etc/arcnode/wizard-cfg.yml, written by the provisioning path."""
 
     deployment: Deployment
+    variant: Variant = Variant.COMMERCIAL  # cloud only; on-prem ignores it
     hardware: HardwareMinimums
     ollama: OllamaSettings | None = None  # on-prem only
 
@@ -103,6 +126,7 @@ class SetupInfo(BaseModel):
     """GET /api/config — what the UI needs before apply."""
 
     deployment: Deployment
+    badge: Badge
     account: str
     completed: list[str]
 

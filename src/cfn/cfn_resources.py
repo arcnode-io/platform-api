@@ -568,6 +568,7 @@ def build_userdata(
         "mkdir -p /etc/arcnode\n"
         "cat > /etc/arcnode/wizard-cfg.yml <<YML\n"
         "deployment: cloud\n"
+        "variant: commercial\n"
         "hardware:\n"
         "  vcpus: 8\n"
         "  memory_gib: 32\n"

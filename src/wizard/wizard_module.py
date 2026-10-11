@@ -172,6 +172,7 @@ class WizardModule:
             analyst_server=self.analyst_server,
             der_control=self.der_control,
             cloud_secrets=self.cloud_secrets,
+            variant=config.variant,
             device_api=self.device_api,
             industrial_gateway=self.industrial_gateway,
             hmi=self.hmi,

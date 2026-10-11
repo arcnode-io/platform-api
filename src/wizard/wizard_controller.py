@@ -51,6 +51,8 @@ from src.wizard.ssh_service import (
 from src.wizard.analyst_server_progress import StageProgress
 from src.wizard.setup_token import TOKEN_HEADER
 from src.wizard.wizard_record import (
+    Variant,
+    badge_for,
     CloudSecrets,
     DerControlRequest,
     AnalystServerKeys,
@@ -115,6 +117,7 @@ class WizardController:
         deployment: Deployment,
         account: SshAccount,
         setup_token: str | None = None,
+        variant: Variant = Variant.COMMERCIAL,
     ) -> None:
         self._preflight = preflight
         self._ssh = ssh
@@ -137,6 +140,7 @@ class WizardController:
         self._grafana = grafana
         self._tracker = tracker
         self._deployment = deployment
+        self._variant = variant
         self._account = account
         self.router = APIRouter()
         token_deps = [Depends(_require_setup_token(setup_token))] if setup_token else []
@@ -196,6 +200,7 @@ class WizardController:
         self._refuse_if_applied()
         return SetupInfo(
             deployment=self._deployment,
+            badge=badge_for(self._deployment, self._variant),
             account=self._account.name,
             completed=self._tracker.completed(),
         )
