@@ -20,6 +20,7 @@ const ALL_STEPS = [
   { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts',           deployments: ['on-prem'] },
   { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements', deployments: ['on-prem'] },
   { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology', deployments: ['on-prem'] },
+  { id: 'cloud_secrets', n: 1, title: 'Passwords', sub: 'Operator, viewer, Grafana', deployments: ['cloud'] },
   { id: 'der_control_api', n: 10, title: 'DER control API', sub: 'Utility link', deployments: ['on-prem'] },
   { id: 'industrial_gateway', n: 11, title: 'Industrial gateway', sub: 'Device bridge', deployments: ['on-prem'] },
   { id: 'hmi',      n: 12, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
@@ -558,6 +559,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [analystServerKeys, setAnalystServerKeys] = useStateW({});
   // The utility's DERMS base URL, optional.
   const [derControlUrl, setDerControlUrl] = useStateW('');
+  // The cloud box's three customer passwords.
+  const [cloudPasswords, setCloudPasswords] = useStateW({});
   // { [model]: latest download progress } while the Ollama page streams
   const [downloads, setDownloads] = useStateW({});
 
@@ -700,6 +703,11 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'mlflow' && (
             <StepMlflow t={t} page={pageOf('mlflow')}
               onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
+          )}
+          {current === 'cloud_secrets' && (
+            <StepCloudSecrets t={t} page={pageOf('cloud_secrets')} passwords={cloudPasswords}
+              onPassword={(k, v) => setCloudPasswords(s => ({ ...s, [k]: v }))}
+              onApply={() => applyStep('cloud_secrets', '/api/cloud-secrets', cloudPasswords)}/>
           )}
           {current === 'der_control_api' && (
             <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}

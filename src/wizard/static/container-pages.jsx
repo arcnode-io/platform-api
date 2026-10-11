@@ -466,3 +466,59 @@ function StepDerControl({ t, page, url, onUrl, onApply }) {
   );
 }
 window.StepDerControl = StepDerControl;
+
+// ─── Cloud passwords ────────────────────────────────────────────────────────────
+// The cloud box's three customer passwords, the same ones on-prem asks for.
+const CLOUD_SECRET_FIELDS = [
+  { key: 'operator_password', label: 'Operator password' },
+  { key: 'viewer_password', label: 'Viewer password' },
+  { key: 'grafana_password', label: 'Grafana admin password' },
+];
+
+function StepCloudSecrets({ t, page, passwords, onPassword, onApply }) {
+  const isApplying = page.state === 'applying';
+  const isDone     = page.state === 'done';
+  const allFilled  = CLOUD_SECRET_FIELDS.every(f => passwords[f.key]);
+  const anyProblem = CLOUD_SECRET_FIELDS.some(f => passwords[f.key] && passwordProblem(passwords[f.key]));
+  const canApply   = !isApplying && !isDone && allFilled && !anyProblem;
+  const buttonLabel = isApplying ? 'Saving'
+    : page.state === 'unverified' ? 'Try again' : 'Save & continue';
+  return (
+    <StepShellW t={t} title="Passwords"
+      blurb="Set a password for each of these. The EMS services start once they're saved.">
+      {CLOUD_SECRET_FIELDS.map(f => {
+        const value   = passwords[f.key] || '';
+        const problem = value ? passwordProblem(value) : null;
+        return (
+          <div key={f.key} style={{ marginBottom: SPACE[4] }}>
+            <FieldLabelW t={t} required>{f.label}</FieldLabelW>
+            <PasswordInputW t={t} label={f.label} value={value}
+              onChange={v => onPassword(f.key, v)}
+              disabled={isApplying || isDone} error={!!problem}/>
+            {problem && <HelperW t={t} error>{problem}</HelperW>}
+          </div>
+        );
+      })}
+      <HelperW t={t}>At least 8 characters with an uppercase letter, a number, and a special character.</HelperW>
+      {!isDone && (
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
+          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {buttonLabel}
+        </button>
+      )}
+      {page.state === 'error' && (
+        <div style={{ marginTop: SPACE[4] }}>
+          <HelperW t={t} error>Failed: {page.error}</HelperW>
+          <HintW t={t} label="See the wizard's own log, on the appliance console" command={WIZARD_LOG_HINT}/>
+        </div>
+      )}
+      {page.result && !isApplying && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[3], marginTop: SPACE[5] }}>
+          {page.result.checks.map(check => <CheckRowW key={check.name} t={t} check={check}/>)}
+        </div>
+      )}
+    </StepShellW>
+  );
+}
+window.StepCloudSecrets = StepCloudSecrets;
