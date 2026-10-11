@@ -78,5 +78,5 @@ def test_progress_route_returns_each_stage_as_an_object(tmp_path: Path) -> None:
     stages = client.get("/api/analyst-server/progress").json()
 
     # Assert
-    assert set(stages[0]) == {"label", "done", "percent"}
+    assert set(stages[0]) == {"label", "done", "percent", "eta_seconds"}
     assert stages[0]["label"] == "Packages installed"

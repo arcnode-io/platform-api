@@ -401,7 +401,7 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE[2], marginTop: SPACE[4] }}>
           {stages.map(stage => (
             <div key={stage.label} style={{ fontSize: 13, color: stage.done ? t.statusOk : t.textSoft }}>
-              {stage.done ? '✓' : '…'} {stage.label}{stage.percent != null ? ` — ${stage.percent}%` : ''}
+              {stage.done ? '✓' : '…'} {stage.label}{stage.percent != null ? ` — ${stage.percent}%` : ''}{stage.eta_seconds != null ? ` · about ${Math.max(1, Math.round(stage.eta_seconds / 60))} min left` : ''}
             </div>
           ))}
         </div>
