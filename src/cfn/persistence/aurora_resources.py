@@ -1,6 +1,6 @@
 """Aurora serverless PG CFN resources — cluster, instance, master secret.
 
-Engine version 16.4 (PG 16.x supports scale-to-0 ACU; 16.3+ required).
+Engine version 16.13 (PG 16.x supports scale-to-0 ACU; 16.3+ required).
 The cluster sits in the existing public subnet for MVP; locking it into
 private subnets is a future hardening step (introduces NAT, changes
 cost; out of scope here).
@@ -9,7 +9,11 @@ cost; out of scope here).
 from pathlib import Path
 from typing import Final
 
-ENGINE_VERSION: Final[str] = "16.4"
+# Pinned to a minor AWS still offers AND cfn-lint's catalog knows: 16.4 was withdrawn
+# and every commercial CreateStack failed with "Cannot find version 16.4" (e2e,
+# 2026-10-11). Before bumping, check both
+# `aws rds describe-db-engine-versions --engine aurora-postgresql` and cfn-lint.
+ENGINE_VERSION: Final[str] = "16.13"
 SECONDS_UNTIL_AUTO_PAUSE: Final[int] = 300  # 5 min idle → auto-pause
 MASTER_USERNAME: Final[str] = "ems_master"
 LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
