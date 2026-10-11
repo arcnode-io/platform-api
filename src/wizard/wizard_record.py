@@ -223,10 +223,16 @@ class DerControlRequest(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def cert_and_key_go_together(self) -> "DerControlRequest":
-        """A certificate without its key (or the reverse) would fail der-control-api at boot."""
+    def utility_identity_is_well_formed(self) -> "DerControlRequest":
+        """A half identity, a non-PKCS#8 key, or a non-PEM file would fail der-control-api at boot."""
         if bool(self.device_cert_pem) != bool(self.device_key_pem):
             raise ValueError("the device certificate and its private key must be given together")
+        if self.device_cert_pem and "-----BEGIN CERTIFICATE-----" not in self.device_cert_pem:
+            raise ValueError("the device certificate must be PEM (-----BEGIN CERTIFICATE-----)")
+        if self.device_key_pem and "-----BEGIN PRIVATE KEY-----" not in self.device_key_pem:
+            raise ValueError("the device key must be PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)")
+        if self.utility_ca_pem and "-----BEGIN CERTIFICATE-----" not in self.utility_ca_pem:
+            raise ValueError("the utility CA bundle must be PEM certificates")
         return self
 
     @field_validator("lfdi_allowlist")

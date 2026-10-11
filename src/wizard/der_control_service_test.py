@@ -135,3 +135,18 @@ def test_no_identity_removes_the_files_so_the_service_boots_without_one(tmp_path
 
     # Assert
     assert not (ems / "der-control-client.pem").exists()
+
+
+def test_a_key_that_is_not_pkcs8_is_refused() -> None:
+    # Arrange + Act / Assert — der-control-api reads PKCS#8 only; an RSA-only key would fail its boot
+    with pytest.raises(ValueError):
+        DerControlRequest(
+            device_cert_pem=CERT_PEM,
+            device_key_pem="-----BEGIN RSA PRIVATE KEY-----\nMIIBkey\n-----END RSA PRIVATE KEY-----\n",
+        )
+
+
+def test_a_cert_that_is_not_pem_is_refused() -> None:
+    # Arrange + Act / Assert
+    with pytest.raises(ValueError):
+        DerControlRequest(device_cert_pem="not a certificate", device_key_pem=KEY_PEM)
