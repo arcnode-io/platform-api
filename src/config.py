@@ -94,7 +94,12 @@ class _ZuluFormatter(logging.Formatter):
 
         """
         zulu_time = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        return f"{zulu_time}  {record.levelname}: {record.getMessage()}"
+        line = f"{zulu_time}  {record.levelname}: {record.getMessage()}"
+        # Reason: logging.exception() puts the cause in exc_info; dropping it leaves
+        # production failures as one line with no traceback.
+        if record.exc_info:
+            line = f"{line}\n{self.formatException(record.exc_info)}"
+        return line
 
 
 def setup_logger(config: Config) -> None:
