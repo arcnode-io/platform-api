@@ -152,3 +152,40 @@ async def test_an_api_error_raises_with_namecheaps_message() -> None:
     # Act + Assert
     with pytest.raises(RuntimeError, match="Invalid request IP"):
         await client.list_records("arcnode.io")
+
+
+@pytest.mark.asyncio
+async def test_an_mx_record_carries_its_priority_and_switches_the_domain_to_custom_mx() -> (
+    None
+):
+    """Namecheap only honours MX hosts when EmailType=MX rides along with setHosts."""
+    # Arrange
+    sent: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        form = _form(request)
+        sent.append(form)
+        if form["Command"] == "namecheap.domains.dns.getHosts":
+            return httpx.Response(200, text=GET_HOSTS_OK)
+        return httpx.Response(200, text=SET_HOSTS_OK)
+
+    client = _client(handler)
+
+    # Act
+    await client.upsert_record(
+        "arcnode.io",
+        DnsRecord(
+            host="send",
+            type=RecordType.MX,
+            address="feedback-smtp.us-east-1.amazonses.com",
+            ttl=1800,
+            mx_pref=10,
+        ),
+    )
+
+    # Assert
+    set_hosts = sent[1]
+    assert (set_hosts["HostName3"], set_hosts["RecordType3"]) == ("send", "MX")
+    assert set_hosts["MXPref3"] == "10"
+    assert set_hosts["EmailType"] == "MX"
+    assert "EmailType" not in sent[0]

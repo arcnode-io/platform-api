@@ -24,6 +24,7 @@ class RecordType(StrEnum):
     A = "A"
     CNAME = "CNAME"
     TXT = "TXT"
+    MX = "MX"
 
 
 class DnsRecord(BaseModel):
@@ -84,6 +85,9 @@ class DnsClient:
             fields[f"Address{n}"] = r.address
             fields[f"MXPref{n}"] = str(r.mx_pref)
             fields[f"TTL{n}"] = str(r.ttl)
+        # Reason: Namecheap drops MX hosts unless the domain's mail setting is custom MX.
+        if any(r.type == RecordType.MX for r in records):
+            fields["EmailType"] = "MX"
         await self._call(SET_HOSTS, fields)
 
     async def _call(self, command: str, fields: dict[str, str]) -> ET.Element:
