@@ -18,14 +18,18 @@ class FakeEc2:
         self.deregistered: list[str] = []
         self.deleted_snapshots: list[str] = []
 
-    def describe_images(self, **kwargs: object) -> dict[str, list[dict[str, object]]]:  # noqa: ARG002  # filters are fixed in the module
+    def describe_images(self, **kwargs: object) -> dict[str, list[dict[str, object]]]:
+        """The fixed image list; the filters don't change the answer here."""
+        del kwargs
         return {"Images": self._images}
 
-    def deregister_image(self, ImageId: str) -> None:  # noqa: N803  # boto3's own name
-        self.deregistered.append(ImageId)
+    def deregister_image(self, **kwargs: object) -> None:
+        """Record the deregistered image."""
+        self.deregistered.append(str(kwargs["ImageId"]))
 
-    def delete_snapshot(self, SnapshotId: str) -> None:  # noqa: N803  # boto3's own name
-        self.deleted_snapshots.append(SnapshotId)
+    def delete_snapshot(self, **kwargs: object) -> None:
+        """Record the deleted snapshot."""
+        self.deleted_snapshots.append(str(kwargs["SnapshotId"]))
 
 
 def test_keeps_the_newest_three_and_deletes_the_rest_with_their_snapshots() -> None:

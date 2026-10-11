@@ -10,18 +10,18 @@ NAME_PREFIX: Final[str] = "arcnode-ems-base-"
 
 
 class Ec2Client(Protocol):
-    """The part of boto3's EC2 client this module uses."""
+    """The part of boto3's EC2 client this module uses; the calls take boto3's keyword arguments."""
 
     def describe_images(self, **kwargs: object) -> dict[str, list[dict[str, object]]]:
         """Images matching the filters."""
         ...
 
-    def deregister_image(self, ImageId: str) -> None:  # noqa: N803  # boto3's own name
-        """Remove an image's registration."""
+    def deregister_image(self, **kwargs: object) -> None:
+        """Remove an image's registration (ImageId=...)."""
         ...
 
-    def delete_snapshot(self, SnapshotId: str) -> None:  # noqa: N803  # boto3's own name
-        """Delete a snapshot."""
+    def delete_snapshot(self, **kwargs: object) -> None:
+        """Delete a snapshot (SnapshotId=...)."""
         ...
 
 
