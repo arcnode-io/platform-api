@@ -541,6 +541,43 @@ function primaryBtnStyle(t, disabled) {
 }
 
 // ─── Main wizard body ───────────────────────────────────────────────
+// The end of setup: shown the moment the last page verifies. The server turns the wizard
+// off when every page is done, so this renders from client state and then hands the
+// browser to the operator screen, which the HMI page put behind HTTPS on this box.
+const REDIRECT_SECONDS = 8;
+
+function SetupCompleteW({ t }) {
+  const [left, setLeft] = useStateW(REDIRECT_SECONDS);
+  const target = `https://${window.location.hostname}/`;
+  useEffectW(() => {
+    if (left <= 0) { window.location.href = target; return undefined; }
+    const timer = setTimeout(() => setLeft(left - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [left]);
+  return (
+    <StepShellW t={t} title="Setup complete"
+      blurb="ArcNode EMS is running on this box. This setup page is now turned off.">
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: SPACE[3], marginTop: SPACE[5],
+        padding: `${SPACE[4]}px`, background: t.panel, border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
+      }}>
+        <CheckW color={t.statusOk} size={18}/>
+        <span style={{ fontFamily: t.fontBody, fontSize: 14, color: t.text }}>
+          Opening the operator screen in {Math.max(left, 0)} s.
+        </span>
+      </div>
+      <a href={target} style={{ ...primaryBtnStyle(t, false), display: 'inline-flex', alignItems: 'center',
+        textDecoration: 'none', marginTop: SPACE[4] }}>
+        Open the operator screen now
+      </a>
+      <div style={{ marginTop: SPACE[4], fontFamily: t.fontBody, fontSize: 13, color: t.textMid, maxWidth: 640, lineHeight: 1.55 }}>
+        This box's certificate is self-signed, so your browser warns once: choose Advanced, then
+        Proceed. Sign in with the operator login you set on the HiveMQ page.
+      </div>
+    </StepShellW>
+  );
+}
+
 function SetupWizardBody({ t, isDark, onToggleTheme }) {
   // { deployment, badge: 'On-Prem' | 'Commercial' | 'Defense', account, completed } from GET /api/config
   const [setup, setSetup] = useStateW(null);
@@ -675,6 +712,9 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     if (idx > 0) setCurrent(order[idx - 1]);
   };
   const onJump = (id) => setCurrent(id);
+  // Every page verified: show the end screen instead of the last page.
+  const finished = setup != null && steps.length > 0 && steps.every(s => completed.has(s.id));
+  const shown = finished ? null : current;
 
   return (
     <div style={{
@@ -697,87 +737,88 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           overflowY: 'auto',
           maxWidth: 820,
         }}>
-          {current === 'preflight' && (
+          {finished && <SetupCompleteW t={t}/>}
+          {shown === 'preflight' && (
             <StepPreflight t={t} page={pageOf('preflight')}
               onApply={() => applyStep('preflight', '/api/preflight', {})}/>
           )}
-          {current === 'ssh' && (
+          {shown === 'ssh' && (
             <StepSsh t={t} setup={setup} sshKey={sshKey} onKey={setSshKey} page={pageOf('ssh')}
               onApply={() => applyStep('ssh', '/api/ssh', { ssh_public_key: sshKey })}/>
           )}
-          {current === 'docker' && (
+          {shown === 'docker' && (
             <StepDocker t={t} page={pageOf('docker')}
               onApply={() => applyStep('docker', '/api/docker', {})}/>
           )}
-          {current === 'postgres' && (
+          {shown === 'postgres' && (
             <StepPostgres t={t} page={pageOf('postgres')} password={pgPassword} onPassword={setPgPassword}
               onApply={() => applyStep('postgres', '/api/postgres', { password: pgPassword })}/>
           )}
-          {current === 'neo4j' && (
+          {shown === 'neo4j' && (
             <StepNeo4j t={t} page={pageOf('neo4j')} password={neo4jPassword} onPassword={setNeo4jPassword}
               onApply={() => applyStep('neo4j', '/api/neo4j', { password: neo4jPassword })}/>
           )}
-          {current === 'ollama' && (
+          {shown === 'ollama' && (
             <StepOllama t={t} page={pageOf('ollama')} downloads={downloads} onApply={applyOllama}/>
           )}
-          {current === 'site' && (
+          {shown === 'site' && (
             <StepSite t={t} page={pageOf('site')}
               onApply={() => applyStep('site', '/api/site', {})}/>
           )}
-          {current === 'prometheus' && (
+          {shown === 'prometheus' && (
             <StepPrometheus t={t} page={pageOf('prometheus')}
               onApply={() => applyStep('prometheus', '/api/prometheus', {})}/>
           )}
-          {current === 'industrial_gateway' && (
+          {shown === 'industrial_gateway' && (
             <StepIndustrialGateway t={t} page={pageOf('industrial_gateway')}
               onApply={() => applyStep('industrial_gateway', '/api/industrial-gateway', {})}/>
           )}
-          {current === 'grafana' && (
+          {shown === 'grafana' && (
             <StepGrafana t={t} page={pageOf('grafana')} password={grafanaPassword} onPassword={setGrafanaPassword}
               onApply={() => applyStep('grafana', '/api/grafana', { password: grafanaPassword })}/>
           )}
-          {current === 'hmi' && (
+          {shown === 'hmi' && (
             <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
           )}
-          {current === 'ssh_lockdown' && (
+          {shown === 'ssh_lockdown' && (
             <StepSshLockdown t={t} page={pageOf('ssh_lockdown')} checked={lockdownPasswords} onChecked={setLockdownPasswords}
               onApply={() => applyStep('ssh_lockdown', '/api/ssh-lockdown', { disable_password_login: lockdownPasswords })}/>
           )}
-          {current === 'device_api' && (
+          {shown === 'device_api' && (
             <StepDeviceApi t={t} page={pageOf('device_api')} secrets={deviceApiSecrets}
               onSecret={(key, value) => setDeviceApiSecrets(p => ({ ...p, [key]: value }))}
               onApply={() => applyStep('device_api', '/api/device-api', deviceApiSecrets)}/>
           )}
-          {current === 'mlflow' && (
+          {shown === 'mlflow' && (
             <StepMlflow t={t} page={pageOf('mlflow')}
               onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
           )}
-          {current === 'cloud_secrets' && (
+          {shown === 'cloud_secrets' && (
             <StepCloudSecrets t={t} page={pageOf('cloud_secrets')} passwords={cloudPasswords}
               onPassword={(k, v) => setCloudPasswords(s => ({ ...s, [k]: v }))}
               onApply={() => applyStep('cloud_secrets', '/api/cloud-secrets', cloudPasswords)}/>
           )}
-          {current === 'der_control_api' && (
+          {shown === 'der_control_api' && (
             <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}
               onUrl={setDerControlUrl} lfdis={derLfdis} onLfdis={setDerLfdis}
               pems={derPems} onPem={(k, v) => setDerPems(s => ({ ...s, [k]: v }))}
               onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null, lfdi_allowlist: derLfdis, ...derPems })}
               onSkip={() => applyStep('der_control_api', '/api/der-control/skip', {})}/>
           )}
-          {current === 'analyst_server' && (
+          {shown === 'analyst_server' && (
             <StepAnalystServer t={t} page={pageOf('analyst_server')} keys={analystServerKeys}
               onKey={(k, v) => setAnalystServerKeys(s => ({ ...s, [k]: v }))}
               onApply={() => applyAnalystServer()}/>
           )}
-          {current === 'analyst_model' && (
+          {shown === 'analyst_model' && (
             <StepAnalystModel t={t} page={pageOf('analyst_model')}
               onApply={() => applyStep('analyst_model', '/api/analyst-model', {})}/>
           )}
-          {current === 'telemetry' && (
+          {shown === 'telemetry' && (
             <StepTelemetry t={t} page={pageOf('telemetry')}
               onApply={() => applyStep('telemetry', '/api/telemetry', {})}/>
           )}
-          {current === 'hivemq' && (
+          {shown === 'hivemq' && (
             <StepHivemq t={t} page={pageOf('hivemq')} passwords={brokerPasswords}
               onPassword={(key, value) => setBrokerPasswords(p => ({ ...p, [key]: value }))}
               onApply={() => applyStep('hivemq', '/api/hivemq', brokerPasswords)}/>
