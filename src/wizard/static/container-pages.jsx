@@ -424,7 +424,7 @@ window.StepAnalystServer = StepAnalystServer;
 
 // ─── DER control API ────────────────────────────────────────────────────────────
 // Optional: the DERMS base URL the utility gives. Blank means the utility isn't connected yet.
-function StepDerControl({ t, page, url, onUrl, onApply }) {
+function StepDerControl({ t, page, url, onUrl, onApply, onSkip }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
   const badUrl     = url !== '' && !url.startsWith('https://');
@@ -449,6 +449,11 @@ function StepDerControl({ t, page, url, onUrl, onApply }) {
           style={{ ...primaryBtnStyle(t, !canApply), marginTop: SPACE[4] }}>
           {isApplying && <SpinnerW color="#fff" size={13}/>}
           {buttonLabel}
+        </button>
+      )}
+      {!isDone && !isApplying && (
+        <button onClick={onSkip} style={{ ...primaryBtnStyle(t, false), marginTop: SPACE[3], background: 'transparent', color: t.textSoft, border: `1px solid ${t.border}` }}>
+          Skip for now
         </button>
       )}
       {page.state === 'error' && (

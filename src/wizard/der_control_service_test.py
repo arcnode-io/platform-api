@@ -51,3 +51,16 @@ def test_utility_url_is_written_when_the_customer_gives_one(tmp_path: Path) -> N
     # Assert
     written = yaml.safe_load((tmp_path / "opt" / DER_CONTROL_CFG_FILE).read_text())
     assert written["utilityMirrorUrl"] == "https://derms.utility.example"
+
+
+def test_skipping_the_der_page_lets_the_wizard_continue(tmp_path: Path) -> None:
+    # Arrange — the utility isn't connected yet; the customer moves on
+    service = make_der_control(tmp_path)
+
+    # Act
+    result = service.skip()
+
+    # Assert
+    assert result.verified
+    assert [c.name for c in result.checks] == ["Skipped for now"]
+    assert tracker(tmp_path).is_done("der_control_api")

@@ -97,7 +97,7 @@ class FakeRunner:
             "logs analyst-server": ok("Uvicorn running on http://0.0.0.0:8000\n"),
             "ip -4 route get": ok("1.1.1.1 via 10.0.0.1 dev eth0 src 10.0.0.209 uid 1000\n"),
             "der-control-api:8080/actuator/health": ok('{"status":"UP"}'),
-            "logs der-control-api": ok("🔐 1 LFDI(s) allowed to POST DERControls\n"),
+            "logs der-control-api": ok("Started Application in 13.117 seconds\n"),
             "logs analyst-model": ok("✅ MLflow healthy at http://mlflow:5000\nScheduler started. Will run daily at 14:00\n"),
             "logs industrial-gateway": ok("initial spec fetched\nMQTT subscriptions established\n"),
             "logs hmi": ok("start worker processes\n"),

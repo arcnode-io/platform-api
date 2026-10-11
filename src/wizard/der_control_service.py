@@ -18,8 +18,9 @@ from src.wizard.wizard_record import Command, Deployment, DerControlRequest, Ste
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 DER_CONTROL_SERVICE: Final[str] = "der-control-api"
-# Logged by LfdiAllowlist at boot, once the config and allowlist have loaded.
-READY_LINE: Final[str] = "LFDI(s) allowed to POST DERControls"
+# Spring Boot prints this once the app has started, whatever the allowlist holds.
+# (An empty allowlist logs a WARN instead of the LFDI count, so waiting on that line hangs.)
+READY_LINE: Final[str] = "Started Application in"
 HEALTH_URL: Final[str] = "http://der-control-api:8080/actuator/health"
 PROBE_IMAGE: Final[str] = "curlimages/curl"
 # The DER ingress's public port on the box; the utility reaches it there.
@@ -71,6 +72,17 @@ class DerControlService:
         if verified:
             self._tracker.mark_done("der_control_api")
         return StepResult(verified=verified, checks=checks)
+
+    def skip(self) -> StepResult:
+        """Mark the page done without starting the service: the utility isn't connected yet.
+        The customer adds the link later, so nothing here can block the rest of setup."""
+        if self._deployment == Deployment.CLOUD:
+            raise DerControlStepNotAvailableError("no DER control API page in the cloud")
+        self._tracker.mark_done("der_control_api")
+        return StepResult(
+            verified=True,
+            checks=[VerifyCheck(name="Skipped for now", ok=True, detail="add the utility link later", hint="")],
+        )
 
     def _box_address(self) -> str:
         """The address the box uses to reach the internet — the one the utility sees."""

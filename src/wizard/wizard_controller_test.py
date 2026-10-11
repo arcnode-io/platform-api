@@ -192,3 +192,14 @@ def test_wizard_files_are_revalidated_on_every_load(tmp_path: Path) -> None:
     # Assert
     assert page.headers["cache-control"] == "no-cache"
     assert asset.headers["cache-control"] == "no-cache"
+
+
+def test_der_control_can_be_skipped_so_setup_continues(tmp_path: Path) -> None:
+    # Arrange — no utility link yet
+    client = wizard_client(tmp_path)
+
+    # Act
+    response = client.post("/api/der-control/skip")
+
+    # Assert
+    assert response.json()["verified"] is True

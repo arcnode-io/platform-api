@@ -165,6 +165,7 @@ class WizardController:
             ("POST", "/api/analyst-server", self.analyst_server),
             ("GET", "/api/analyst-server/progress", self.analyst_server_progress),
             ("POST", "/api/der-control", self.der_control),
+            ("POST", "/api/der-control/skip", self.der_control_skip),
             ("POST", "/api/cloud-secrets", self.cloud_secrets),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
@@ -308,6 +309,13 @@ class WizardController:
         try:
             return self._cloud_secrets.apply(request)
         except (StepAlreadyDoneError, CloudSecretsStepNotAvailableError) as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    def der_control_skip(self) -> StepResult:
+        """Skip the DER page for now: the utility isn't connected yet."""
+        try:
+            return self._der_control.skip()
+        except (StepAlreadyDoneError, DerControlStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def der_control(self, request: DerControlRequest) -> StepResult:

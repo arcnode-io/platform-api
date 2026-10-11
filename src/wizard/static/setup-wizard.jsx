@@ -712,7 +712,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {current === 'der_control_api' && (
             <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}
               onUrl={setDerControlUrl}
-              onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null })}/>
+              onApply={() => applyStep('der_control_api', '/api/der-control', { utility_mirror_url: derControlUrl || null })}
+              onSkip={() => applyStep('der_control_api', '/api/der-control/skip', {})}/>
           )}
           {current === 'analyst_server' && (
             <StepAnalystServer t={t} page={pageOf('analyst_server')} keys={analystServerKeys}
