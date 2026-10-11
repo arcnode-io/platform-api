@@ -136,8 +136,11 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
     assert "EmsInstanceProfile" in rendered
     assert "EmsSubnet" in rendered
     assert "EmsSecurityGroup" in rendered
-    # SSM resolve syntax — CFN looks up the latest AL2023 AMI in --region
-    assert "resolve:ssm:/arcnode/ems/base-ami-id" in rendered
+    # SSM resolve syntax — CFN looks up the latest stock AL2023 AMI in --region
+    assert (
+        "resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+        in rendered
+    )
     # No stale top-level Mappings table (anchor to start-of-line so this
     # doesn't false-positive on BlockDeviceMappings: in the EmsInstance).
     assert "\nMappings:" not in rendered
@@ -634,19 +637,25 @@ def test_userdata_writes_the_setup_token_for_the_wizard() -> None:
     assert "SETUP_TOKEN=$(" in rendered
 
 
-def test_cloud_instance_uses_the_base_ami_from_ssm() -> None:
-    """The stack reads the base AMI id the build job publishes, not the stock
-    Amazon Linux image, so the cloud box boots the same baked image as on-prem."""
+def test_cloud_instance_uses_the_stock_al2023_ami_for_every_variant() -> None:
+    """Every cloud variant boots the stock Amazon Linux 2023 AMI, GovCloud included.
+    The box downloads the wizard at boot, so there is no custom image to build or copy.
+    """
     # Arrange + Act
-    rendered = _render(DeploymentContext.COMMERCIAL)
+    commercial = _render(DeploymentContext.COMMERCIAL)
+    defense = _render(DeploymentContext.DEFENSE_FORWARD)
 
     # Assert
-    assert "/arcnode/ems/base-ami-id" in rendered
+    stock = "resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+    assert stock in commercial
+    assert stock in defense
+    assert "base-ami-id" not in commercial
 
 
 def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> None:
-    """The cloud box runs the baked wizard as a service, configured for cloud with
-    the m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU), after secrets.env exists."""
+    """The cloud box downloads the wizard at boot and runs it as a service, configured
+    for cloud with the m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU), after secrets.env exists.
+    """
     # Arrange + Act
     rendered = _render(DeploymentContext.COMMERCIAL)
 
@@ -654,9 +663,22 @@ def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> Non
     assert "deployment: cloud" in rendered
     assert "vcpus: 8" in rendered
     assert "gpus: 0" in rendered
-    # Assert — the unit runs the baked source, and starts after the token is written
-    assert "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main" in rendered
+    # Assert — the bundle and its pinned deps come from arcnode-public at boot, not a baked image
+    assert f"{ARCNODE_PUBLIC_BASE_URL}/wizard/wizard-src.tar.gz" in rendered
+    assert "dnf install -y python3.13" in rendered
+    assert "python3.13 -m venv /opt/arcnode-wizard-venv" in rendered
+    assert (
+        "/opt/arcnode-wizard-venv/bin/pip install -r "
+        "/opt/arcnode-wizard-src/src/wizard/requirements.txt"
+    ) in rendered
+    # Assert — the unit runs the downloaded source, and starts after the token is written
+    assert (
+        "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main" in rendered
+    )
     assert "systemctl enable --now arcnode-wizard" in rendered
+    assert rendered.index("pip install -r") < rendered.index(
+        "systemctl enable --now arcnode-wizard"
+    )
     assert rendered.index("SETUP_TOKEN=$(") < rendered.index(
         "systemctl enable --now arcnode-wizard"
     )

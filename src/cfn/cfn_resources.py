@@ -72,10 +72,17 @@ ARCNODE_PUBLIC_BASE_URL: Final[str] = (
     "https://arcnode-public.s3.us-east-1.amazonaws.com"
 )
 
-# Latest Amazon Linux 2023 x86_64 AMI in any region. CFN resolves this SSM
-# parameter against `--region` at deploy time, so the template is region-portable
-# without a Mappings table that would go stale every AMI revision.
-AMI_SSM_PARAMETER: Final[str] = "{{resolve:ssm:/arcnode/ems/base-ami-id}}"
+# Latest stock Amazon Linux 2023 x86_64 AMI in any region, GovCloud included. CFN resolves
+# this public SSM parameter against `--region` at deploy time, so the template is region-portable
+# without a Mappings table that would go stale every AMI revision. The wizard and its deps
+# are downloaded at boot, so no custom image is needed.
+AMI_SSM_PARAMETER: Final[str] = (
+    "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
+)
+# The wizard bundle CI publishes per release: src/__init__.py, customer_inputs.py, src/wizard/.
+WIZARD_BUNDLE_URL: Final[str] = f"{ARCNODE_PUBLIC_BASE_URL}/wizard/wizard-src.tar.gz"
+WIZARD_SRC_DIR: Final[str] = "/opt/arcnode-wizard-src"
+WIZARD_VENV_DIR: Final[str] = "/opt/arcnode-wizard-venv"
 EMS_SERVICES: Final[tuple[str, ...]] = (
     "ems-device-api",
     "ems-hmi",
@@ -565,6 +572,14 @@ def build_userdata(
     # with m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU). It starts after secrets.env
     # holds SETUP_TOKEN, so the gate is never open.
     wizard_block = (
+        # Stock AL2023 has no python 3.13, and the wizard needs it. pipefail (set above)
+        # makes a failed download stop the boot instead of installing a partial bundle.
+        "dnf install -y python3.13\n"
+        f"mkdir -p {WIZARD_SRC_DIR}\n"
+        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {WIZARD_BUNDLE_URL} "
+        f"| tar -xz -C {WIZARD_SRC_DIR}\n"
+        f"python3.13 -m venv {WIZARD_VENV_DIR}\n"
+        f"{WIZARD_VENV_DIR}/bin/pip install -r {WIZARD_SRC_DIR}/src/wizard/requirements.txt\n"
         "mkdir -p /etc/arcnode\n"
         "cat > /etc/arcnode/wizard-cfg.yml <<YML\n"
         "deployment: cloud\n"

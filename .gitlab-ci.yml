@@ -86,27 +86,15 @@ publish_compose:
   only:
     - main
 
-# Base AMI: Packer bakes the wizard and Docker into one image, the cloud's
-# equivalent of the ISO. Runs on every push to main after checks pass; it updates
-# the SSM parameter the stack reads, then keeps only the newest three AMIs.
-build_base_ami:
+# The cloud wizard bundle: cloud boxes run stock Amazon Linux 2023 and download this at
+# boot (EC2 UserData), so no custom AMI is built. Excludes keep test files out of the bucket.
+publish_wizard:
   stage: publish
-  image:
-    name: hashicorp/packer:1.16.0
-    entrypoint: [""]
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-  variables:
-    AWS_DEFAULT_REGION: us-east-1
-  before_script:
-    - apk add --no-cache aws-cli py3-boto3 jq
   script:
-    - packer init src/ami/ems-base.pkr.hcl
-    - packer build -var "release=${CI_COMMIT_SHORT_SHA}" src/ami/ems-base.pkr.hcl
-    - AMI_ID=$(jq -r '.builds[-1].artifact_id' ami-manifest.json)
-    - AMI_ID="${AMI_ID#*:}"
-    - aws ssm put-parameter --name /arcnode/ems/base-ami-id --type String --value "$AMI_ID" --overwrite
-    - python3 src/ami/prune_base_amis.py --keep 3
+    - tar -czf wizard-src.tar.gz --exclude "__pycache__" --exclude "*_test.py" src/__init__.py src/customer_inputs.py src/wizard
+    - aws s3 cp wizard-src.tar.gz s3://arcnode-public/wizard/wizard-src.tar.gz
+  only:
+    - main
 
 publish_iso:
   # The appliance ISO: stock Debian netinst + preseed late_command hook.
