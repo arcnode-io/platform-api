@@ -4,7 +4,7 @@ CI runs this before the checks job, and you run it by hand before the orders
 integration test. The repo's keys equal the S3 keys, so each file is one raw
 GitLab URL. Files the repo doesn't have (404) are reported, not faked here.
 
-Usage: uv run python tests/fixtures/edp_assets.py --sha df0e970
+Usage: uv run python tests/fixtures/edp_assets.py --sha 5846e0f
 """
 
 import argparse
