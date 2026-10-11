@@ -568,7 +568,7 @@ def build_userdata(
         "mkdir -p /etc/arcnode\n"
         "cat > /etc/arcnode/wizard-cfg.yml <<YML\n"
         "deployment: cloud\n"
-        "variant: commercial\n"
+        f"variant: {'commercial' if is_commercial else 'defense'}\n"
         "hardware:\n"
         "  vcpus: 8\n"
         "  memory_gib: 32\n"
@@ -595,7 +595,7 @@ def build_userdata(
     # Commercial waits for the wizard: the containers start once the customer saves
     # their passwords. e2e has no wizard, and defense never had one, so both start here.
     compose_up_line = (
-        "" if (is_commercial and not e2e) else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
+        "" if (not e2e) else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
     )
     # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
     # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.

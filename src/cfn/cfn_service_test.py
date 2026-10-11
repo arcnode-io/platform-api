@@ -145,9 +145,9 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
 
 def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
     """UserData bootstraps docker + compose, fetches artifacts, and starts the stack.
-    Defense starts at boot; commercial waits for the wizard."""
+    e2e starts at boot; real deploys wait for the wizard."""
     # Arrange + Act
-    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
+    rendered = _render(e2e=True)
 
     # Assert — bash shell + the expected file layout
     assert "#!/bin/bash" in rendered
@@ -665,3 +665,14 @@ def test_commercial_userdata_leaves_the_containers_to_the_wizard() -> None:
 
     # Assert
     assert "docker-compose.yaml up -d" not in rendered
+
+
+def test_defense_userdata_leaves_the_containers_to_the_wizard_and_names_its_variant() -> None:
+    """Defense waits for the wizard like commercial does, and its wizard config
+    says it's defense so the header badge reads Defense."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
+
+    # Assert
+    assert "docker-compose.yaml up -d" not in rendered
+    assert "variant: defense" in rendered
