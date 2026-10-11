@@ -5,6 +5,7 @@ answers from the arcnode network."""
 from pathlib import Path
 
 from src.wizard.analyst_server_service import AnalystServerService
+from src.wizard.controller_fixtures import wizard_client
 from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import AnalystServerKeys, Deployment
 
@@ -67,3 +68,15 @@ def test_progress_reports_each_stage_from_the_container_logs(tmp_path: Path) -> 
 
     # Assert
     assert [s.done for s in stages] == [False, False, False, True]
+
+
+def test_progress_route_returns_each_stage_as_an_object(tmp_path: Path) -> None:
+    # Arrange — the page reads stage.label and stage.done, so each stage must be a JSON object
+    client = wizard_client(tmp_path, runner=FakeRunner())
+
+    # Act
+    stages = client.get("/api/analyst-server/progress").json()
+
+    # Assert
+    assert set(stages[0]) == {"label", "done"}
+    assert stages[0]["label"] == "Packages installed"
