@@ -60,8 +60,13 @@ participant ses
 participant ems_hmi_cicd
 
 customer -> website : submit form
-website -> orchestrator : POST /submit
-orchestrator --> website : 200 "form submitted"
+website -> orchestrator : POST /platform-api/orders (ConfiguratorPayload)
+orchestrator --> website : 202 { order_id }
+note right of website
+  The 2xx is the site's only confirmation:
+  "Thanks for your order. Check your email shortly."
+  No status polling, no links — the email is the delivery.
+end note
 orchestrator -> platform_db : store config
 platform_db --> orchestrator : cfg_id
 loop until status == complete
