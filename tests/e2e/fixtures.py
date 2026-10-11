@@ -46,9 +46,11 @@ POLL_INTERVAL_S: Final[int] = 30
 # these — import them, don't hardcode.
 E2E_OPERATOR_PW: Final[str] = "e2e-operator-pw"
 E2E_VIEWER_PW: Final[str] = "e2e-viewer-pw"
+E2E_GRAFANA_PW: Final[str] = "e2e-grafana-pw"
 _AUTH_PARAMS: Final[list[ParameterTypeDef]] = [
     {"ParameterKey": "AuthOperatorPw", "ParameterValue": E2E_OPERATOR_PW},
     {"ParameterKey": "AuthViewerPw", "ParameterValue": E2E_VIEWER_PW},
+    {"ParameterKey": "GrafanaAdminPw", "ParameterValue": E2E_GRAFANA_PW},
 ]
 
 
@@ -122,6 +124,8 @@ def defense_stack(
                 "ParameterKey": "OpenweathermapApiKey",
                 "ParameterValue": "0" * 32,
             },
+            # The analyst-model's daily schedule reads this; e2e never gets that far.
+            {"ParameterKey": "GridstatusApiKey", "ParameterValue": "0" * 32},
             *_AUTH_PARAMS,
         ],
         Tags=[
@@ -184,6 +188,8 @@ def commercial_stack(
                 "ParameterKey": "OpenweathermapApiKey",
                 "ParameterValue": "0" * 32,
             },
+            # The analyst-model's daily schedule reads this; e2e never gets that far.
+            {"ParameterKey": "GridstatusApiKey", "ParameterValue": "0" * 32},
             {"ParameterKey": "GraphConnectionUrl", "ParameterValue": aura_url},
             {"ParameterKey": "TimeseriesConnectionUrl", "ParameterValue": tiger_url},
             *_AUTH_PARAMS,
