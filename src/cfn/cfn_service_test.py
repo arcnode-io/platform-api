@@ -731,3 +731,16 @@ def test_userdata_prepares_the_https_ingress_with_a_self_signed_cert_for_the_eip
     assert "-out /opt/arcnode/tls/server.pem" in rendered
     assert "-keyout /opt/arcnode/tls/server-key.pem" in rendered
     assert "subjectAltName=IP:${EmsEip}" in rendered
+
+
+def test_userdata_hands_the_observability_data_dirs_to_the_containers_users() -> None:
+    """Prometheus (uid 65534) and Grafana (uid 472) don't run as root, so a root-owned
+    data dir crash-loops them with 'permission denied'. Found on the first real stock-AMI
+    stack: the wizard fixes this on-prem, the cloud path never did."""
+    # Arrange + Act
+    rendered = _render(DeploymentContext.COMMERCIAL)
+
+    # Assert — created, then chowned, before compose ever starts
+    assert "chown -R 65534:65534 /opt/arcnode/observability/prometheus-data" in rendered
+    assert "chown -R 472:472 /opt/arcnode/observability/grafana-data" in rendered
+    assert rendered.index("chown -R 472:472") < rendered.index("docker compose")

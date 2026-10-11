@@ -758,6 +758,10 @@ def build_userdata(
         "/opt/arcnode/observability/grafana-data /opt/arcnode/observability/grafana-provisioning "
         "/opt/arcnode/mlflow/mlflow-data /opt/arcnode/mlflow/mlflow-artifacts "
         "/opt/arcnode/der-control-tls /opt/arcnode/tls\n"
+        # Prometheus runs as nobody (65534) and Grafana as 472; a root-owned data dir
+        # crash-loops both with "permission denied". Same ids the on-prem wizard uses.
+        "chown -R 65534:65534 /opt/arcnode/observability/prometheus-data\n"
+        "chown -R 472:472 /opt/arcnode/observability/grafana-data\n"
         "# config.env — non-secret config (deployment metadata + IAM-auth hostnames).\n"
         "cat > /opt/arcnode/config.env <<ENV\n"
         "AWS_REGION=${AWS::Region}\n"
