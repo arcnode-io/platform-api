@@ -342,6 +342,12 @@ def check_browser_dispatch_settles(stack: dict[str, str]) -> None:
             )
             apply_btn = page.get_by_test_id("dispatch-apply")
             expect(apply_btn).to_be_visible(timeout=20_000)
+            # Apply stays disabled at a 0 setpoint (CommandPanel: disabled when setpointKw === 0),
+            # and nothing proposes one for a fresh module, so set one with the stepper first.
+            page.locator('[data-comp="SetpointStepper"]').get_by_text(
+                "+", exact=True
+            ).click()
+            expect(apply_btn).to_be_enabled(timeout=10_000)
             apply_btn.click()
             # Two-step confirm — Apply never dispatches on first click.
             page.locator('[data-action="confirm"]').click()
