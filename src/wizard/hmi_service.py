@@ -141,7 +141,7 @@ class HmiService:
                     "/dev/null",
                     "-w",
                     "%{http_code}",
-                    HTTPS_URL,
+                    HTTP_URL,
                 ]
             )
         )
