@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 from src.edp_client.edp_artifacts import ArtifactRef
+from src.manifest.artifact_summary import subtitle_for
 from src.manifest.artifact_metadata import (
     MOCK_ARTIFACT_METADATA,
     SECTION_LETTER,
@@ -98,7 +99,11 @@ class ManifestService:
                 ManifestArtifact(
                     code="",
                     name=meta.name,
-                    subtitle=meta.subtitle,
+                    # Real counts from edp-api when it sent them; otherwise the table's line (or none).
+                    subtitle=subtitle_for(
+                        first_ref.kind, [r for r, _ in refs_with_sizes]
+                    )
+                    or meta.subtitle,
                     files=files,
                 )
             )

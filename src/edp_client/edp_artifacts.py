@@ -37,6 +37,19 @@ class ArtifactKind(StrEnum):
     DTM = "dtm"
 
 
+class ArtifactSummary(BaseModel):
+    """Real counts for one artifact, from edp-api. Null on the POST 202 response, filled in on
+    GET /jobs/{id} once complete. Each field is set only for the kinds that have it."""
+
+    line_items: int | None = None  # bom
+    vendors: int | None = None  # bom
+    runs: int | None = None  # cable_hose_schedule (cables + hoses)
+    media_kinds: int | None = None  # cable_hose_schedule
+    devices: int | None = None  # dtm
+    buses: int | None = None  # dtm
+    plates: int | None = None  # interface_plate: quantity of this plate_id
+
+
 class ArtifactRef(BaseModel):
     """One artifact entry — flat, one per (kind, format[, plate_id])."""
 
@@ -44,6 +57,7 @@ class ArtifactRef(BaseModel):
     format: str  # json | xlsx | dxf | pdf | step | glb
     url: str
     plate_id: str | None = None  # only when kind=INTERFACE_PLATE
+    summary: ArtifactSummary | None = None
 
 
 class JobCreated(BaseModel):

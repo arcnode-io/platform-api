@@ -80,3 +80,33 @@ def test_the_site_callback_points_the_box_at_its_own_order_and_dns_name() -> Non
     )
     assert callback.hostname == site_hostname("nevada_facility_2", order_id)
     assert token_matches("s3cret", order_id, callback.token)
+
+
+def test_archiving_keeps_the_summary_edp_api_filled_in() -> None:
+    """The counts arrive on the completed job's refs; the rebuilt ref must still carry them."""
+    # Arrange
+    import asyncio
+
+    from src.edp_client.edp_artifacts import ArtifactKind, ArtifactRef, ArtifactSummary
+    from src.orchestrator.orchestrator_service import OrchestratorService
+
+    class FakeS3:
+        async def archive_from_url(self, _source: str, *, key: str) -> tuple[str, int]:
+            return f"https://platform/{key}", 1234
+
+    service = OrchestratorService.__new__(OrchestratorService)
+    service._s3 = FakeS3()
+    service._to_absolute_url = lambda url: url
+    ref = ArtifactRef(
+        kind=ArtifactKind.BOM,
+        format="json",
+        url="https://edp/bom.json",
+        summary=ArtifactSummary(line_items=19, vendors=11),
+    )
+
+    # Act
+    new_ref, size = asyncio.run(service._archive_ref("order-1", ref))
+
+    # Assert
+    assert new_ref.summary == ArtifactSummary(line_items=19, vendors=11)
+    assert size == 1234

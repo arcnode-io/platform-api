@@ -1,4 +1,4 @@
-"""The shipped artifact table never shows a placeholder count to a customer."""
+"""The shipped artifact table carries no invented numbers and no MOCK text."""
 
 from src.edp_client.edp_artifacts import ArtifactKind
 from src.manifest.artifact_metadata import (
@@ -8,24 +8,23 @@ from src.manifest.artifact_metadata import (
 
 
 def test_no_shipped_subtitle_carries_a_placeholder_or_mock_label() -> None:
-    # Arrange + Act
-    subtitles = [m.subtitle for m in MOCK_ARTIFACT_METADATA.values() if m.subtitle]
+    # Arrange
+    tables = (MOCK_ARTIFACT_METADATA, MOCK_SYSTEM_IMAGE_TEMPLATES)
+    subtitles = [m.subtitle for table in tables for m in table.values() if m.subtitle]
 
-    # Assert — no "MOCK" text; every count is labelled as an estimate
-    assert not any("MOCK" in s for s in subtitles)
-    for s in subtitles:
-        if any(c.isdigit() for c in s):
-            assert s.startswith("Estimated · "), s
+    # Act + Assert
+    assert not any("MOCK" in s or "Estimated" in s for s in subtitles)
 
 
-def test_the_counted_artifacts_are_labelled_estimates_until_edp_api_emits_counts() -> (
-    None
-):
+def test_the_counted_artifacts_take_their_subtitle_from_edp_api_not_the_table() -> None:
     # Arrange + Act + Assert
-    for key in (ArtifactKind.BOM, ArtifactKind.CABLE_HOSE_SCHEDULE, ArtifactKind.DTM):
-        subtitle = MOCK_ARTIFACT_METADATA[key].subtitle
-        assert subtitle is not None and subtitle.startswith("Estimated · ")
-    assert MOCK_ARTIFACT_METADATA[ArtifactKind.INTERFACE_PLATE].subtitle is None
+    for key in (
+        ArtifactKind.BOM,
+        ArtifactKind.CABLE_HOSE_SCHEDULE,
+        ArtifactKind.DTM,
+        ArtifactKind.INTERFACE_PLATE,
+    ):
+        assert MOCK_ARTIFACT_METADATA[key].subtitle is None
 
 
 def test_the_android_row_describes_only_the_apk_with_its_real_minimum_sdk() -> None:

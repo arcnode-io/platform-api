@@ -149,7 +149,11 @@ class OrchestratorService:
         key = f"orders/{order_id}/{filename}"
         new_url, size = await self._s3.archive_from_url(source, key=key)
         new_ref = ArtifactRef(
-            kind=ref.kind, format=ref.format, url=new_url, plate_id=ref.plate_id
+            kind=ref.kind,
+            format=ref.format,
+            url=new_url,
+            plate_id=ref.plate_id,
+            summary=ref.summary,
         )
         return new_ref, size
 
