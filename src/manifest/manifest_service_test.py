@@ -11,7 +11,9 @@ from src.manifest.manifest_record import (
 from src.manifest.manifest_service import ManifestService
 
 BUILT_AT: datetime = datetime(2026, 4, 29, 18, 42, tzinfo=UTC)
-ORDER_ID: str = "0123abcd-4567-89ef-0123-456789abcdef"
+BUNDLE_URL: str = (
+    "https://bucket.s3.amazonaws.com/orders/x/arcnode.zip?X-Amz-Signature=abc"
+)
 
 
 def _service() -> ManifestService:
@@ -33,7 +35,7 @@ def test_build_slugifies_site_name() -> None:
     """Display name → URL-safe slug (lowercase, dash-separated)."""
     # Arrange + Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="Brookside DC-1",
         archived=[],
         system_artifacts=[],
@@ -65,7 +67,7 @@ def test_build_assigns_positional_letter_codes_per_section() -> None:
 
     # Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="Test Site",
         archived=archived,
         system_artifacts=[apk_artifact],
@@ -91,7 +93,7 @@ def test_build_collapses_same_kind_into_one_artifact_with_multiple_files() -> No
 
     # Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="t",
         archived=archived,
         system_artifacts=[],
@@ -123,7 +125,7 @@ def test_build_computes_totals() -> None:
 
     # Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="t",
         archived=archived,
         system_artifacts=[apk],
@@ -140,7 +142,7 @@ def test_build_stamps_mock_signed_badge() -> None:
     """MVP shows signed=True with a placeholder key for design-fidelity."""
     # Arrange + Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="t",
         archived=[],
         system_artifacts=[],
@@ -153,11 +155,11 @@ def test_build_stamps_mock_signed_badge() -> None:
     assert m.key_id.startswith("0x")
 
 
-def test_build_emits_curl_url_with_slug() -> None:
-    """curl one-liner uses platform.arcnode.io/{slug}-{order6}/arcnode.zip."""
+def test_build_puts_the_presigned_bundle_url_in_the_header_and_curl_line() -> None:
+    """The bundle link is the presigned URL the orchestrator signed, shown as-is."""
     # Arrange + Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="Brookside DC-1",
         archived=[],
         system_artifacts=[],
@@ -165,10 +167,8 @@ def test_build_emits_curl_url_with_slug() -> None:
     )
 
     # Assert
-    assert (
-        m.bundle_curl_url
-        == "https://platform.arcnode.io/brookside-dc-1-0123ab/arcnode.zip"
-    )
+    assert m.bundle_url == BUNDLE_URL
+    assert m.bundle_curl_url == BUNDLE_URL
 
 
 def test_build_uppercases_file_formats() -> None:
@@ -178,7 +178,7 @@ def test_build_uppercases_file_formats() -> None:
 
     # Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="t",
         archived=archived,
         system_artifacts=[],
@@ -194,7 +194,7 @@ def test_build_empty_when_no_inputs() -> None:
     """Smoke: zero artifacts yields a manifest with empty sections + 0 totals."""
     # Arrange + Act
     m = _service().build(
-        order_id=ORDER_ID,
+        bundle_url=BUNDLE_URL,
         site_display_name="t",
         archived=[],
         system_artifacts=[],

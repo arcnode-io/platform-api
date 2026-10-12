@@ -18,7 +18,6 @@ are stamped here. Grep `mock_` to find every fake-data swap point.
 from datetime import UTC, datetime
 from typing import Final
 
-from src.bundle.bundle_record import bundle_path_slug
 from src.edp_client.edp_artifacts import ArtifactRef
 from src.manifest.artifact_summary import subtitle_for
 from src.manifest.artifact_metadata import (
@@ -37,8 +36,6 @@ MOCK_REVISION: Final[int] = 1
 # MOCK — signing infra not implemented; show the badge for design-fidelity.
 MOCK_SIGNED: Final[bool] = True
 MOCK_KEY_ID: Final[str] = "0xA3F1...9C72"
-# MOCK — bundle phase pending; this URL is what Phase 2 will produce.
-MOCK_BUNDLE_CURL_TEMPLATE: Final[str] = "https://platform.arcnode.io/{slug}/arcnode.zip"
 # Bundle ID format. Once versioning lands the trailing semver comes from the
 # Order's revision history; today every delivery is "1.0.0".
 MOCK_BUNDLE_VERSION: Final[str] = "1.0.0"
@@ -50,7 +47,7 @@ class ManifestService:
     def build(
         self,
         *,
-        order_id: str,
+        bundle_url: str,
         site_display_name: str,
         archived: list[tuple[ArtifactRef, int]],
         system_artifacts: list[ManifestArtifact],
@@ -130,10 +127,8 @@ class ManifestService:
             total_size_bytes=total_size,
             total_file_count=total_files,
             artifact_count=artifact_count,
-            bundle_url=None,  # Bundle phase (Tier 2.4) emits this
-            bundle_curl_url=MOCK_BUNDLE_CURL_TEMPLATE.format(
-                slug=bundle_path_slug(slug, order_id)
-            ),
+            bundle_url=bundle_url,
+            bundle_curl_url=bundle_url,
             cloud=cloud,
             sections=sections,
         )

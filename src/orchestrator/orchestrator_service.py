@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
-from src.bundle.bundle_service import BundleService, bundle_files_for
+from src.bundle.bundle_record import BUNDLE_LINK_EXPIRY_S
+from src.bundle.bundle_service import BundleService, bundle_files_for, unique_path
 from src.aws.ses_service import SesService
 from src.cfn.site_callback import SiteCallback
 from src.dns.site_identity import site_hostname, site_token
@@ -145,15 +146,15 @@ class OrchestratorService:
         Returns (ref, size_bytes) so the manifest builder can render file-size
         chips without a follow-up HEAD round-trip.
         """
-        return [await self._archive_ref(order_id, a) for a in edp.edp_artifact_urls]
+        keys = archive_keys(order_id, [a.url for a in edp.edp_artifact_urls])
+        return [
+            await self._archive_ref(key, a)
+            for key, a in zip(keys, edp.edp_artifact_urls, strict=True)
+        ]
 
-    async def _archive_ref(
-        self, order_id: str, ref: ArtifactRef
-    ) -> tuple[ArtifactRef, int]:
-        """Stream one artifact's bytes into platform-api S3, return (ref, size)."""
+    async def _archive_ref(self, key: str, ref: ArtifactRef) -> tuple[ArtifactRef, int]:
+        """Stream one artifact's bytes into platform-api S3 at `key`, return (ref, size)."""
         source = self._to_absolute_url(ref.url)
-        filename = source.rsplit("/", 1)[-1]
-        key = f"orders/{order_id}/{filename}"
         new_url, size = await self._s3.archive_from_url(source, key=key)
         new_ref = ArtifactRef(
             kind=ref.kind,
@@ -222,8 +223,11 @@ class OrchestratorService:
         body links to).
         """
         system_artifacts = await self._build_system_artifacts(delivery)
+        bundle_url = await self._s3.generate_presigned_url(
+            f"orders/{order_id}/arcnode.zip", expiration_seconds=BUNDLE_LINK_EXPIRY_S
+        )
         manifest = self._manifest.build(
-            order_id=order_id,
+            bundle_url=bundle_url,
             site_display_name=payload.deployment_site_name,
             archived=archived,
             system_artifacts=system_artifacts,
@@ -442,3 +446,18 @@ def _slugify_site_id(name: str) -> str:
     if not slug:
         raise ValueError(f"deployment_site_name slugifies to empty: {name!r}")
     return slug
+
+
+def archive_keys(order_id: str, urls: list[str]) -> list[str]:
+    """One S3 key per edp-api file, named by its file name.
+
+    Reason: two files with the same name (two plates' assembly.step) would overwrite
+    each other in the order's folder, so later ones get a numbered name.
+    """
+    taken: set[str] = set()
+    keys: list[str] = []
+    for url in urls:
+        name = unique_path(url.rsplit("/", 1)[-1], taken)
+        taken.add(name)
+        keys.append(f"orders/{order_id}/{name}")
+    return keys

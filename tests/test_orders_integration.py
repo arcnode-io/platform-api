@@ -24,7 +24,9 @@ Walks the walking-skeleton path:
 5. SES captured a single delivery email — body advertises the portal URL
 """
 
+import io
 import time
+import zipfile
 from ipaddress import IPv4Address
 from pathlib import Path
 
@@ -36,8 +38,10 @@ from fastapi.testclient import TestClient
 from testcontainers.core.network import Network
 
 from src.app_module import AppModule
+from src.bundle.bundle_service import bundle_files_for
 from src.config import Config, EmailProvider, LogLevel
 from src.edp_client.edp_artifacts import ArtifactKind
+from src.manifest.manifest_record import DeploymentManifest
 from src.orders.orders_record import GetOrderResponse
 from tests.fixtures.iso import extract, seed_base_iso
 from tests.fixtures.public_downloads import seed_public_downloads
@@ -277,6 +281,36 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             assert apk_url in html
             assert bom_json.url in html
             assert template_url in html
+
+            # Assert — every file the manifest lists downloads at the size it reports
+            manifest_resp = httpx.get(portal_url.replace("index.html", "manifest.json"))
+            assert manifest_resp.status_code == 200, manifest_resp.text
+            manifest = DeploymentManifest.model_validate(manifest_resp.json())
+            files = [
+                f for arts in manifest.sections.values() for a in arts for f in a.files
+            ]
+            assert files, "manifest lists no downloadable files"
+            for f in files:
+                resp = httpx.get(f.url)
+                assert resp.status_code == 200, f"{f.url}: {resp.status_code}"
+                assert (
+                    len(resp.content) == f.size_bytes
+                ), f"{f.url}: manifest says {f.size_bytes} bytes, served {len(resp.content)}"
+
+            # Assert — the presigned bundle link downloads the zip
+            assert manifest.bundle_url is not None
+            assert manifest.bundle_curl_url == manifest.bundle_url
+            zip_resp = httpx.get(manifest.bundle_url)
+            assert zip_resp.status_code == 200, zip_resp.text
+            zip_bytes = zip_resp.content
+            # Assert — the zip holds every manifest file under its artifact code, byte for byte
+            expected = bundle_files_for(manifest.sections)
+            with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+                assert sorted(archive.namelist()) == sorted(e.path for e in expected)
+                for entry in expected:
+                    assert (
+                        archive.read(entry.path) == httpx.get(entry.url).content
+                    ), entry.path
 
 
 # All 4 deployment-profile combinations the resolver supports today.

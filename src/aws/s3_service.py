@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Final
 
 import aioboto3
+from botocore.config import Config as BotoConfig
 import httpx
 
 DEFAULT_REGION: Final[str] = "us-east-1"
@@ -24,10 +25,16 @@ class S3Service:
         endpoint_url: str | None,
         bucket: str,
         region: str = DEFAULT_REGION,
+        presign_access_key_id: str | None = None,
+        presign_secret_access_key: str | None = None,
     ) -> None:
         self._endpoint_url = endpoint_url
         self._bucket = bucket
         self._region = region
+        # Reason: the instance role's temporary credentials rotate every few hours, which would
+        # cut a presigned link short, so links are signed with a long-lived IAM user key.
+        self._presign_access_key_id = presign_access_key_id
+        self._presign_secret_access_key = presign_secret_access_key
         self._session = aioboto3.Session()
 
     async def ensure_bucket(self) -> None:
@@ -141,7 +148,7 @@ class S3Service:
         self, key: str, expiration_seconds: int = 86400
     ) -> str:
         """Generate a presigned GET URL for `key`. Valid for `expiration_seconds` (default: 24h)."""
-        async with self._client() as s3:
+        async with self._presign_client() as s3:
             url: str = await s3.generate_presigned_url(
                 "get_object",
                 Params={"Bucket": self._bucket, "Key": key},
@@ -162,6 +169,20 @@ class S3Service:
         url = self._public_url(key)
         logging.info("uploaded %d bytes %s → %s", len(body), content_type, url)
         return url
+
+    def _presign_client(self):  # noqa: ANN202
+        """Client that signs with the presign key when one is configured, else the default chain."""
+        if self._presign_access_key_id is None:
+            return self._client()
+        return self._session.client(
+            "s3",
+            endpoint_url=self._endpoint_url,
+            region_name=self._region,
+            aws_access_key_id=self._presign_access_key_id,
+            aws_secret_access_key=self._presign_secret_access_key,
+            # Reason: SigV4 is what caps a presigned link at 7 days; the older SigV2 links don't carry that cap.
+            config=BotoConfig(signature_version="s3v4"),
+        )
 
     def _client(self):  # noqa: ANN202 — async context manager type is ugly to spell
         # LocalStack ignores credentials but boto3 still requires non-empty values;

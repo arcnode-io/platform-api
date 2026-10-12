@@ -44,10 +44,14 @@ def _filesize(n: int) -> str:
 
 
 def _split_curl_url(url: str) -> tuple[str, str]:
-    """Split URL into (prefix-with-trailing-slash, filename) for chip-coloring."""
-    if "/" not in url:
-        return "", url
-    prefix, _, filename = url.rpartition("/")
+    """Split URL into (prefix-with-trailing-slash, filename) for chip-coloring.
+
+    Reason: the query string holds the presigned signature, which the chips leave out.
+    """
+    path = url.split("?", 1)[0]
+    if "/" not in path:
+        return "", path
+    prefix, _, filename = path.rpartition("/")
     return f"{prefix}/", filename
 
 

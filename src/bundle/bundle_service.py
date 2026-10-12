@@ -48,13 +48,13 @@ def bundle_files_for(
         for artifact in arts:
             for file in artifact.files:
                 name = urlparse(file.url).path.rsplit("/", 1)[-1]
-                path = _unique_path(f"{artifact.code}/{name}", taken)
+                path = unique_path(f"{artifact.code}/{name}", taken)
                 taken.add(path)
                 entries.append(BundleFile(path=path, url=file.url))
     return entries
 
 
-def _unique_path(path: str, taken: set[str]) -> str:
+def unique_path(path: str, taken: set[str]) -> str:
     """`D3/plate.dxf` → `D3/plate-2.dxf` when `D3/plate.dxf` is already in the zip."""
     if path not in taken:
         return path

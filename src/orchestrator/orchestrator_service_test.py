@@ -155,3 +155,25 @@ async def test_the_bundle_zips_every_manifest_file_for_the_order() -> None:
     assert bundle.calls == [
         ("abc123", [BundleFile(path="D1/dtm.json", url="s3://b/dtm.json")])
     ]
+
+
+def test_colliding_archive_names_get_numbered_keys() -> None:
+    """Two edp-api files named assembly.step must not overwrite each other in the order's folder."""
+    # Arrange
+    from src.orchestrator.orchestrator_service import archive_keys
+
+    urls = [
+        "https://edp.example/a/assembly.step",
+        "https://edp.example/b/assembly.step",
+        "https://edp.example/c/dtm.json",
+    ]
+
+    # Act
+    keys = archive_keys("abc123", urls)
+
+    # Assert
+    assert keys == [
+        "orders/abc123/assembly.step",
+        "orders/abc123/assembly-2.step",
+        "orders/abc123/dtm.json",
+    ]

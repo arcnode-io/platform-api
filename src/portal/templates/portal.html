@@ -554,7 +554,7 @@
       <span class="curl-prompt">$</span>
       <code class="curl-cmd">curl -LO {{ curl_prefix }}<span class="filename">{{ curl_filename }}</span></code>
       <button class="curl-copy"
-              onclick="navigator.clipboard.writeText('curl -LO {{ manifest.bundle_curl_url }}')"
+              onclick="navigator.clipboard.writeText('curl -LO \'{{ manifest.bundle_curl_url }}\'')"
               title="Copy command">⎘</button>
     </div>
     {% endif %}

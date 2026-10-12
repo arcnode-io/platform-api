@@ -330,7 +330,7 @@ def test_cloud_manifest_assigns_c_codes_to_edge_section() -> None:
 
     # Act
     m = ManifestService().build(
-        order_id="0123abcd-4567-89ef-0123-456789abcdef",
+        bundle_url="https://bucket.s3.amazonaws.com/orders/x/arcnode.zip?X-Amz-Signature=abc",
         site_display_name="Brookside DC-1",
         archived=[],
         system_artifacts=[art],
