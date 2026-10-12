@@ -126,8 +126,8 @@ class FakeRunner:
             ),
             "logs hmi": ok("start worker processes\n"),
             "logs https-ingress": ok("start worker processes\n"),
-            # The host-side HTTPS probe through the ingress's published port.
-            "https://127.0.0.1/": ok("200"),
+            # The host-side HTTP probe through the ingress's published port.
+            "http://127.0.0.1/": ok("200"),
             "openssl req": ok(""),
             "curlimages/curl -fsS -o": ok("200"),
             "logs grafana": ok('logger=http.server msg="HTTP Server Listen"\n'),

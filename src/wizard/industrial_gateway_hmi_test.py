@@ -31,7 +31,7 @@ def test_industrial_gateway_starts_and_verifies(tmp_path: Path) -> None:
     assert tracker(tmp_path).is_done("industrial_gateway")
 
 
-def test_hmi_starts_behind_the_https_ingress_with_a_cert_for_the_box(
+def test_hmi_starts_behind_the_ingress_over_http(
     tmp_path: Path,
 ) -> None:
     # Arrange
@@ -49,15 +49,11 @@ def test_hmi_starts_behind_the_https_ingress_with_a_cert_for_the_box(
     # Assert — both nginx answer; the page is done
     assert [(c.name, c.ok) for c in result.checks] == [
         ("Serves the operator screen", True),
-        ("Serves HTTPS on port 443", True),
+        ("Serves HTTP on port 80", True),
     ]
     assert result.verified
     assert tracker(tmp_path).is_done("hmi")
-    # Assert — the cert names the box's address, the key is private, both start together
-    openssl = next(c.args for c in runner.calls if c.args[0] == "openssl")
-    assert "subjectAltName=IP:10.0.0.209" in openssl
-    assert "-out" in openssl and str(tmp_path / "opt" / "tls" / "server.pem") in openssl
-    key = tmp_path / "opt" / "tls" / "server-key.pem"
-    assert key.stat().st_mode & 0o777 == 0o600
+    # Assert — no certificate is generated; both services start together.
+    assert not any(c.args[0] == "openssl" for c in runner.calls)
     up = next(c.args for c in runner.calls if "up" in c.args)
     assert up[-3:] == ["-d", "hmi", "https-ingress"]
