@@ -326,7 +326,7 @@ function StepHmi({ t, page, onApply }) {
   const buttonLabel = isApplying ? 'Verifying'
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
-    <StepShellW t={t} title="HMI" blurb="it starts the operator screen over HTTPS at this box's address. The certificate is self-signed, so each browser warns once.">
+    <StepShellW t={t} title="HMI" blurb="it starts the operator screen over HTTPS at this box's address.">
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>

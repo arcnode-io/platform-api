@@ -22,7 +22,7 @@ TLS_DIR: Final[str] = "tls"
 CERT_FILE: Final[str] = "server.pem"
 KEY_FILE: Final[str] = "server-key.pem"
 CERT_DAYS: Final[str] = "3650"
-HTTPS_URL: Final[str] = "https://127.0.0.1/"
+HTTP_URL: Final[str] = "http://127.0.0.1/"
 LOG_HINT: Final[str] = (
     "sudo docker compose -f /opt/arcnode/docker-compose.yaml logs hmi https-ingress"
 )
@@ -54,13 +54,12 @@ class HmiService:
             raise HmiStepNotAvailableError("no HMI page in the cloud")
         if self._tracker.is_done("hmi"):
             raise StepAlreadyDoneError("HMI is already set up")
-        self._write_self_signed_cert()
         self._run(
             compose_command(self._ems_dir, "up", "-d", HMI_SERVICE, INGRESS_SERVICE)
         )
         wait_for_log(self._run, self._ems_dir, HMI_SERVICE, READY_LINE)
         wait_for_log(self._run, self._ems_dir, INGRESS_SERVICE, READY_LINE)
-        checks = [self._serves_app(), self._serves_https()]
+        checks = [self._serves_app(), self._serves_http()]
         verified = all(check.ok for check in checks)
         if verified:
             self._tracker.mark_done("hmi")
@@ -131,13 +130,13 @@ class HmiService:
             hint=LOG_HINT,
         )
 
-    def _serves_https(self) -> VerifyCheck:
+    def _serves_http(self) -> VerifyCheck:
         """From the host, through the published port: what a browser on the LAN gets."""
         out = self._run(
             Command(
                 args=[
                     "curl",
-                    "-ksS",
+                    "-fsS",
                     "-o",
                     "/dev/null",
                     "-w",
@@ -148,10 +147,10 @@ class HmiService:
         )
         ok = out.returncode == 0 and out.stdout.strip() == "200"
         return VerifyCheck(
-            name="Serves HTTPS on port 443",
+            name="Serves HTTP on port 80",
             ok=ok,
             detail=(
-                "HTTPS 200 with the box's self-signed cert"
+                "HTTPS 200 on port 80"
                 if ok
                 else f"got {out.stdout.strip() or f'exit {out.returncode}'}"
             ),

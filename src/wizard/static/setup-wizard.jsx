@@ -549,7 +549,7 @@ const REDIRECT_SECONDS = 8;
 
 function SetupCompleteW({ t }) {
   const [left, setLeft] = useStateW(REDIRECT_SECONDS);
-  const target = `https://${window.location.hostname}/`;
+  const target = `http://${window.location.hostname}/`;
   useEffectW(() => {
     if (left <= 0) { window.location.href = target; return undefined; }
     const timer = setTimeout(() => setLeft(left - 1), 1000);
