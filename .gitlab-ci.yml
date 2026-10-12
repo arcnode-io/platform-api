@@ -143,12 +143,21 @@ deploy_platform:
   # stacks (instances + Aurora, ~$1.50/h) running. This runs regardless and deletes whatever
   # this pipeline's tests created.
   after_script:
+    # Before teardown: the stacks' events and the boxes' cloud-init logs, so a failure stays
+    # diagnosable after the stacks are gone. The job log and artifacts keep them.
     - |
       for s in $(aws cloudformation describe-stacks --region us-east-1 --query "Stacks[?Tags[?Key=='arcnode-pipeline' && Value=='${CI_PIPELINE_ID}']].StackName" --output text); do
+        echo "===== events: $s"
+        aws cloudformation describe-stack-events --region us-east-1 --stack-name "$s" --query "StackEvents[?contains(ResourceStatus,'FAILED') || contains(ResourceStatus,'ROLLBACK')].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]" --output text | tee -a e2e-stack-events.log || true
+        aws s3 cp "s3://arcnode-artifacts/diagnostic/$s/cloud-init.log" "e2e-cloud-init-$s.log" 2>/dev/null || true
         aws cloudformation delete-stack --region us-east-1 --stack-name "$s"
       done
   artifacts:
     when: always
+    paths:
+      - e2e-run.log
+      - e2e-stack-events.log
+      - e2e-cloud-init-*.log
     reports:
       junit: junit-e2e.xml
 
@@ -177,7 +186,7 @@ e2e_commercial:
       tests/e2e/test_commercial.py
       tests/e2e/test_broker_auth.py
       tests/e2e/test_hmi_browser.py
-      -v --junitxml=junit-e2e.xml
+      -v -s --log-cli-level=INFO --junitxml=junit-e2e.xml 2>&1 | tee e2e-run.log
   # commercial_stack is session-scoped (one stack across both tests).
   # Budget: 25 min CFN create + 10 min /health + (2 × ~5 min test work) +
   # ~10 min teardown ≈ 55 min. 90 min for AWS-flake headroom.
