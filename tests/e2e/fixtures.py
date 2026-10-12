@@ -239,6 +239,22 @@ def commercial_stack(
         # nightly job sweeps any leftover orphans.
 
 
+def _failed_events(cfn: CloudFormationClient, stack_name: str) -> str:
+    """The resources that failed and why, from the stack's events. Printed to the job log, and
+    appended to e2e-stack-events.log so the job's artifacts keep them."""
+    events = cfn.describe_stack_events(StackName=stack_name)["StackEvents"]
+    lines = [
+        f"{e['LogicalResourceId']}: {e.get('ResourceStatusReason', '')}"
+        for e in events
+        if "FAILED" in e["ResourceStatus"]
+    ]
+    text = "; ".join(lines) or "no failed resource events"
+    with open("e2e-stack-events.log", "a") as log:
+        log.write(f"== {stack_name}\n" + "\n".join(lines) + "\n")
+    print(f"stack {stack_name} failed: {text}", flush=True)
+    return text
+
+
 def _wait_for_terminal(
     cfn: CloudFormationClient, stack_name: str, op: str, timeout_s: int
 ) -> None:
@@ -251,7 +267,9 @@ def _wait_for_terminal(
         if status == success:
             return
         if status != in_progress:
-            raise RuntimeError(f"stack {stack_name} {op} reached {status}")
+            raise RuntimeError(
+                f"stack {stack_name} {op} reached {status}: {_failed_events(cfn, stack_name)}"
+            )
         time.sleep(POLL_INTERVAL_S)
     raise TimeoutError(f"stack {stack_name} {op} not done after {timeout_s}s")
 
