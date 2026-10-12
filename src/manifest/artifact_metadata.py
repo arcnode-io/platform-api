@@ -102,7 +102,7 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
     "ems_field_client": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
         name="EMS Field Client",
-        subtitle=None,  # real value comes from edp-api once it emits the counts
+        subtitle="Android 7.0+ · APK",
     ),
     # On-prem: the generic installer with this order's site + devices baked
     # in (src/iso/iso_service.py). Presigned, so the link expires.
