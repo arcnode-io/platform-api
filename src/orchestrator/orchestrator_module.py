@@ -7,6 +7,7 @@ Imports `EdpClientModule`, `AwsModule`, `CfnModule`, `IsoModule`, `PortalModule`
 
 from src.aws.aws_module import AwsModule
 from src.aws.ses_service import SesService
+from src.bundle.bundle_service import BundleService
 from src.cfn.cfn_module import CfnModule
 from src.edp_client.edp_client_module import EdpClientModule
 from src.email.resend_service import ResendService
@@ -42,6 +43,7 @@ class OrchestratorModule:
             iso=iso.service,
             portal=portal.service,
             manifest=manifest.service,
+            bundle=BundleService(s3=aws.s3),
             ems_hmi_apk_url=ems_hmi_apk_url,
             ems_industrial_gateway_tarball_url=ems_industrial_gateway_tarball_url,
             site_token_secret=site_token_secret,

@@ -110,3 +110,48 @@ def test_archiving_keeps_the_summary_edp_api_filled_in() -> None:
     # Assert
     assert new_ref.summary == ArtifactSummary(line_items=19, vendors=11)
     assert size == 1234
+
+
+@pytest.mark.asyncio
+async def test_the_bundle_zips_every_manifest_file_for_the_order() -> None:
+    """The order's manifest files go into its arcnode.zip, under its order id."""
+    # Arrange
+    from src.bundle.bundle_record import BundleFile
+    from src.manifest.manifest_record import (
+        ManifestArtifact,
+        ManifestFile,
+        ManifestSection,
+    )
+    from src.orchestrator.orchestrator_service import OrchestratorService
+
+    class RecordingBundle:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, list[BundleFile]]] = []
+
+        async def build(self, *, order_id: str, files: list[BundleFile]) -> int:
+            self.calls.append((order_id, files))
+            return 0
+
+    bundle = RecordingBundle()
+    service = OrchestratorService.__new__(OrchestratorService)
+    service._bundle = bundle  # type: ignore[attr-defined]
+    sections = {
+        ManifestSection.ENGINEERING_DRAWINGS: [
+            ManifestArtifact(
+                code="D1",
+                name="DTM",
+                subtitle=None,
+                files=[
+                    ManifestFile(format="JSON", size_bytes=1, url="s3://b/dtm.json")
+                ],
+            )
+        ]
+    }
+
+    # Act
+    await service._build_bundle("abc123", sections)
+
+    # Assert
+    assert bundle.calls == [
+        ("abc123", [BundleFile(path="D1/dtm.json", url="s3://b/dtm.json")])
+    ]

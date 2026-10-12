@@ -18,6 +18,7 @@ are stamped here. Grep `mock_` to find every fake-data swap point.
 from datetime import UTC, datetime
 from typing import Final
 
+from src.bundle.bundle_record import bundle_path_slug
 from src.edp_client.edp_artifacts import ArtifactRef
 from src.manifest.artifact_summary import subtitle_for
 from src.manifest.artifact_metadata import (
@@ -49,6 +50,7 @@ class ManifestService:
     def build(
         self,
         *,
+        order_id: str,
         site_display_name: str,
         archived: list[tuple[ArtifactRef, int]],
         system_artifacts: list[ManifestArtifact],
@@ -129,7 +131,9 @@ class ManifestService:
             total_file_count=total_files,
             artifact_count=artifact_count,
             bundle_url=None,  # Bundle phase (Tier 2.4) emits this
-            bundle_curl_url=MOCK_BUNDLE_CURL_TEMPLATE.format(slug=slug),
+            bundle_curl_url=MOCK_BUNDLE_CURL_TEMPLATE.format(
+                slug=bundle_path_slug(slug, order_id)
+            ),
             cloud=cloud,
             sections=sections,
         )

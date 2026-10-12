@@ -23,6 +23,7 @@ from src.email.resend_service import ResendService
 from src.iso.iso_module import IsoModule
 from src.manifest.manifest_module import ManifestModule
 from src.orchestrator.orchestrator_module import OrchestratorModule
+from src.bundle.bundle_module import BundleModule
 from src.orders.orders_module import OrdersModule
 from src.portal.portal_module import PortalModule
 from src.sites.sites_module import SitesModule
@@ -61,6 +62,7 @@ class AppModule:
             if self.config.site_dns
             else None
         )
+        self.bundle_module = BundleModule(s3=self.aws_module.s3)
         self.orchestrator_module = OrchestratorModule(
             edp=self.edp_client_module,
             aws=self.aws_module,
@@ -101,6 +103,7 @@ class AppModule:
         app.include_router(app_controller.router)
         app.include_router(self.orders_module.router)
         app.include_router(self.sizing_module.router)
+        app.include_router(self.bundle_module.router)
         if self.sites_module is not None:
             app.include_router(self.sites_module.router)
 

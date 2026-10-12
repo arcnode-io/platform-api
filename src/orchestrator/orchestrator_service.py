@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
+from src.bundle.bundle_service import BundleService, bundle_files_for
 from src.aws.ses_service import SesService
 from src.cfn.site_callback import SiteCallback
 from src.dns.site_identity import site_hostname, site_token
@@ -26,7 +27,11 @@ from src.edp_client.edp_artifacts import (
 from src.edp_client.edp_client_service import EdpClientService
 from src.iso.iso_service import IsoService
 from src.manifest.artifact_metadata import MOCK_SYSTEM_IMAGE_TEMPLATES
-from src.manifest.manifest_record import ManifestArtifact, ManifestFile
+from src.manifest.manifest_record import (
+    ManifestArtifact,
+    ManifestFile,
+    ManifestSection,
+)
 from src.manifest.manifest_service import ManifestService
 from src.orders.configurator_payload import ConfiguratorPayload
 from src.orders.order_entity import Order, OrderStatus
@@ -62,6 +67,7 @@ class OrchestratorService:
         iso: IsoService,
         portal: PortalService,
         manifest: ManifestService,
+        bundle: BundleService,
         ems_hmi_apk_url: str,
         ems_industrial_gateway_tarball_url: str,
         site_token_secret: str | None = None,
@@ -74,6 +80,7 @@ class OrchestratorService:
         self._iso = iso
         self._portal = portal
         self._manifest = manifest
+        self._bundle = bundle
         self._ems_hmi_apk_url = ems_hmi_apk_url
         self._ems_industrial_gateway_tarball_url = ems_industrial_gateway_tarball_url
         # None (local dev, tests): templates carry no DNS callback and keep the self-signed IP cert.
@@ -216,6 +223,7 @@ class OrchestratorService:
         """
         system_artifacts = await self._build_system_artifacts(delivery)
         manifest = self._manifest.build(
+            order_id=order_id,
             site_display_name=payload.deployment_site_name,
             archived=archived,
             system_artifacts=system_artifacts,
@@ -225,8 +233,17 @@ class OrchestratorService:
         )
         html = self._portal.render(manifest=manifest)
         manifest_json = self._portal.render_manifest_json(manifest=manifest)
+        await self._build_bundle(order_id, manifest.sections)
         await self._s3.upload_json(f"orders/{order_id}/manifest.json", manifest_json)
         return await self._s3.upload_html(f"orders/{order_id}/index.html", html)
+
+    async def _build_bundle(
+        self,
+        order_id: str,
+        sections: dict[ManifestSection, list[ManifestArtifact]],
+    ) -> None:
+        """Zip every manifest file into the order's arcnode.zip (the curl link's target)."""
+        await self._bundle.build(order_id=order_id, files=bundle_files_for(sections))
 
     async def _build_system_artifacts(
         self, delivery: OrderEmsDelivery

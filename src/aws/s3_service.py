@@ -74,6 +74,24 @@ class S3Service:
             resp = await s3.get_object(Bucket=bucket, Key=key)
             return await resp["Body"].read()
 
+    async def download_to(self, url: str, path: Path) -> None:
+        """Stream `url` (s3:// or https://) to a local file. Used by the bundle build
+        so multi-GB installers never sit in memory."""
+        if url.startswith("s3://"):
+            bucket, _, key = url.removeprefix("s3://").partition("/")
+            async with self._client() as s3:
+                await s3.download_file(bucket, key, str(path))
+            return
+        async with (
+            httpx.AsyncClient(timeout=120.0, follow_redirects=True) as http,
+            http.stream("GET", url) as resp,
+        ):
+            resp.raise_for_status()
+            # Reason: a sync file can't join `async with`; the body still streams chunk by chunk.
+            with path.open("wb") as out:
+                async for chunk in resp.aiter_bytes():
+                    out.write(chunk)
+
     async def head_size(self, url: str) -> int:
         """HEAD request → Content-Length. For URLs not archived through us
         (e.g., the EMS HMI APK in cfg.yml hosted on arcnode-public S3).

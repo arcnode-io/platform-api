@@ -330,6 +330,7 @@ def test_cloud_manifest_assigns_c_codes_to_edge_section() -> None:
 
     # Act
     m = ManifestService().build(
+        order_id="0123abcd-4567-89ef-0123-456789abcdef",
         site_display_name="Brookside DC-1",
         archived=[],
         system_artifacts=[art],
