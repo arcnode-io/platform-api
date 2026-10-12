@@ -76,7 +76,11 @@ class AppModule:
             site_token_secret=site_token_secret,
             platform_public_url=self.config.platform_public_url,
         )
-        self.orders_module = OrdersModule(orchestrator=self.orchestrator_module)
+        self.orders_module = OrdersModule(
+            orchestrator=self.orchestrator_module,
+            rate_limit_count=self.config.order_rate_limit_count,
+            rate_limit_window_s=self.config.order_rate_limit_window_s,
+        )
         self.sizing_module = SizingModule(edp_api_url=self.config.edp_api_url)
         self._db_lifespan_enabled = False
 
@@ -121,6 +125,8 @@ class AppModule:
             allow_origins=self.config.cors_origins,
             allow_methods=["GET", "POST"],
             allow_headers=["Content-Type"],
+            # The site reads Retry-After on a 429 to tell the customer how long to wait.
+            expose_headers=["Retry-After"],
         )
         self.import_module(app)
         return app

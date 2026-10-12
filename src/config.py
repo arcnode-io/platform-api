@@ -47,6 +47,8 @@ class Config(BaseModel):  # noqa: D101
     # the environment). Off for local dev and tests, which have no zone to write.
     site_dns: bool
     platform_public_url: str  # where a customer's stack reaches this API
+    order_rate_limit_count: int  # orders one client may place per window
+    order_rate_limit_window_s: int  # the window, in seconds
     dns_api_user: str  # Namecheap API user
     dns_client_ip: str  # this host's public IP, whitelisted at Namecheap
     ems_hmi_apk_url: str  # F-Droid / S3 URL of the EMS HMI Android APK

@@ -47,6 +47,8 @@ def _client(edp_api_url: str) -> TestClient:
         email_provider=EmailProvider.SES,
         site_dns=False,
         platform_public_url="http://localhost:8000",
+        order_rate_limit_count=1000,
+        order_rate_limit_window_s=600,
         dns_api_user="test",
         dns_client_ip="127.0.0.1",
         ems_hmi_apk_url=APK_URL,

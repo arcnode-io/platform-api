@@ -1,9 +1,11 @@
 """Orders HTTP controller — POST + GET /platform-api/orders."""
 
 from classy_fastapi import Routable, get, post
-from fastapi import BackgroundTasks, HTTPException, status
+from fastapi import BackgroundTasks, HTTPException, Request, status
 
 from src.orders.configurator_payload import ConfiguratorPayload
+from src.orders.client_address import client_address
+from src.orders.order_rate_limit import OrderRateLimiter
 from src.orders.orders_record import GetOrderResponse, PostOrderResponse
 from src.orders.orders_service import OrdersService
 
@@ -11,9 +13,10 @@ from src.orders.orders_service import OrdersService
 class OrdersController(Routable):
     """Async order lifecycle endpoints."""
 
-    def __init__(self, service: OrdersService) -> None:
+    def __init__(self, service: OrdersService, limiter: OrderRateLimiter) -> None:
         super().__init__()
         self._service = service
+        self._limiter = limiter
 
     @post(
         "/platform-api/orders",
@@ -26,8 +29,20 @@ class OrdersController(Routable):
         self,
         payload: ConfiguratorPayload,
         background_tasks: BackgroundTasks,
+        request: Request,
     ) -> PostOrderResponse:
-        """Create a PENDING order, schedule the orchestrator, return the polling URL."""
+        """Create a PENDING order, schedule the orchestrator, return the polling URL.
+        Over the per-client limit: 429 with Retry-After (whole seconds)."""
+        socket = request.client.host if request.client else None
+        check = self._limiter.check(
+            client_address(request.headers.get("x-forwarded-for"), fallback=socket)
+        )
+        if not check.allowed:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="too many orders from this client; wait before placing another",
+                headers={"Retry-After": str(check.retry_after_s)},
+            )
         response, order = await self._service.submit(payload)
         background_tasks.add_task(self._service.execute, str(order.id))
         return response
