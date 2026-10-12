@@ -61,11 +61,16 @@ def test_loader_role_trusts_neptune_service_with_arcnode_public_read() -> None:
     # Assert — assumed by the RDS service (Neptune is part of RDS family)
     statement = role["Properties"]["AssumeRolePolicyDocument"]["Statement"][0]
     assert statement["Principal"]["Service"] == "rds.amazonaws.com"
-    # Assert — narrow scope: only arcnode-public/seed/graph-neptune/*
-    # ARN is Fn::Sub-wrapped so ${AWS::Partition} resolves per-deploy.
+    # Assert — narrow scope: the seed prefixes only. The scoped graph (89 KB / 379 KB instead of
+    # 125 MB) lives under graph-neptune-scoped-v1/; the old prefix stays readable for rollback.
+    # ARNs are Fn::Sub-wrapped so ${AWS::Partition} resolves per-deploy.
     policy = role["Properties"]["Policies"][0]["PolicyDocument"]["Statement"][0]
     sub_strs = [r["Fn::Sub"] for r in policy["Resource"]]
-    assert "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*" in sub_strs
+    assert set(sub_strs) == {
+        "arn:${AWS::Partition}:s3:::arcnode-public",
+        "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*",
+        "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune-scoped-v1/*",
+    }
 
 
 def test_neptune_cluster_associates_loader_role() -> None:

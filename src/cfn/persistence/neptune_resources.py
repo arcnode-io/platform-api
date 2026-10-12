@@ -22,8 +22,11 @@ NEPTUNE_HOST_SSM_PARAM: Final[str] = "/arcnode-ems/${AWS::StackName}/neptune-hos
 NEPTUNE_LOADER_ROLE_SSM_PARAM: Final[str] = (
     "/arcnode-ems/${AWS::StackName}/neptune-loader-role-arn"
 )
-ARCNODE_PUBLIC_SEED_PREFIX: Final[str] = (
-    "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*"
+# The loader reads only these seed prefixes. The scoped graph (vertices/edges.csv, 379 KB
+# instead of 125 MB) is graph-neptune-scoped-v1; the original stays for rollback.
+ARCNODE_PUBLIC_SEED_PREFIXES: Final[tuple[str, ...]] = (
+    "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune/*",
+    "arn:${AWS::Partition}:s3:::arcnode-public/seed/graph-neptune-scoped-v1/*",
 )
 
 
@@ -85,7 +88,10 @@ def neptune_resources(
                                         {
                                             "Fn::Sub": "arn:${AWS::Partition}:s3:::arcnode-public",
                                         },
-                                        {"Fn::Sub": ARCNODE_PUBLIC_SEED_PREFIX},
+                                        *(
+                                            {"Fn::Sub": prefix}
+                                            for prefix in ARCNODE_PUBLIC_SEED_PREFIXES
+                                        ),
                                     ],
                                 }
                             ],
