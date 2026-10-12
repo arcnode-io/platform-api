@@ -13,9 +13,9 @@ settlement_point fields — see configurator_grid.py and
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from src.orders.configurator_grid import Grid, GridPath, OnsiteGeneration, Site
+from src.orders.configurator_grid import Grid, OnsiteGeneration, Site
 
 
 class PrimaryWorkload(StrEnum):
@@ -73,9 +73,9 @@ class AwsPartition(StrEnum):
 class ConfiguratorPayload(BaseModel):
     """Operator-submitted configuration. Forwarded verbatim to edp-api.
 
-    Platform-api checks the one cross-field rule that decides whether an order can be
-    submitted at all (grid paths need coordinates). edp-api owns every other structural and
-    region-dependent rule on `site`/`onsite_generation`/`grid`, and platform-api relays its 422.
+    No cross-field validators (policy unchanged from v1) — edp-api owns
+    every structural + region-dependent rule on `site`/`onsite_generation`/
+    `grid`; platform-api just relays its 422 on an invalid combo.
 
     extra="forbid": a misspelled/stray key must 422 here, not get silently
     stripped and forwarded as if it were never sent — matches edp-api's
@@ -105,13 +105,3 @@ class ConfiguratorPayload(BaseModel):
     site: Site
     onsite_generation: OnsiteGeneration
     grid: Grid
-
-    @model_validator(mode="after")
-    def grid_connected_requires_coordinates(self) -> "ConfiguratorPayload":
-        """Grid paths need lat/lon to resolve the utility; off grid needs no location."""
-        loc = self.site.location
-        if self.grid.path != GridPath.OFF_GRID and (loc.lat is None or loc.lon is None):
-            raise ValueError(
-                f"grid.path={self.grid.path.value} requires site.location lat and lon"
-            )
-        return self

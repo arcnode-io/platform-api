@@ -258,61 +258,37 @@ def test_compute_shed_enabled_accepts_true() -> None:
     assert payload.compute_shed_enabled is True
 
 
-def _payload_without_coordinates(
-    grid: dict[str, object] | None = None,
-) -> dict[str, object]:
-    """The fixture payload with null lat/lon, optionally on a different grid path."""
-    from src.orders.configurator_payload import ConfiguratorPayload
-
-    payload = ConfiguratorPayload.model_validate(JS_PAYLOAD)
-    location = payload.site.location.model_copy(update={"lat": None, "lon": None})
-    site = payload.site.model_copy(update={"location": location})
-    raw: dict[str, object] = payload.model_dump() | {"site": site.model_dump()}
-    if grid is not None:
-        raw["grid"] = grid
-    return raw
-
-
-def test_a_grid_connected_site_without_coordinates_is_rejected_at_submit() -> None:
-    """Grid paths need lat/lon to resolve the utility, so a null there fails at submit, not in edp-api."""
+def test_a_site_without_coordinates_is_rejected_on_every_path() -> None:
+    """Every site has a physical location, so a null lat or lon is a 422 at submit, off grid included."""
     import pytest
     from pydantic import ValidationError
 
-    from src.orders.configurator_payload import ConfiguratorPayload
-
-    # Arrange — the fixture is flexible-path with its coordinates nulled
-    raw = _payload_without_coordinates()
+    # Arrange — the off-grid fixture with its location nulled
+    off_grid_grid = {
+        "path": "off_grid",
+        "interconnection_level": None,
+        "wires_owner": None,
+        "retail_provider_separate": False,
+        "market_region": None,
+        "service_type": None,
+        "flex_obligation": None,
+        "export_mode": "non_export",
+        "export_limit_mw": None,
+        "market_access": "none",
+        "market_program": None,
+        "settlement_point": None,
+        "intentional_islanding": False,
+    }
+    no_location = {
+        **JS_PAYLOAD,
+        "site": {
+            "location": {"lat": None, "lon": None, "address": None},
+            "country": "US",
+            "state": "TX",
+        },
+        "grid": off_grid_grid,
+    }
 
     # Act / Assert
-    with pytest.raises(ValidationError, match=r"requires site\.location lat and lon"):
-        ConfiguratorPayload.model_validate(raw)
-
-
-def test_an_off_grid_site_without_coordinates_is_accepted() -> None:
-    """Off grid means no utility connection, so no location is needed."""
-    from src.orders.configurator_payload import ConfiguratorPayload
-
-    # Arrange
-    raw = _payload_without_coordinates(
-        grid={
-            "path": "off_grid",
-            "interconnection_level": None,
-            "wires_owner": None,
-            "retail_provider_separate": False,
-            "market_region": "non_rto",
-            "service_type": None,
-            "flex_obligation": None,
-            "export_mode": "non_export",
-            "export_limit_mw": None,
-            "market_access": "none",
-            "market_program": None,
-            "settlement_point": None,
-            "intentional_islanding": False,
-        }
-    )
-
-    # Act
-    payload = ConfiguratorPayload.model_validate(raw)
-
-    # Assert
-    assert payload.site.location.lat is None
+    with pytest.raises(ValidationError):
+        ConfiguratorPayload.model_validate(no_location)
