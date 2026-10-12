@@ -38,6 +38,10 @@ DTM_URL: Final[str] = (
 )
 # 25min covers Aurora ~5min + Lambda CR ~30s + EC2 boot + image pulls.
 S3 = boto3.client("s3", region_name=REGION)
+# Tiger is reached from the CI runner over the internet; these bound a stalled connection.
+TIGER_CONNECT_TIMEOUT_S: Final[int] = 30
+TIGER_KEEPALIVE_IDLE_S: Final[int] = 30
+TIGER_STATEMENT_TIMEOUT_MS: Final[int] = 60_000
 STACK_READY_TIMEOUT_S: Final[int] = 1500
 STACK_DELETE_TIMEOUT_S: Final[int] = 1800
 POLL_INTERVAL_S: Final[int] = 30
@@ -252,10 +256,23 @@ def _wait_for_terminal(
     raise TimeoutError(f"stack {stack_name} {op} not done after {timeout_s}s")
 
 
-@pytest.fixture
+def connect_tiger(tiger_url: str) -> psycopg2.extensions.connection:
+    """Open the customer Tiger DB connection, bounded on purpose: with no timeouts a stalled
+    socket (a dropped path, an unanswered query) blocks the job until the runner kills it.
+    Each limit fails loudly instead."""
+    return psycopg2.connect(
+        tiger_url,
+        connect_timeout=TIGER_CONNECT_TIMEOUT_S,
+        keepalives=1,
+        keepalives_idle=TIGER_KEEPALIVE_IDLE_S,
+        options=f"-c statement_timeout={TIGER_STATEMENT_TIMEOUT_MS}",
+    )
+
+
+@pytest.fixture(scope="session")
 def tiger_conn(tiger_url: str) -> Iterator[psycopg2.extensions.connection]:
     """Connection to the customer Tiger DB. Caller owns cursor lifecycle."""
-    conn = psycopg2.connect(tiger_url)
+    conn = connect_tiger(tiger_url)
     try:
         yield conn
     finally:
