@@ -38,7 +38,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         name="Bill of Materials",
         # MOCK SUBTITLE — replace with computed "{n} items · {m} vendors" once
         # edp-api emits item/vendor counts in ArtifactRef.
-        subtitle=None,  # real value comes from edp-api once it emits the counts
+        subtitle="Estimated · 19 line items · 11 vendors",
     ),
     ArtifactKind.COMPUTE_CONTAINER_3D: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
@@ -76,7 +76,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         section=ManifestSection.MANIFESTS_AND_SCHEDULES,
         name="Cable & Hose Schedule",
         # MOCK SUBTITLE — replace with computed "{n} runs · cu · fiber · glycol · CDA".
-        subtitle=None,  # real value comes from edp-api once it emits the counts
+        subtitle="Estimated · 81 runs · 4 media kinds",
     ),
     ArtifactKind.INSTALL_SEQUENCE: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
@@ -87,7 +87,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         section=ManifestSection.MANIFESTS_AND_SCHEDULES,
         name="Device Topology Manifest",
         # MOCK SUBTITLE — replace with computed "{n} devices · addressing + bus map".
-        subtitle=None,  # real value comes from edp-api once it emits the counts
+        subtitle="Estimated · 36 devices · 1 AC bus",
     ),
 }
 

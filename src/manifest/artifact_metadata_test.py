@@ -8,18 +8,18 @@ def test_no_shipped_subtitle_carries_a_placeholder_or_mock_label() -> None:
     # Arrange + Act
     subtitles = [m.subtitle for m in MOCK_ARTIFACT_METADATA.values() if m.subtitle]
 
-    # Assert — no "MOCK" text, and no digits (a count) that edp-api does not emit yet
+    # Assert — no "MOCK" text; every count is labelled as an estimate
     assert not any("MOCK" in s for s in subtitles)
-    assert not any(any(c.isdigit() for c in s) for s in subtitles)
+    for s in subtitles:
+        if any(c.isdigit() for c in s):
+            assert s.startswith("Estimated · "), s
 
 
-def test_the_counted_artifacts_show_no_subtitle_until_edp_api_emits_counts() -> None:
+def test_the_counted_artifacts_are_labelled_estimates_until_edp_api_emits_counts() -> (
+    None
+):
     # Arrange + Act + Assert
-    for key in (
-        ArtifactKind.BOM,
-        ArtifactKind.CABLE_HOSE_SCHEDULE,
-        ArtifactKind.DTM,
-        ArtifactKind.INTERFACE_PLATE,
-    ):
-        assert key in MOCK_ARTIFACT_METADATA
-        assert MOCK_ARTIFACT_METADATA[key].subtitle is None
+    for key in (ArtifactKind.BOM, ArtifactKind.CABLE_HOSE_SCHEDULE, ArtifactKind.DTM):
+        subtitle = MOCK_ARTIFACT_METADATA[key].subtitle
+        assert subtitle is not None and subtitle.startswith("Estimated · ")
+    assert MOCK_ARTIFACT_METADATA[ArtifactKind.INTERFACE_PLATE].subtitle is None
