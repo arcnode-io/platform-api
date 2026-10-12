@@ -139,6 +139,14 @@ deploy_platform:
 
 .e2e_base: &e2e_base
   stage: e2e
+  # A killed or timed-out job never reaches the fixtures' teardown, which once left three
+  # stacks (instances + Aurora, ~$1.50/h) running. This runs regardless and deletes whatever
+  # this pipeline's tests created.
+  after_script:
+    - |
+      for s in $(aws cloudformation describe-stacks --region us-east-1 --query "Stacks[?Tags[?Key=='arcnode-pipeline' && Value=='${CI_PIPELINE_ID}']].StackName" --output text); do
+        aws cloudformation delete-stack --region us-east-1 --stack-name "$s"
+      done
   artifacts:
     when: always
     reports:
@@ -173,7 +181,8 @@ e2e_commercial:
   # commercial_stack is session-scoped (one stack across both tests).
   # Budget: 25 min CFN create + 10 min /health + (2 × ~5 min test work) +
   # ~10 min teardown ≈ 55 min. 90 min for AWS-flake headroom.
-  timeout: 90 minutes
+  # Three stacks one after another, ~25-30 min each plus tests: 90 min was not enough.
+  timeout: 150 minutes
 
 e2e_defense:
   # Real-AWS e2e — deploys the defense stack (Aurora + Neptune + AOSS)

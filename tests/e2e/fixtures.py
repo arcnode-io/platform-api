@@ -46,6 +46,7 @@ POLL_INTERVAL_S: Final[int] = 30
 # read-only). Required NoEcho params on every stack since the broker-auth flip.
 # The broker-auth e2e (test_broker_auth.py / test_hmi_browser.py) log in with
 # these — import them, don't hardcode.
+PIPELINE_ID: Final[str] = os.environ.get("CI_PIPELINE_ID", "local")
 E2E_OPERATOR_PW: Final[str] = "e2e-operator-pw"
 E2E_VIEWER_PW: Final[str] = "e2e-viewer-pw"
 E2E_GRAFANA_PW: Final[str] = "e2e-grafana-pw"
@@ -133,6 +134,8 @@ def defense_stack(
         ],
         Tags=[
             {"Key": "arcnode-smoke", "Value": "ci-defense"},
+            # The job's cleanup deletes any stack of its own pipeline that teardown missed.
+            {"Key": "arcnode-pipeline", "Value": PIPELINE_ID},
             {"Key": "auto-teardown", "Value": "true"},
         ],
         OnFailure="ROLLBACK",
@@ -201,6 +204,8 @@ def commercial_stack(
         ],
         Tags=[
             {"Key": "arcnode-smoke", "Value": "ci"},
+            # The job's cleanup deletes any stack of its own pipeline that teardown missed.
+            {"Key": "arcnode-pipeline", "Value": PIPELINE_ID},
             {"Key": "auto-teardown", "Value": "true"},
         ],
         OnFailure="ROLLBACK",
