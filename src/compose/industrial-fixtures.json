@@ -120,11 +120,9 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4000,
-      "data_type": "int32",
-      "word_order": "high_low",
-      "scale": 1.0,
-      "offset": 0.0
+      "address": 3204,
+      "data_type": "int64",
+      "word_order": "high_low"
      }
     },
     "kwh_received": {
@@ -135,8 +133,8 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4002,
-      "data_type": "int32",
+      "address": 3208,
+      "data_type": "int64",
       "word_order": "high_low"
      }
     },
@@ -146,14 +144,17 @@
      "poll_rate_hz": 1,
      "display_name_default": "POI Active Power (+ import, - export)",
      "iec_61850_ref": "MMXU.W",
-     "bounds": { "min": -10000000, "max": 10000000, "nominal": 0 },
+     "bounds": {
+      "min": -10000000,
+      "max": 10000000,
+      "nominal": 0
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4030,
-      "data_type": "int32",
-      "word_order": "high_low",
-      "scale": 1.0
+      "address": 3060,
+      "data_type": "float32",
+      "word_order": "high_low"
      }
     },
     "power_factor": {
@@ -164,9 +165,9 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4010,
-      "data_type": "int16",
-      "scale": 0.001
+      "address": 3150,
+      "data_type": "float32",
+      "word_order": "high_low"
      }
     },
     "thd_voltage_a": {
@@ -177,9 +178,9 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4020,
-      "data_type": "int16",
-      "scale": 0.01
+      "address": 21330,
+      "data_type": "float32",
+      "word_order": "high_low"
      }
     },
     "thd_voltage_b": {
@@ -190,9 +191,9 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4021,
-      "data_type": "int16",
-      "scale": 0.01
+      "address": 21332,
+      "data_type": "float32",
+      "word_order": "high_low"
      }
     },
     "thd_voltage_c": {
@@ -203,9 +204,9 @@
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
-      "address": 4022,
-      "data_type": "int16",
-      "scale": 0.01
+      "address": 21334,
+      "data_type": "float32",
+      "word_order": "high_low"
      }
     }
    },
@@ -218,14 +219,18 @@
     },
     {
      "name": "wire_ct_pt_inputs",
-     "depends_on": ["mount_in_panel"],
+     "depends_on": [
+      "mount_in_panel"
+     ],
      "est_minutes": 60,
      "crew_role": "electrician",
      "cx_level": "L2"
     },
     {
      "name": "modbus_commission",
-     "depends_on": ["wire_ct_pt_inputs"],
+     "depends_on": [
+      "wire_ct_pt_inputs"
+     ],
      "est_minutes": 15,
      "crew_role": "it",
      "cx_level": "L3"
@@ -308,14 +313,18 @@
     },
     {
      "name": "uplink_terminate",
-     "depends_on": ["rack_install"],
+     "depends_on": [
+      "rack_install"
+     ],
      "est_minutes": 30,
      "crew_role": "it",
      "cx_level": "L2"
     },
     {
      "name": "snmp_commission",
-     "depends_on": ["uplink_terminate"],
+     "depends_on": [
+      "uplink_terminate"
+     ],
      "est_minutes": 15,
      "crew_role": "it",
      "cx_level": "L3"
@@ -346,9 +355,9 @@
    "template": "dc_external",
    "kind": "leaf",
    "equipment_id": "EXT-DC-001",
-   "vendor": "G\u00fcntner",
+   "vendor": "Güntner",
    "model": "GFD V-shape",
-   "description": "G\u00fcntner GFD V-shape dry cooler with BACnet/IP telemetry (router-fronted MS-TP in production)",
+   "description": "Güntner GFD V-shape dry cooler with BACnet/IP telemetry (router-fronted MS-TP in production)",
    "measurements": {
     "supply_water_temp": {
      "unit": "celsius",
@@ -367,7 +376,7 @@
   "bess_module": {
    "template": "bess_module",
    "kind": "module",
-   "description": "BESS module aggregation \u2014 published rollups + setpoint fanout",
+   "description": "BESS module aggregation — published rollups + setpoint fanout",
    "contains": [
     {
      "template": "bess_rack",
@@ -452,7 +461,7 @@
      "binding": {
       "protocol": "distribute",
       "allocation_policy": "soc_weighted",
-      "ramp_rate_per_sec": 0.10,
+      "ramp_rate_per_sec": 0.1,
       "hysteresis_margin": 0.05,
       "hysteresis_dwell_secs": 30.0
      }
@@ -498,8 +507,17 @@
      "poll_rate_hz": 1,
      "display_name_default": "State of Charge",
      "iec_61850_ref": "ZBAT.BatChaSt",
-     "bounds": { "min": 0, "max": 100, "nominal": 50 },
-     "thresholds": { "warn_min": 15, "warn_max": 90, "alarm_min": 5, "alarm_max": 95 },
+     "bounds": {
+      "min": 0,
+      "max": 100,
+      "nominal": 50
+     },
+     "thresholds": {
+      "warn_min": 15,
+      "warn_max": 90,
+      "alarm_min": 5,
+      "alarm_max": 95
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -515,8 +533,17 @@
      "poll_rate_hz": 1,
      "display_name_default": "Active Power (+ discharge, - charge)",
      "iec_61850_ref": "MMXU.W",
-     "bounds": { "min": -4000000, "max": 4000000, "nominal": 0 },
-     "thresholds": { "warn_min": -3800000, "warn_max": 3800000, "alarm_min": -4000000, "alarm_max": 4000000 },
+     "bounds": {
+      "min": -4000000,
+      "max": 4000000,
+      "nominal": 0
+     },
+     "thresholds": {
+      "warn_min": -3800000,
+      "warn_max": 3800000,
+      "alarm_min": -4000000,
+      "alarm_max": 4000000
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -532,8 +559,17 @@
      "poll_rate_hz": 1,
      "display_name_default": "Reactive Power",
      "iec_61850_ref": "MMXU.VAr",
-     "bounds": { "min": -2000000, "max": 2000000, "nominal": 0 },
-     "thresholds": { "warn_min": -1800000, "warn_max": 1800000, "alarm_min": -2000000, "alarm_max": 2000000 },
+     "bounds": {
+      "min": -2000000,
+      "max": 2000000,
+      "nominal": 0
+     },
+     "thresholds": {
+      "warn_min": -1800000,
+      "warn_max": 1800000,
+      "alarm_min": -2000000,
+      "alarm_max": 2000000
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -549,8 +585,17 @@
      "poll_rate_hz": 1,
      "display_name_default": "AC Bus Voltage",
      "iec_61850_ref": "MMXU.PhV.phsA",
-     "bounds": { "min": 0, "max": 600, "nominal": 480 },
-     "thresholds": { "warn_min": 432, "warn_max": 528, "alarm_min": 408, "alarm_max": 552 },
+     "bounds": {
+      "min": 0,
+      "max": 600,
+      "nominal": 480
+     },
+     "thresholds": {
+      "warn_min": 432,
+      "warn_max": 528,
+      "alarm_min": 408,
+      "alarm_max": 552
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -566,8 +611,17 @@
      "poll_rate_hz": 10,
      "display_name_default": "AC Frequency",
      "iec_61850_ref": "MMXU.Hz",
-     "bounds": { "min": 55.0, "max": 65.0, "nominal": 60.0 },
-     "thresholds": { "warn_min": 59.5, "warn_max": 60.5, "alarm_min": 59.0, "alarm_max": 61.0 },
+     "bounds": {
+      "min": 55.0,
+      "max": 65.0,
+      "nominal": 60.0
+     },
+     "thresholds": {
+      "warn_min": 59.5,
+      "warn_max": 60.5,
+      "alarm_min": 59.0,
+      "alarm_max": 61.0
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -583,8 +637,17 @@
      "poll_rate_hz": 0.1,
      "display_name_default": "Energy Discharged",
      "iec_61850_ref": "MMTR.SupWh",
-     "bounds": { "min": 0, "max": 1000000000, "nominal": 0 },
-     "thresholds": { "warn_min": 0, "warn_max": 950000000, "alarm_min": 0, "alarm_max": 1000000000 },
+     "bounds": {
+      "min": 0,
+      "max": 1000000000,
+      "nominal": 0
+     },
+     "thresholds": {
+      "warn_min": 0,
+      "warn_max": 950000000,
+      "alarm_min": 0,
+      "alarm_max": 1000000000
+     },
      "binding": {
       "protocol": "modbus_tcp",
       "function_code": 3,
@@ -642,14 +705,18 @@
     },
     {
      "name": "wire_dc_bus",
-     "depends_on": ["set_and_anchor"],
+     "depends_on": [
+      "set_and_anchor"
+     ],
      "est_minutes": 120,
      "crew_role": "electrician",
      "cx_level": "L2"
     },
     {
      "name": "canopen_commission",
-     "depends_on": ["wire_dc_bus"],
+     "depends_on": [
+      "wire_dc_bus"
+     ],
      "est_minutes": 30,
      "crew_role": "it",
      "cx_level": "L3"
@@ -670,8 +737,17 @@
      "poll_rate_hz": 0.0033,
      "display_name_default": "Import Limit",
      "iec_61850_ref": "CSIP.opModImpLimW",
-     "bounds": { "min": 0, "max": 10000000, "nominal": 5000000 },
-     "thresholds": { "warn_min": 100000, "warn_max": 9500000, "alarm_min": 0, "alarm_max": 10000000 },
+     "bounds": {
+      "min": 0,
+      "max": 10000000,
+      "nominal": 5000000
+     },
+     "thresholds": {
+      "warn_min": 100000,
+      "warn_max": 9500000,
+      "alarm_min": 0,
+      "alarm_max": 10000000
+     },
      "binding": {
       "protocol": "dnp3_tcp",
       "point_type": "analog_input",
@@ -685,8 +761,17 @@
      "poll_rate_hz": 0.0033,
      "display_name_default": "Export Limit",
      "iec_61850_ref": "CSIP.opModExpLimW",
-     "bounds": { "min": 0, "max": 10000000, "nominal": 0 },
-     "thresholds": { "warn_min": 0, "warn_max": 9500000, "alarm_min": 0, "alarm_max": 10000000 },
+     "bounds": {
+      "min": 0,
+      "max": 10000000,
+      "nominal": 0
+     },
+     "thresholds": {
+      "warn_min": 0,
+      "warn_max": 9500000,
+      "alarm_min": 0,
+      "alarm_max": 10000000
+     },
      "binding": {
       "protocol": "dnp3_tcp",
       "point_type": "analog_input",
@@ -723,14 +808,18 @@
     },
     {
      "name": "sensor_wire",
-     "depends_on": ["pi_mount"],
+     "depends_on": [
+      "pi_mount"
+     ],
      "est_minutes": 45,
      "crew_role": "electrician",
      "cx_level": "L2"
     },
     {
      "name": "dnp3_commission",
-     "depends_on": ["sensor_wire"],
+     "depends_on": [
+      "sensor_wire"
+     ],
      "est_minutes": 30,
      "crew_role": "it",
      "cx_level": "L3"
