@@ -40,6 +40,7 @@ from src.config import Config, EmailProvider, LogLevel
 from src.edp_client.edp_artifacts import ArtifactKind
 from src.orders.orders_record import GetOrderResponse
 from tests.fixtures.iso import extract, seed_base_iso
+from tests.fixtures.public_downloads import seed_public_downloads
 from tests.fixtures.containers import (
     seed_edp_manifest,
     start_edp_api,
@@ -57,8 +58,6 @@ ASSETS_DIR: Path = Path(__file__).resolve().parent / "fixtures" / "edp-assets"
 
 POSTGRES_PASSWORD: str = "test"
 S3_BUCKET: str = "platform-api-artifacts-test"
-APK_URL: str = "https://f-droid.example/test/ems-hmi.apk"
-GATEWAY_TARBALL_URL: str = "https://arcnode-public.example/gateway/latest.tar.gz"
 SENDER_EMAIL: str = "noreply@arcnode.test"
 
 # v2 grid model (CONTRACT §1) — "firm" grid path, ERCOT/Oncor site.
@@ -161,6 +160,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH, ASSETS_DIR)
         base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
+        apk_url, gateway_url = seed_public_downloads(ls.url, S3_BUCKET)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
@@ -186,8 +186,8 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
                 order_rate_limit_window_s=600,
                 dns_api_user="test",
                 dns_client_ip="127.0.0.1",
-                ems_hmi_apk_url=APK_URL,
-                ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
+                ems_hmi_apk_url=apk_url,
+                ems_industrial_gateway_tarball_url=gateway_url,
                 base_iso_url=base_iso_url,
                 cors_origins=["*"],
             )
@@ -274,7 +274,7 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             html_resp = httpx.get(portal_url)
             assert html_resp.status_code == 200, html_resp.text
             html = html_resp.text
-            assert APK_URL in html
+            assert apk_url in html
             assert bom_json.url in html
             assert template_url in html
 
@@ -306,6 +306,7 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
     ):
         seed_edp_manifest(ls.url, EDP_MANIFEST_PATH, ASSETS_DIR)
         base_iso_url = seed_base_iso(ls.url, S3_BUCKET, tmp_path)
+        apk_url, gateway_url = seed_public_downloads(ls.url, S3_BUCKET)
         with (
             start_edp_api(network=net, s3_endpoint_url="http://localstack:4566") as edp,
             pytest.MonkeyPatch.context() as mp,
@@ -331,8 +332,8 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
                 order_rate_limit_window_s=600,
                 dns_api_user="test",
                 dns_client_ip="127.0.0.1",
-                ems_hmi_apk_url=APK_URL,
-                ems_industrial_gateway_tarball_url=GATEWAY_TARBALL_URL,
+                ems_hmi_apk_url=apk_url,
+                ems_industrial_gateway_tarball_url=gateway_url,
                 base_iso_url=base_iso_url,
                 cors_origins=["*"],
             )

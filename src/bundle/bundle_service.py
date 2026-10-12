@@ -2,7 +2,7 @@
 
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 from typing import Final
 
@@ -42,12 +42,24 @@ def bundle_files_for(
     sections: dict[ManifestSection, list[ManifestArtifact]],
 ) -> list[BundleFile]:
     """Flatten a manifest's sections into zip entries, one per downloadable file."""
-    return [
-        BundleFile(
-            path=f"{artifact.code}/{urlparse(file.url).path.rsplit('/', 1)[-1]}",
-            url=file.url,
-        )
-        for arts in sections.values()
-        for artifact in arts
-        for file in artifact.files
-    ]
+    entries: list[BundleFile] = []
+    taken: set[str] = set()
+    for arts in sections.values():
+        for artifact in arts:
+            for file in artifact.files:
+                name = urlparse(file.url).path.rsplit("/", 1)[-1]
+                path = _unique_path(f"{artifact.code}/{name}", taken)
+                taken.add(path)
+                entries.append(BundleFile(path=path, url=file.url))
+    return entries
+
+
+def _unique_path(path: str, taken: set[str]) -> str:
+    """`D3/plate.dxf` → `D3/plate-2.dxf` when `D3/plate.dxf` is already in the zip."""
+    if path not in taken:
+        return path
+    posix = PurePosixPath(path)
+    count = 2
+    while str(posix.with_name(f"{posix.stem}-{count}{posix.suffix}")) in taken:
+        count += 1
+    return str(posix.with_name(f"{posix.stem}-{count}{posix.suffix}"))

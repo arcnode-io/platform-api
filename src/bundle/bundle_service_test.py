@@ -91,3 +91,31 @@ def test_bundle_files_nest_each_file_under_its_artifact_code() -> None:
             url="s3://bucket/orders/x/dtm.json?X-Amz-Signature=abc",
         ),
     ]
+
+
+def test_bundle_files_keep_same_named_files_in_one_artifact_apart() -> None:
+    """Two plates with the same file name must not collide inside the zip."""
+    # Arrange
+    sections = {
+        ManifestSection.ENGINEERING_DRAWINGS: [
+            ManifestArtifact(
+                code="D3",
+                name="Plates",
+                subtitle=None,
+                files=[
+                    ManifestFile(
+                        format="DXF", size_bytes=1, url="https://h/a/plate.dxf"
+                    ),
+                    ManifestFile(
+                        format="DXF", size_bytes=1, url="https://h/b/plate.dxf"
+                    ),
+                ],
+            )
+        ]
+    }
+
+    # Act
+    files = bundle_files_for(sections)
+
+    # Assert
+    assert [f.path for f in files] == ["D3/plate.dxf", "D3/plate-2.dxf"]
