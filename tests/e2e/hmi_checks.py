@@ -306,9 +306,10 @@ def check_browser_login_sld(stack: dict[str, str]) -> None:
             expect(page.get_by_test_id("login-submit")).to_be_hidden(timeout=15_000)
 
             # Act — navigate to the single-line diagram (default screen is
-            # Overview; SLD is its own route /modules/sld). SPA route, served
+            # Overview; SLD is its own top-level route /sld, see ems-hmi routes.ts).
+            # SPA route, served
             # via nginx history-fallback.
-            page.goto(f"https://{ip}/modules/sld", wait_until="domcontentloaded")
+            page.goto(f"https://{ip}/sld", wait_until="domcontentloaded")
 
             # Assert — the SLD canvas mounts (topology rendered from the broker).
             expect(page.get_by_test_id("sld-canvas")).to_be_visible(timeout=20_000)
