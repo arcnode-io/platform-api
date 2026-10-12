@@ -99,6 +99,12 @@ class OrchestratorService:
         except Exception:
             logging.exception("❌ orchestrator failed for order %s", order.id)
             await self._mark_failed(order)
+            payload = ConfiguratorPayload.model_validate(order.payload)
+            await self._notify_failed(
+                to=payload.contact_email,
+                site_name=payload.deployment_site_name,
+                order_id=str(order.id),
+            )
             return
         logging.info("✅ orchestrator complete order=%s", order.id)
         await self._mark_complete(order, result)
@@ -347,6 +353,17 @@ class OrchestratorService:
             subject="ARCNODE deployment package ready",
             body_text=(
                 f"Your ARCNODE deployment package is ready.\n\nPortal: {portal_url}\n"
+            ),
+        )
+
+    async def _notify_failed(self, *, to: str, site_name: str, order_id: str) -> None:
+        """Tell the contact the build failed, and quote the order id for support."""
+        await self._ses.send_delivery_email(
+            to=to,
+            subject="ARCNODE deployment package failed",
+            body_text=(
+                f"We could not finish the ARCNODE deployment package for {site_name}.\n\n"
+                f"Order: {order_id}\n\nReply to this email with the order id and we will follow up.\n"
             ),
         )
 

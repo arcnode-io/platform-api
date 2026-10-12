@@ -177,3 +177,33 @@ def test_colliding_archive_names_get_numbered_keys() -> None:
         "orders/abc123/assembly-2.step",
         "orders/abc123/dtm.json",
     ]
+
+
+@pytest.mark.asyncio
+async def test_a_failed_order_emails_the_contact_with_the_order_id() -> None:
+    """A failed build tells the customer, with the order id to quote to support."""
+    # Arrange
+    from src.orchestrator.orchestrator_service import OrchestratorService
+
+    class RecordingSes:
+        def __init__(self) -> None:
+            self.sent: list[dict[str, str]] = []
+
+        async def send_delivery_email(
+            self, *, to: str, subject: str, body_text: str
+        ) -> None:
+            self.sent.append({"to": to, "subject": subject, "body_text": body_text})
+
+    ses = RecordingSes()
+    service = OrchestratorService.__new__(OrchestratorService)
+    service._ses = ses  # type: ignore[attr-defined]
+
+    # Act
+    await service._notify_failed(to="ops@acme.io", site_name="bar", order_id="abc123")
+
+    # Assert
+    assert len(ses.sent) == 1
+    assert ses.sent[0]["to"] == "ops@acme.io"
+    assert ses.sent[0]["subject"] == "ARCNODE deployment package failed"
+    assert "abc123" in ses.sent[0]["body_text"]
+    assert "bar" in ses.sent[0]["body_text"]
