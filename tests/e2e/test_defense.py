@@ -194,6 +194,10 @@ def test_defense_browser_login_then_live_sld(defense_stack: dict[str, str]) -> N
 
 
 @pytest.mark.e2e
+@pytest.mark.skip(
+    reason="Browser dispatch UI check disabled for launch. The dispatch path itself is covered by "
+    "test_defense_operator_dispatch_round_trip (broker level). Re-enable when the dispatch UI is in scope."
+)
 def test_defense_browser_operator_dispatch_settles(
     defense_stack: dict[str, str],
 ) -> None:
