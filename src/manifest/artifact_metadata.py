@@ -19,9 +19,11 @@ from src.manifest.manifest_record import ManifestSection
 
 
 class ArtifactMetadata:
-    """Render-time metadata for one ArtifactKind."""
+    """Render-time metadata for one ArtifactKind. A None subtitle renders nothing."""
 
-    def __init__(self, *, section: ManifestSection, name: str, subtitle: str) -> None:
+    def __init__(
+        self, *, section: ManifestSection, name: str, subtitle: str | None
+    ) -> None:
         self.section = section
         self.name = name
         self.subtitle = subtitle
@@ -36,7 +38,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         name="Bill of Materials",
         # MOCK SUBTITLE — replace with computed "{n} items · {m} vendors" once
         # edp-api emits item/vendor counts in ArtifactRef.
-        subtitle="MOCK 1,284 items · 47 vendors",
+        subtitle=None,  # real value comes from edp-api once it emits the counts
     ),
     ArtifactKind.COMPUTE_CONTAINER_3D: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
@@ -53,7 +55,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         name="Interface Plates",
         # MOCK SUBTITLE — replace with computed "{n} plates · {kinds}" once
         # edp-api emits plate count + kind summary.
-        subtitle="MOCK 4 plates · BESS, cooling, and comms",
+        subtitle=None,  # real value comes from edp-api once it emits the counts
     ),
     ArtifactKind.SLD: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
@@ -74,7 +76,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         section=ManifestSection.MANIFESTS_AND_SCHEDULES,
         name="Cable & Hose Schedule",
         # MOCK SUBTITLE — replace with computed "{n} runs · cu · fiber · glycol · CDA".
-        subtitle="MOCK 318 runs · cu · fiber · glycol · CDA",
+        subtitle=None,  # real value comes from edp-api once it emits the counts
     ),
     ArtifactKind.INSTALL_SEQUENCE: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
@@ -85,7 +87,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
         section=ManifestSection.MANIFESTS_AND_SCHEDULES,
         name="Device Topology Manifest",
         # MOCK SUBTITLE — replace with computed "{n} devices · addressing + bus map".
-        subtitle="MOCK 142 devices · addressing + bus map",
+        subtitle=None,  # real value comes from edp-api once it emits the counts
     ),
 }
 
@@ -100,7 +102,7 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
     "ems_field_client": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
         name="EMS Field Client",
-        subtitle="MOCK Android · arm64-v8a · minSdk 30",
+        subtitle=None,  # real value comes from edp-api once it emits the counts
     ),
     # On-prem: the generic installer with this order's site + devices baked
     # in (src/iso/iso_service.py). Presigned, so the link expires.

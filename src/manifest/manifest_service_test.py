@@ -148,7 +148,7 @@ def test_build_stamps_mock_signed_badge() -> None:
 
 
 def test_build_emits_curl_url_with_slug() -> None:
-    """curl one-liner uses delivery.arcnode.io/{slug}/arcnode.zip."""
+    """curl one-liner uses platform.arcnode.io/{slug}/arcnode.zip."""
     # Arrange + Act
     m = _service().build(
         site_display_name="Brookside DC-1",
@@ -158,7 +158,7 @@ def test_build_emits_curl_url_with_slug() -> None:
     )
 
     # Assert
-    assert m.bundle_curl_url == "https://delivery.arcnode.io/brookside-dc-1/arcnode.zip"
+    assert m.bundle_curl_url == "https://platform.arcnode.io/brookside-dc-1/arcnode.zip"
 
 
 def test_build_uppercases_file_formats() -> None:

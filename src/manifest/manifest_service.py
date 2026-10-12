@@ -36,7 +36,7 @@ MOCK_REVISION: Final[int] = 1
 MOCK_SIGNED: Final[bool] = True
 MOCK_KEY_ID: Final[str] = "0xA3F1...9C72"
 # MOCK — bundle phase pending; this URL is what Phase 2 will produce.
-MOCK_BUNDLE_CURL_TEMPLATE: Final[str] = "https://delivery.arcnode.io/{slug}/arcnode.zip"
+MOCK_BUNDLE_CURL_TEMPLATE: Final[str] = "https://platform.arcnode.io/{slug}/arcnode.zip"
 # Bundle ID format. Once versioning lands the trailing semver comes from the
 # Order's revision history; today every delivery is "1.0.0".
 MOCK_BUNDLE_VERSION: Final[str] = "1.0.0"

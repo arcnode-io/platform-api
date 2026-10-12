@@ -42,7 +42,7 @@ def _manifest(*, signed: bool = True, with_bundle: bool = False) -> DeploymentMa
         total_file_count=21,
         artifact_count=10,
         bundle_url="https://example.com/orders/x/arcnode.zip" if with_bundle else None,
-        bundle_curl_url="https://delivery.arcnode.io/brookside-dc-1/arcnode.zip",
+        bundle_curl_url="https://platform.arcnode.io/brookside-dc-1/arcnode.zip",
         sections={
             ManifestSection.SYSTEM_IMAGES: [
                 ManifestArtifact(
@@ -92,11 +92,11 @@ def test_split_curl_url_separates_filename_for_chip_coloring() -> None:
     """The trailing path segment is colorized in the curl one-liner."""
     # Arrange + Act
     prefix, fname = _split_curl_url(
-        "https://delivery.arcnode.io/brookside-dc-1/arcnode.zip"
+        "https://platform.arcnode.io/brookside-dc-1/arcnode.zip"
     )
 
     # Assert
-    assert prefix == "https://delivery.arcnode.io/brookside-dc-1/"
+    assert prefix == "https://platform.arcnode.io/brookside-dc-1/"
     assert fname == "arcnode.zip"
 
 
@@ -202,7 +202,7 @@ def test_render_curl_one_liner_with_highlighted_filename() -> None:
 
     # Assert
     assert (
-        "curl -LO https://delivery.arcnode.io/brookside-dc-1/"
+        "curl -LO https://platform.arcnode.io/brookside-dc-1/"
         '<span class="filename">arcnode.zip</span>'
     ) in html
 

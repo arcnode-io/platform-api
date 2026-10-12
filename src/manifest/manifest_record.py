@@ -41,14 +41,14 @@ class ManifestArtifact(BaseModel):
     Engineering Drawings; M1..M3 in Manifests & Schedules). Not stable across
     deliveries — recomputed per render from artifact ordering.
 
-    `subtitle` is a one-line description (e.g., "Debian 12 · linux-rt 6.6"
-    or "1,284 items · 47 vendors"). Currently sourced from the
-    `MOCK_ARTIFACT_METADATA` table; will move to edp-api emission later.
+    `subtitle` is a one-line description (e.g., "Debian 12 · linux-rt 6.6"), or None
+    when it would need a count edp-api does not emit yet: nothing is shown rather than a
+    placeholder. Sourced from `MOCK_ARTIFACT_METADATA`; counts will come from edp-api later.
     """
 
     code: str  # "A1", "D2", "M3"
     name: str
-    subtitle: str
+    subtitle: str | None
     files: list[ManifestFile]
 
 

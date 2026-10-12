@@ -588,7 +588,7 @@
             <div class="artifact-code">{{ artifact.code }}</div>
             <div class="artifact-body">
               <div class="artifact-name">{{ artifact.name }}</div>
-              <div class="artifact-subtitle">{{ artifact.subtitle }}</div>
+              {% if artifact.subtitle %}<div class="artifact-subtitle">{{ artifact.subtitle }}</div>{% endif %}
               <div class="artifact-files">
                 {% for file in artifact.files %}
                 <a href="{{ file.url }}" class="chip chip-{{ file.format | lower }}" download>
