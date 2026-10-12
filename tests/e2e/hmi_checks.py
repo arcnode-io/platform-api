@@ -23,6 +23,8 @@ from .fixtures import E2E_OPERATOR_PW, E2E_VIEWER_PW
 from .tls import insecure_pool
 
 HMI_TIMEOUT_S = 600
+# How long an unbound device gets to answer before we call its silence settled.
+GHOST_SILENCE_WINDOW_S = 10
 HMI_POLL_S = 15
 BROKER_CONNECT_TIMEOUT_S = 15
 TELEMETRY_TIMEOUT_S = 60
@@ -202,7 +204,7 @@ def check_viewer_receives_telemetry(stack: dict[str, str]) -> None:
 
 
 def check_dispatch_round_trip(stack: dict[str, str]) -> None:
-    """operator command → gateway received→done; ghost → failed+reason."""
+    """operator command → gateway received→done; ghost device → silence (no ack)."""
     # Arrange
     ip = stack["public_ip"]
     site = stack["site_id"]
@@ -258,7 +260,9 @@ def check_dispatch_round_trip(stack: dict[str, str]) -> None:
     assert delivered, f"expected 2 acks, got {events}"
     assert [e["phase"] for e in events[:2]] == ["received", "done"]
 
-    # Act — ghost device is rejected with a reason.
+    # Act — a device the gateway has no binding for is ignored: no received, no failed (Joe's
+    # call, b524ce2: der-control-api owns the der_dispatch acks). Silence can only be checked
+    # over a window, so wait a bounded time and assert nothing arrived.
     events.clear()
     got_two.clear()
     wanted["command_id"] = f"e2e-{run_id}-2"
@@ -272,14 +276,12 @@ def check_dispatch_round_trip(stack: dict[str, str]) -> None:
         json_lib.dumps(frame),
         qos=1,
     )
-    delivered = got_two.wait(30)
+    got_two.wait(GHOST_SILENCE_WINDOW_S)
     client.loop_stop()
     client.disconnect()
 
-    # Assert
-    assert delivered, f"expected 2 acks for ghost, got {events}"
-    assert [e["phase"] for e in events[:2]] == ["received", "failed"]
-    assert "ghost_99" in events[1].get("reason", "")
+    # Assert — the gateway stayed silent for the unknown device
+    assert events == [], f"expected no ack for an unbound device, got {events}"
 
 
 def check_browser_login_sld(stack: dict[str, str]) -> None:
