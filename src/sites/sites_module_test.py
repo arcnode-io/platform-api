@@ -22,6 +22,8 @@ def test_the_address_callback_is_served_when_site_dns_is_on(
     monkeypatch.setenv("ENV", "local")
     monkeypatch.setenv("NAMECHEAP_API_KEY", "nc-key")
     monkeypatch.setenv("SITE_TOKEN_SECRET", "s3cret")
+    monkeypatch.setenv("PRESIGN_ACCESS_KEY_ID", "AKIDTEST")
+    monkeypatch.setenv("PRESIGN_SECRET_ACCESS_KEY", "secret-for-test")
     config = load_config().model_copy(update={"site_dns": True})
 
     # Act
