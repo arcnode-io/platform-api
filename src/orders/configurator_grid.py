@@ -19,8 +19,9 @@ class SiteLocation(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
+    # Reason: null for off-grid sites; edp-api's grid rules require numbers on every grid-connected path.
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
     address: str | None = None
 
 
