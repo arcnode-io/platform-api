@@ -9,7 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
     /* SOVEREIGN tokens — see ems-mockups/tokens.jsx §SOVEREIGN */
+    /* Reason: the browser picks the scheme; the controls and scrollbars follow it. */
     :root {
+      color-scheme: light dark;
       --bg:           #080808;
       --surface:      #0e0e0e;
       --panel:        #131313;
@@ -41,6 +43,30 @@
       --radius-2: 4px;
       --radius-3: 6px;
       --radius-4: 8px;
+    }
+
+    /* Light scheme: same tokens, re-tuned so text stays readable on the paper background. */
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg:           #f5f4ef;
+        --surface:      #fbfaf7;
+        --panel:        #eeece6;
+        --border:       #d9d6cf;
+        --border-soft:  #c9c5bc;
+        --accent:       #2f5f8f;
+        --accent-dim:   #3d6f9e;
+        --accent-faint: #e4edf6;
+        --text:         #1d1c1a;
+        --text-mid:     #4f4c46;
+        --text-soft:    #6b6860;
+        --text-faint:   #8f8b83;
+        --status-ok:    #2f6b4c;
+        --status-warn:  #9a6200;
+        --status-alarm: #b02e2e;
+        --color-bess:    #2f6b4c;
+        --color-thermal: #2f7a7a;
+        --color-pv:      #8a6a1c;
+      }
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }

@@ -340,3 +340,13 @@ def test_cloud_manifest_assigns_c_codes_to_edge_section() -> None:
     # Assert
     assert m.cloud is True
     assert m.sections[ManifestSection.SYSTEM_IMAGES][0].code == "C1"
+
+
+def test_render_follows_the_browser_light_or_dark_setting() -> None:
+    """The page declares both schemes and swaps its tokens for light, so it matches the browser."""
+    # Arrange + Act
+    html = PortalService().render(manifest=_manifest())
+
+    # Assert
+    assert "color-scheme: light dark" in html
+    assert "@media (prefers-color-scheme: light)" in html
