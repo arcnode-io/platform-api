@@ -80,7 +80,7 @@ MOCK_ARTIFACT_METADATA: Final[dict[ArtifactKind, ArtifactMetadata]] = {
     ),
     ArtifactKind.INSTALL_SEQUENCE: ArtifactMetadata(
         section=ManifestSection.ENGINEERING_DRAWINGS,
-        name="Installation Graph",
+        name="Installation Sequence",
         subtitle="Install order · torque specs",
     ),
     ArtifactKind.DTM: ArtifactMetadata(
