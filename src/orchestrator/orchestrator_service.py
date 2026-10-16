@@ -24,6 +24,7 @@ from src.edp_client.edp_artifacts import (
     ArtifactKind,
     ArtifactRef,
     JobResult,
+    content_type_for,
 )
 from src.edp_client.edp_client_service import EdpClientService
 from src.iso.iso_service import IsoService
@@ -168,7 +169,9 @@ class OrchestratorService:
     async def _archive_ref(self, key: str, ref: ArtifactRef) -> tuple[ArtifactRef, int]:
         """Stream one artifact's bytes into platform-api S3 at `key`, return (ref, size)."""
         source = self._to_absolute_url(ref.url)
-        new_url, size = await self._s3.archive_from_url(source, key=key)
+        new_url, size = await self._s3.archive_from_url(
+            source, key=key, content_type=content_type_for(ref.format)
+        )
         new_ref = ArtifactRef(
             kind=ref.kind,
             format=ref.format,

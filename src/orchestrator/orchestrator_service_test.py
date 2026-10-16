@@ -91,7 +91,13 @@ def test_archiving_keeps_the_summary_edp_api_filled_in() -> None:
     from src.orchestrator.orchestrator_service import OrchestratorService
 
     class FakeS3:
-        async def archive_from_url(self, _source: str, *, key: str) -> tuple[str, int]:
+        async def archive_from_url(
+            self,
+            _source: str,
+            *,
+            key: str,
+            content_type: str,  # noqa: ARG002
+        ) -> tuple[str, int]:
             return f"https://platform/{key}", 1234
 
     service = OrchestratorService.__new__(OrchestratorService)
@@ -110,6 +116,58 @@ def test_archiving_keeps_the_summary_edp_api_filled_in() -> None:
     # Assert
     assert new_ref.summary == ArtifactSummary(line_items=19, vendors=11)
     assert size == 1234
+
+
+def test_archived_artifacts_are_stored_with_their_real_content_type() -> None:
+    """A PDF served as application/json won't open in a browser (order 51de5d81's sld.pdf)."""
+    # Arrange
+    import asyncio
+
+    from src.edp_client.edp_artifacts import ArtifactKind, ArtifactRef
+    from src.orchestrator.orchestrator_service import OrchestratorService
+
+    class RecordingS3:
+        def __init__(self) -> None:
+            self.content_types: dict[str, str] = {}
+
+        async def archive_from_url(
+            self, _source: str, *, key: str, content_type: str
+        ) -> tuple[str, int]:
+            self.content_types[key] = content_type
+            return f"https://platform/{key}", 1
+
+    s3 = RecordingS3()
+    service = OrchestratorService.__new__(OrchestratorService)
+    service._s3 = s3
+    service._to_absolute_url = lambda url: url
+    refs = [
+        ArtifactRef(kind=ArtifactKind.SLD, format="pdf", url="https://edp/sld.pdf"),
+        ArtifactRef(kind=ArtifactKind.SLD, format="dxf", url="https://edp/sld.dxf"),
+        ArtifactRef(
+            kind=ArtifactKind.SLD_HMI_SVG, format="svg", url="https://edp/sld_hmi.svg"
+        ),
+        ArtifactRef(kind=ArtifactKind.BOM, format="xlsx", url="https://edp/bom.xlsx"),
+        ArtifactRef(
+            kind=ArtifactKind.COMPUTE_CONTAINER_3D,
+            format="glb",
+            url="https://edp/a.glb",
+        ),
+    ]
+
+    # Act
+    for ref in refs:
+        asyncio.run(
+            service._archive_ref(f"orders/o/{ref.kind.value}.{ref.format}", ref)
+        )
+
+    # Assert
+    assert s3.content_types == {
+        "orders/o/sld.pdf": "application/pdf",
+        "orders/o/sld.dxf": "image/vnd.dxf",
+        "orders/o/sld_hmi_svg.svg": "image/svg+xml",
+        "orders/o/bom.xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "orders/o/compute_container_3d.glb": "model/gltf-binary",
+    }
 
 
 @pytest.mark.asyncio

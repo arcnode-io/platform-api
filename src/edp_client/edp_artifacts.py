@@ -5,6 +5,7 @@ codegen from edp-api's OpenAPI export is the planned next step.
 """
 
 from enum import StrEnum
+from typing import Final
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -54,10 +55,28 @@ class ArtifactRef(BaseModel):
     """One artifact entry — flat, one per (kind, format[, plate_id])."""
 
     kind: ArtifactKind
-    format: str  # json | xlsx | dxf | pdf | step | glb
+    format: str  # json | xlsx | dxf | pdf | svg | step | glb
     url: str
     plate_id: str | None = None  # only when kind=INTERFACE_PLATE
     summary: ArtifactSummary | None = None
+
+
+# What S3 serves each format as. Reason: a PDF stored as application/json never
+# opens in a browser; the portal links straight to the object.
+CONTENT_TYPES: Final[dict[str, str]] = {
+    "json": "application/json",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "dxf": "image/vnd.dxf",
+    "pdf": "application/pdf",
+    "svg": "image/svg+xml",
+    "step": "model/step",
+    "glb": "model/gltf-binary",
+}
+
+
+def content_type_for(artifact_format: str) -> str:
+    """MIME type for an ArtifactRef.format. An unknown format is a contract change: fail loud."""
+    return CONTENT_TYPES[artifact_format]
 
 
 class JobCreated(BaseModel):
