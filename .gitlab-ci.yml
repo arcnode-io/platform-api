@@ -10,7 +10,7 @@ checks:
   variables:
     UV_FROZEN: "true"
     # Pinned commit of edp-module-assemblies; bump when you want newer equipment.
-    EDP_MODULE_ASSEMBLIES_SHA: "5846e0f"
+    EDP_MODULE_ASSEMBLIES_SHA: "2cfac23"
   script:
     - curl -fsSL "https://gitlab.com/arcnode-io/edp-module-assemblies/-/raw/${EDP_MODULE_ASSEMBLIES_SHA}/manifest.yaml" -o tests/fixtures/edp-module-assemblies-manifest.yaml
     - uv run python tests/fixtures/edp_assets.py --sha "${EDP_MODULE_ASSEMBLIES_SHA}"
