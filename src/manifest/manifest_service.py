@@ -34,8 +34,8 @@ from src.manifest.manifest_record import (
 # MOCK — first delivery is rev 1; revision counter belongs on Order entity (Tier 5).
 MOCK_REVISION: Final[int] = 1
 # MOCK — signing infra not implemented; show the badge for design-fidelity.
-MOCK_SIGNED: Final[bool] = True
-MOCK_KEY_ID: Final[str] = "0xA3F1...9C72"
+# Reason: no manifest signing yet; a placeholder key would claim a signature we don't make.
+MOCK_SIGNED: Final[bool] = False
 # Bundle ID format. Once versioning lands the trailing semver comes from the
 # Order's revision history; today every delivery is "1.0.0".
 MOCK_BUNDLE_VERSION: Final[str] = "1.0.0"
@@ -123,7 +123,7 @@ class ManifestService:
             supersedes=None,
             built_at=when,
             signed=MOCK_SIGNED,
-            key_id=MOCK_KEY_ID if MOCK_SIGNED else None,
+            key_id=None,
             total_size_bytes=total_size,
             total_file_count=total_files,
             artifact_count=artifact_count,

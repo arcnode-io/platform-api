@@ -138,8 +138,8 @@ def test_build_computes_totals() -> None:
     assert m.artifact_count == 3  # BOM, DTM, EMS Field Client
 
 
-def test_build_stamps_mock_signed_badge() -> None:
-    """MVP shows signed=True with a placeholder key for design-fidelity."""
+def test_build_reports_unsigned_until_manifest_signing_exists() -> None:
+    """No fake signature: the manifest says unsigned and carries no key."""
     # Arrange + Act
     m = _service().build(
         bundle_url=BUNDLE_URL,
@@ -150,9 +150,8 @@ def test_build_stamps_mock_signed_badge() -> None:
     )
 
     # Assert
-    assert m.signed is True
-    assert m.key_id is not None
-    assert m.key_id.startswith("0x")
+    assert m.signed is False
+    assert m.key_id is None
 
 
 def test_build_puts_the_presigned_bundle_url_in_the_header_and_curl_line() -> None:

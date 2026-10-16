@@ -171,17 +171,23 @@ class S3Service:
         return url
 
     def _presign_client(self):  # noqa: ANN202
-        """Client that signs with the presign key when one is configured, else the default chain."""
+        """SigV4 client for presigning; uses the presign key when configured, else the default chain."""
+        # Reason: SigV4 is what caps a presigned link at 7 days; SigV2 links carry no cap.
+        config = BotoConfig(signature_version="s3v4")
         if self._presign_access_key_id is None:
-            return self._client()
+            return self._session.client(
+                "s3",
+                endpoint_url=self._endpoint_url,
+                region_name=self._region,
+                config=config,
+            )
         return self._session.client(
             "s3",
             endpoint_url=self._endpoint_url,
             region_name=self._region,
             aws_access_key_id=self._presign_access_key_id,
             aws_secret_access_key=self._presign_secret_access_key,
-            # Reason: SigV4 is what caps a presigned link at 7 days; the older SigV2 links don't carry that cap.
-            config=BotoConfig(signature_version="s3v4"),
+            config=config,
         )
 
     def _client(self):  # noqa: ANN202 — async context manager type is ugly to spell
@@ -200,6 +206,10 @@ class S3Service:
             endpoint_url=self._endpoint_url,
             region_name=self._region,
         )
+
+    def public_url(self, key: str) -> str:
+        """Plain public URL for `key` in our bucket (no signature, no expiry)."""
+        return self._public_url(key)
 
     def _public_url(self, key: str) -> str:
         """Path-style URL for LocalStack; virtual-host style for real S3."""

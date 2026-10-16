@@ -8,12 +8,12 @@ Per NestJS clean-orchestrator conventions:
 """
 
 import logging
+from typing import Final
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from src.aws.s3_service import S3Service
-from src.bundle.bundle_record import BUNDLE_LINK_EXPIRY_S
 from src.bundle.bundle_service import BundleService, bundle_files_for, unique_path
 from src.aws.ses_service import SesService
 from src.cfn.site_callback import SiteCallback
@@ -43,6 +43,9 @@ from src.orders.orders_record import (
 )
 from src.portal.portal_service import PortalService
 from src.wizard.order_record import OrderSite
+
+# Reason: SigV4 caps a presigned link at 7 days; the portal link is the only gate.
+DELIVERY_LINK_EXPIRY_S: Final[int] = 604800
 
 
 @dataclass(frozen=True)
@@ -229,9 +232,8 @@ class OrchestratorService:
         body links to).
         """
         system_artifacts = await self._build_system_artifacts(delivery)
-        bundle_url = await self._s3.generate_presigned_url(
-            f"orders/{order_id}/arcnode.zip", expiration_seconds=BUNDLE_LINK_EXPIRY_S
-        )
+        # Reason: the zip is plain; the presigned portal link is the gate, and it expires.
+        bundle_url = self._s3.public_url(f"orders/{order_id}/arcnode.zip")
         manifest = self._manifest.build(
             bundle_url=bundle_url,
             site_display_name=payload.deployment_site_name,
@@ -245,7 +247,12 @@ class OrchestratorService:
         manifest_json = self._portal.render_manifest_json(manifest=manifest)
         await self._build_bundle(order_id, manifest.sections)
         await self._s3.upload_json(f"orders/{order_id}/manifest.json", manifest_json)
-        return await self._s3.upload_html(f"orders/{order_id}/index.html", html)
+        index_key = f"orders/{order_id}/index.html"
+        await self._s3.upload_html(index_key, html)
+        # Reason: retention. The portal link dies after 7 days (SigV4 cap), and the files go with it.
+        return await self._s3.generate_presigned_url(
+            index_key, expiration_seconds=DELIVERY_LINK_EXPIRY_S
+        )
 
     async def _build_bundle(
         self,

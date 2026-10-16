@@ -269,8 +269,11 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             ), f"expected one delivery email; got {len(delivery_emails)}"
             body = delivery_emails[0].get("Body", {}).get("text_part", "")
             portal_url = _extract_portal_url(body)
-            assert portal_url.endswith(f"orders/{order_id}/index.html")
+            # Reason: the emailed portal link is presigned, so check its path and its 7-day expiry.
+            portal_path = portal_url.split("?", 1)[0]
+            assert portal_path.endswith(f"orders/{order_id}/index.html")
             assert ls.url in portal_url
+            assert "X-Amz-Expires=604800" in portal_url
 
             # Assert — portal HTML lists artifacts + APK + per-order CFN URL.
             # Prereqs/Download-CTA copy intentionally not asserted — that
@@ -283,7 +286,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             assert template_url in html
 
             # Assert — every file the manifest lists downloads at the size it reports
-            manifest_resp = httpx.get(portal_url.replace("index.html", "manifest.json"))
+            manifest_resp = httpx.get(
+                portal_path.replace("index.html", "manifest.json")
+            )
             assert manifest_resp.status_code == 200, manifest_resp.text
             manifest = DeploymentManifest.model_validate(manifest_resp.json())
             files = [
