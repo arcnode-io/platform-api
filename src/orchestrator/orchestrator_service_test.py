@@ -207,3 +207,34 @@ async def test_a_failed_order_emails_the_contact_with_the_order_id() -> None:
     assert ses.sent[0]["subject"] == "ARCNODE deployment package failed"
     assert "abc123" in ses.sent[0]["body_text"]
     assert "bar" in ses.sent[0]["body_text"]
+
+
+@pytest.mark.asyncio
+async def test_the_ready_email_names_the_deployment_site() -> None:
+    """The ready email carries the site name in subject and body, so a contact with several
+    orders can tell them apart in the inbox."""
+    # Arrange
+    from src.orchestrator.orchestrator_service import OrchestratorService
+
+    class RecordingSes:
+        def __init__(self) -> None:
+            self.sent: list[dict[str, str]] = []
+
+        async def send_delivery_email(
+            self, *, to: str, subject: str, body_text: str
+        ) -> None:
+            self.sent.append({"to": to, "subject": subject, "body_text": body_text})
+
+    ses = RecordingSes()
+    service = OrchestratorService.__new__(OrchestratorService)
+    service._ses = ses  # type: ignore[attr-defined]
+
+    # Act
+    await service._notify(
+        to="ops@acme.io", site_name="manual-qa", portal_url="https://p/portal.html"
+    )
+
+    # Assert
+    assert ses.sent[0]["subject"] == "ARCNODE deployment package ready: manual-qa"
+    assert "manual-qa" in ses.sent[0]["body_text"]
+    assert "Portal: https://p/portal.html" in ses.sent[0]["body_text"]

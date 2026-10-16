@@ -134,7 +134,11 @@ class OrchestratorService:
             str(order.id), payload, archived, delivery
         )
         logging.info("📧 notify %s order=%s", payload.contact_email, order.id)
-        await self._notify(payload.contact_email, portal_url)
+        await self._notify(
+            to=payload.contact_email,
+            site_name=payload.deployment_site_name,
+            portal_url=portal_url,
+        )
         return _PipelineResult(
             edp=edp,
             archived=[ref for ref, _ in archived],
@@ -348,8 +352,9 @@ class OrchestratorService:
 
         return artifacts
 
-    async def _notify(self, to: str, portal_url: str) -> None:
-        """Email the operator the portal link + a brief prereq pointer.
+    async def _notify(self, *, to: str, site_name: str, portal_url: str) -> None:
+        """Email the operator the portal link, named after the site so several orders
+        in one inbox stay apart.
 
         Body deliberately short — full prereq detail (token names, where to
         find them, doc links) lives in the portal page so this email stays
@@ -357,9 +362,10 @@ class OrchestratorService:
         """
         await self._ses.send_delivery_email(
             to=to,
-            subject="ARCNODE deployment package ready",
+            subject=f"ARCNODE deployment package ready: {site_name}",
             body_text=(
-                f"Your ARCNODE deployment package is ready.\n\nPortal: {portal_url}\n"
+                f"Your ARCNODE deployment package for {site_name} is ready.\n\n"
+                f"Portal: {portal_url}\n"
             ),
         )
 
