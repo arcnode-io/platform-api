@@ -12,7 +12,7 @@ checks:
     # Pinned commit of edp-module-assemblies; bump when you want newer equipment.
     EDP_MODULE_ASSEMBLIES_SHA: "2cfac23"
   script:
-    - curl -fsSL "https://gitlab.com/arcnode-io/edp-module-assemblies/-/raw/${EDP_MODULE_ASSEMBLIES_SHA}/manifest.yaml" -o tests/fixtures/edp-module-assemblies-manifest.yaml
+    # One archive download: GitLab rate-limits per-file raw fetches and 429'd the shared runner.
     - uv run python tests/fixtures/edp_assets.py --sha "${EDP_MODULE_ASSEMBLIES_SHA}"
     - uv run poe checks
     - uv run pytest --junitxml=junit.xml
