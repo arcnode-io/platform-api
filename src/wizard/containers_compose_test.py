@@ -25,6 +25,18 @@ def test_override_puts_every_service_on_the_arcnode_network() -> None:
     assert actual == expected
 
 
+def test_override_publishes_the_hmi_on_port_80() -> None:
+    """On-prem there is no ingress: browsers reach the HMI at http://<box>/ directly."""
+    # Arrange
+    expected = ["80:80"]
+
+    # Act
+    actual = yaml.safe_load(ONPREM_OVERRIDE)["services"]["hmi"]["ports"]
+
+    # Assert
+    assert actual == expected
+
+
 class ScriptedRunner:
     """Answers each call with the first still-unused script entry whose needle matches."""
 

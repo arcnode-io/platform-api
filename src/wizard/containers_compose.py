@@ -14,11 +14,16 @@ COMPOSE_FILE: Final[str] = "docker-compose.yaml"
 ONPREM_OVERRIDE_FILE: Final[str] = "docker-compose.onprem.yaml"
 # Reason: compose's default network can't reach the host daemons on the
 # arcnode bridge's gateway. Replacing `default` (not per-service) keeps this
-# file the only on-prem difference from the cloud compose.
+# file the only on-prem difference from the cloud compose. The HMI is published
+# on port 80 here because on-prem has no https-ingress: it's http://<box>/.
 ONPREM_OVERRIDE: Final[str] = """networks:
   default:
     name: arcnode
     external: true
+services:
+  hmi:
+    ports:
+      - "80:80"
 """
 
 

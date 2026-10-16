@@ -319,14 +319,14 @@ function StepIndustrialGateway({ t, page, onApply }) {
 }
 
 // ─── HMI ─────────────────────────────────────────────────────────
-// No input: it starts the operator screen over HTTPS, served to the browsers on this box.
+// No input: it starts the operator screen on port 80, plain HTTP at this box's address.
 function StepHmi({ t, page, onApply }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
   const buttonLabel = isApplying ? 'Verifying'
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
-    <StepShellW t={t} title="HMI" blurb="it starts the operator screen over HTTPS at this box's address.">
+    <StepShellW t={t} title="HMI" blurb={`it starts the operator screen at http://${window.location.hostname}/`}>
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>

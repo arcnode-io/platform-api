@@ -121,9 +121,6 @@ install -m 0755 /root/arcnode-phases/test-mode.sh /usr/local/sbin/test-mode.sh
 mkdir -p /opt/arcnode
 install -m 0644 /root/arcnode-phases/credentials.template.xml /opt/arcnode/credentials.template.xml
 install -m 0644 /root/arcnode-phases/docker-compose.yaml /opt/arcnode/docker-compose.yaml
-# The HTTPS ingress config is static; the wizard's HMI page writes the cert next to it.
-install -m 0644 /root/arcnode-phases/https-ingress.conf /opt/arcnode/https-ingress.conf
-mkdir -p /opt/arcnode/tls /opt/arcnode/acme
 mkdir -p /usr/local/share/arcnode
 cp -r /root/arcnode-phases/test-order /usr/local/share/arcnode/test-order
 

@@ -125,10 +125,8 @@ class FakeRunner:
                 "initial spec fetched\nMQTT subscriptions established\n"
             ),
             "logs hmi": ok("start worker processes\n"),
-            "logs https-ingress": ok("start worker processes\n"),
-            # The host-side HTTP probe through the ingress's published port.
+            # The host-side HTTP probe through the HMI's published port 80.
             "http://127.0.0.1/": ok("200"),
-            "openssl req": ok(""),
             "curlimages/curl -fsS -o": ok("200"),
             "logs grafana": ok('logger=http.server msg="HTTP Server Listen"\n'),
             "grafana:3000/api/health": ok('{"database":"ok","version":"12.0.0"}'),

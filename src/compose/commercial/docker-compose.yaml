@@ -122,10 +122,10 @@ services:
       hivemq:
         condition: service_started
 
-  # The only host entry point. Port 80 serves the Let's Encrypt challenge and
-  # redirects everything else to HTTPS; 443 terminates TLS and proxies to the
-  # HMI (WebSocket /mqtt included). Cert files: /opt/arcnode/tls, from UserData
-  # (cloud) or the ISO's self-signed bootstrap (on-prem).
+  # Cloud only: the host entry point. Port 80 serves the Let's Encrypt challenge
+  # and redirects everything else to HTTPS; 443 terminates TLS and proxies to the
+  # HMI (WebSocket /mqtt included). Cert files: /opt/arcnode/tls, from UserData.
+  # On-prem never starts this; the wizard publishes the HMI itself on port 80.
   https-ingress:
     image: nginx:1.27-alpine
     restart: unless-stopped

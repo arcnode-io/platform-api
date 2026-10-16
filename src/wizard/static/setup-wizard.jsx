@@ -544,7 +544,7 @@ function primaryBtnStyle(t, disabled) {
 // ─── Main wizard body ───────────────────────────────────────────────
 // The end of setup: shown the moment the last page verifies. The server turns the wizard
 // off when every page is done, so this renders from client state and then hands the
-// browser to the operator screen, which the HMI page put behind HTTPS on this box.
+// browser to the operator screen, which the HMI page serves on port 80 of this box.
 const REDIRECT_SECONDS = 8;
 
 function SetupCompleteW({ t }) {
@@ -572,8 +572,7 @@ function SetupCompleteW({ t }) {
         Open the operator screen now
       </a>
       <div style={{ marginTop: SPACE[4], fontFamily: t.fontBody, fontSize: 13, color: t.textMid, maxWidth: 640, lineHeight: 1.55 }}>
-        This box's certificate is self-signed, so your browser warns once: choose Advanced, then
-        Proceed. Sign in with the operator login you set on the HiveMQ page.
+        Sign in with the operator login you set on the HiveMQ page.
       </div>
     </StepShellW>
   );
