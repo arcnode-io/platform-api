@@ -342,6 +342,9 @@ def check_browser_dispatch_settles(stack: dict[str, str]) -> None:
             )
             apply_btn = page.get_by_test_id("dispatch-apply")
             expect(apply_btn).to_be_visible(timeout=20_000)
+            # Reason: command controls start locked (ems-hmi 78d67cf); the stepper
+            # and Apply stay disabled until the operator presses Unlock controls.
+            page.locator('[data-action="unlock"]').click()
             # Apply stays disabled at a 0 setpoint (CommandPanel: disabled when setpointKw === 0),
             # and nothing proposes one for a fresh module, so set one with the stepper first.
             page.locator('[data-comp="SetpointStepper"]').get_by_text(
