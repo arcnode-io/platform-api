@@ -734,7 +734,7 @@
     "import_limit": {
      "unit": "watts",
      "type": "float",
-     "poll_rate_hz": 0.0033,
+     "poll_rate_hz": null,
      "display_name_default": "Import Limit",
      "iec_61850_ref": "CSIP.opModImpLimW",
      "bounds": {
@@ -758,7 +758,7 @@
     "export_limit": {
      "unit": "watts",
      "type": "float",
-     "poll_rate_hz": 0.0033,
+     "poll_rate_hz": null,
      "display_name_default": "Export Limit",
      "iec_61850_ref": "CSIP.opModExpLimW",
      "bounds": {
@@ -782,7 +782,7 @@
     "status": {
      "unit": "none",
      "type": "enum",
-     "poll_rate_hz": 1,
+     "poll_rate_hz": null,
      "display_name_default": "Status",
      "iec_61850_ref": "ZGEN.Mod.stVal",
      "values": {
