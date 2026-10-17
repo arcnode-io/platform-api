@@ -29,15 +29,6 @@ one. `sudo test-mode.sh` gives it the test site in `phases/test-order/`
 instead: edp-api's real generator output for 1 compute module, plus 1 BESS
 module and rack from edp-api's templates.
 
-## History
-
-Folded in from the defunct `platform-ems-iso` repo, which tried
-live-build + d-i and then Hetzner `installimage` + Ansible self-converge
-before this (tags `archive/live-build-approach` and
-`archive/ansible-hetzner-approach` there). Lesson: the install medium was
-the biggest bug surface and it wasn't the product — so this is a plain,
-preseeded Debian netinst, proven in small increments on real hardware.
-
 ## Architecture
 
 - **`preseed.cfg`** — only the `late_command` hook; the installer asks

@@ -2,9 +2,8 @@
 
 The function runs in Lambda; we test the parts that are pure Python:
 module loads, handler is callable, error message contains the actionable
-AWS console path. The probe targets themselves are no longer hardcoded
-in the Lambda — they're passed in via event.ResourceProperties — so the
-"do model IDs match IAM" check has moved to bedrock_models_test.
+AWS console path. The probe targets come in via event.ResourceProperties,
+so the "do model IDs match IAM" check lives in bedrock_models_test.
 """
 
 import importlib.util

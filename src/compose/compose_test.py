@@ -158,7 +158,7 @@ def test_no_variant_declares_industrial_fixtures(variant_path: Path) -> None:
 
 def test_fixtures_overlay_declares_every_fixture_and_gateway_dependency() -> None:
     """The overlay declares all 7 fixtures and adds them to industrial-gateway's
-    depends_on — the two things a real deploy's compose files no longer have."""
+    depends_on; a real deploy's compose files have neither."""
     # Arrange + Act
     services = yaml.safe_load(FIXTURES_COMPOSE.read_text())["services"]
 

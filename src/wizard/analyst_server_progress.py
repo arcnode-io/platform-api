@@ -2,8 +2,8 @@
 analyst prints a line when each stage finishes, so the page shows real progress
 instead of a timer. A seed stage has two phases the analyst reports separately:
 it downloads a dump (`seed progress: <seed> N% (X MiB of Y MiB)`), then imports
-it (`seed import: <seed> N% (A of B statements)`). Between the two the analyst
-used to log nothing, so the page sat at "100%" for the whole import."""
+it (`seed import: <seed> N% (A of B statements)`), so the import shows its own
+progress instead of sitting at the download's "100%"."""
 
 import re
 from datetime import datetime

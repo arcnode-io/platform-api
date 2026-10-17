@@ -68,7 +68,6 @@ def test_lambda_inlines_the_source_file() -> None:
 
     # Assert
     assert "def handler(" in code_zip
-    # Source now reads from event.ResourceProperties — model IDs are NOT
-    # constants in the Lambda anymore; they're passed in by the CR.
+    # The source reads model IDs from event.ResourceProperties; the CR passes them in.
     assert "ChatModelId" in code_zip
     assert "EmbedModelId" in code_zip

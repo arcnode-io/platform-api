@@ -627,12 +627,9 @@ def build_userdata(
             "  loader_role_arn: $NEPTUNE_LOADER_ROLE_ARN\n"
             "YML"
         )
-    # Init scripts: previously /opt/arcnode/init-scripts/telemetry_writer.py
-    # was curl-fetched + bind-mounted into a python:3.13-alpine container
-    # that did `pip install paho-mqtt psycopg2-binary` at startup. Replaced
-    # by the public ECR image ems-telemetry-writer (built from
-    # src/compose/images/telemetry-writer/Dockerfile) — script + deps baked
-    # in. No UserData fetch needed. All data seeding (vector, graph, ercot)
+    # The telemetry writer is the public ECR image ems-telemetry-writer (built
+    # from src/compose/images/telemetry-writer/Dockerfile) with its script and
+    # deps baked in, so UserData fetches nothing for it. All data seeding (vector, graph, ercot)
     # lives in consumer services (mcp-server in analyst-server seeds vector +
     # graph; analyst-model seeds ercot).
     # Observability config (prometheus + grafana provisioning) compose

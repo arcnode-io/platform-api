@@ -20,8 +20,8 @@ handler. `socket.create_connection`'s `timeout=` only bounds the TCP
 connect phase — DNS lookup is unbounded and can block forever if the
 host doesn't resolve. SIGALRM catches that and any other hang so the
 function ALWAYS responds to CFN (SUCCESS or FAILED) instead of dying
-silently at Lambda's 30s ceiling. Previously a DNS-block left CFN
-waiting ~50 min for retries before giving up.
+silently at Lambda's 30s ceiling, which leaves CFN waiting ~50 min for
+retries before giving up.
 """
 
 import json

@@ -68,7 +68,7 @@ def aurora_cluster_resources(
     # Aurora is up and the per-slice DB + app user are provisioned.
     #
     # Naming: `arcnode-ems-{STACK}/<slice>-url` — UserData curls these by
-    # name into /opt/arcnode/secrets.env, unchanged from the old path.
+    # name into /opt/arcnode/secrets.env.
     slice_secrets = {
         f"AuroraSlice{slice_name.title()}Secret": {
             "Type": "AWS::SecretsManager::Secret",
