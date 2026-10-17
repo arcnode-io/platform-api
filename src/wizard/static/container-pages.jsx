@@ -31,7 +31,7 @@ function StepSite({ t, page, info, onApply }) {
               padding: `${SPACE[3]}px ${SPACE[4]}px`,
               borderBottom: i < rows.length - 1 ? `1px solid ${t.border}` : 'none',
             }}>
-              <span style={{ fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.18,
+              <span style={{ fontFamily: t.fontLabel, fontSize: 10, fontWeight: 500, letterSpacing: 0.18,
                 color: t.textSoft, textTransform: 'uppercase' }}>{row.label}</span>
               <span style={{ fontFamily: row.mono ? t.fontLabel : t.fontBody, fontSize: 14, color: t.text }}>
                 {row.value || '—'}
@@ -43,7 +43,7 @@ function StepSite({ t, page, info, onApply }) {
       {info && !isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={{ ...primaryBtnStyle(t, isApplying), marginTop: SPACE[5] }}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -103,7 +103,7 @@ function StepHivemq({ t, page, passwords, onPassword, onApply }) {
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -136,7 +136,7 @@ function StepTelemetry({ t, page, onApply }) {
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -165,11 +165,11 @@ function StepPrometheus({ t, page, onApply }) {
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
     <StepShellW t={t} title="Prometheus"
-      blurb="it fetches the same scrape config as the cloud, then starts Prometheus.">
+      blurb="It fetches the same scrape config as the cloud, then starts Prometheus.">
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -197,11 +197,11 @@ function StepMlflow({ t, page, onApply }) {
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
     <StepShellW t={t} title="MLflow"
-      blurb="it starts the experiment tracker the analyst model logs its forecasts to.">
+      blurb="It starts the experiment tracker the analyst model logs its forecasts to.">
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -244,7 +244,7 @@ function StepDeviceApi({ t, page, secrets, onSecret, onApply }) {
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -276,11 +276,11 @@ function StepAnalystModel({ t, page, onApply }) {
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
     <StepShellW t={t} title="Analyst model"
-      blurb="it starts the model that trains and publishes the daily price forecast to MLflow.">
+      blurb="It starts the model that trains and publishes the daily price forecast to MLflow.">
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -309,11 +309,11 @@ function StepIndustrialGateway({ t, page, onApply }) {
   const buttonLabel = isApplying ? 'Verifying'
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
-    <StepShellW t={t} title="Industrial gateway" blurb="it starts the gateway that bridges your devices onto the broker. It fetches the device spec and subscribes to the broker.">
+    <StepShellW t={t} title="Industrial gateway" blurb="It starts the gateway that bridges your devices onto the broker. It fetches the device spec and subscribes to the broker.">
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -344,7 +344,7 @@ function StepHmi({ t, page, onApply }) {
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -402,7 +402,7 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
     <StepShellW t={t} title="Analyst server"
-      blurb="it starts the server the analyst chat talks to. It needs two API keys: one for weather, one for market prices.">
+      blurb="It starts the server the analyst chat talks to. It needs two API keys: one for weather, one for market prices.">
       {ANALYST_SERVER_FIELDS.map(f => (
         <div key={f.key} style={{ marginBottom: SPACE[4] }}>
           <FieldLabelW t={t} required>{f.label}</FieldLabelW>
@@ -414,7 +414,7 @@ function StepAnalystServer({ t, page, keys, onKey, onApply }) {
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -460,7 +460,7 @@ function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, pems, onPem, onAp
     : page.state === 'unverified' ? 'Try again' : 'Save & verify';
   return (
     <StepShellW t={t} title="DER control API"
-      blurb="it receives the utility's DER controls. Give the utility's base URL if you have it; you can leave it blank and add it later.">
+      blurb="It receives the utility's DER controls. Give the utility's base URL if you have it; you can leave it blank and add it later.">
       <FieldLabelW t={t}>UTILITY BASE URL</FieldLabelW>
       <input type="text" value={url} disabled={isApplying || isDone} placeholder="https://derms.utility.example"
         onChange={e => onUrl(e.target.value)} aria-label="Utility base URL"
@@ -494,7 +494,7 @@ function StepDerControl({ t, page, url, onUrl, lfdis, onLfdis, pems, onPem, onAp
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={{ ...primaryBtnStyle(t, !canApply), marginTop: SPACE[4] }}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -555,7 +555,7 @@ function StepCloudSecrets({ t, page, passwords, onPassword, onApply }) {
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -590,14 +590,14 @@ function StepSshLockdown({ t, page, checked, onChecked, onApply }) {
           <input type="checkbox" checked={checked} disabled={isApplying}
             onChange={e => onChecked(e.target.checked)}/>
           <span>Disable SSH password login</span>
-          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+          <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
             padding: '2px 6px', borderRadius: 4, background: t.accent + '12', color: t.accent }}>Recommended</span>
         </label>
       )}
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}

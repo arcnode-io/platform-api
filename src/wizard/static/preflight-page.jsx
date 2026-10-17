@@ -13,7 +13,7 @@ function StepPreflight({ t, page, onApply }) {
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}

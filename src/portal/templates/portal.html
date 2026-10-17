@@ -30,6 +30,8 @@
       --color-bess:    #4a7c5f;
       --color-thermal: #4a9a9a;
       --color-pv:      #d4a849;
+      /* Text on the amber primary action; the wizard's tokens.jsx carries the same pair. */
+      --on-primary:    #1a0e02;
 
       --space-1: 4px;
       --space-2: 8px;
@@ -66,6 +68,8 @@
         --color-bess:    #2f6b4c;
         --color-thermal: #2f7a7a;
         --color-pv:      #8a6a1c;
+        /* Reason: near-black on the light scheme's dark amber was unreadable. */
+        --on-primary:    #fbfaf7;
       }
     }
 
@@ -236,9 +240,9 @@
 
     .action-primary {
       background: var(--status-warn);
-      color: #1a0e02;
+      color: var(--on-primary);
       border: 1px solid var(--status-warn);
-      font-weight: 600;
+      font-weight: 500;
     }
 
     .action-primary:hover {

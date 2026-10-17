@@ -74,7 +74,7 @@ function StepDocker({ t, page, onApply }) {
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -117,7 +117,7 @@ function StepPassword({ t, title, blurb, label, page, password, onPassword, onAp
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}

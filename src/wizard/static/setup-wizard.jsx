@@ -78,7 +78,6 @@ function SpinnerW({ color, size = 14 }) {
 }
 // ─── Step rail (left column) ─────────────────────────────────────────
 function StepRailW({ t, steps, current, completed, onJump }) {
-  const isSov = t.name === 'sovereign';
   const preflightActive = current === 'preflight';
   const preflightDone = completed.has('preflight');
   return (
@@ -90,7 +89,7 @@ function StepRailW({ t, steps, current, completed, onJump }) {
       display: 'flex', flexDirection: 'column', gap: SPACE[2],
     }}>
       <div style={{
-        fontFamily: t.fontLabel, fontSize: 9, fontWeight: 700,
+        fontFamily: t.fontLabel, fontSize: 9, fontWeight: 500,
         letterSpacing: 0.22, color: t.textFaint, textTransform: 'uppercase',
         marginBottom: SPACE[3],
       }}>Setup · {steps.length} {steps.length === 1 ? 'step' : 'steps'}</div>
@@ -124,7 +123,7 @@ function StepRailW({ t, steps, current, completed, onJump }) {
         </span>
         <div style={{ minWidth: 0 }}>
           <div style={{
-            fontFamily: t.fontBody, fontSize: 13, fontWeight: 600,
+            fontFamily: t.fontBody, fontSize: 13, fontWeight: 500,
             color: preflightActive ? t.text : t.textMid,
             lineHeight: 1.2,
           }}>Hardware preflight</div>
@@ -160,14 +159,14 @@ function StepRailW({ t, steps, current, completed, onJump }) {
               background: dotBg,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0, marginTop: 1,
-              fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
+              fontFamily: t.fontLabel, fontSize: 10, fontWeight: 500,
               color: dotFg,
             }}>
               {isDone ? <CheckW color="#fff" size={11}/> : s.n}
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontFamily: t.fontBody, fontSize: 13, fontWeight: 600,
+                fontFamily: t.fontBody, fontSize: 13, fontWeight: 500,
                 color: isActive ? t.text : t.textMid,
                 lineHeight: 1.2,
               }}>{s.title}</div>
@@ -187,11 +186,11 @@ function StepRailW({ t, steps, current, completed, onJump }) {
         padding: `${SPACE[3]}px`,
         background: t.bg,
         border: `1px solid ${t.border}`,
-        borderRadius: RADIUS[2],
+        borderRadius: RADIUS[3],
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          fontFamily: t.fontLabel, fontSize: 9, fontWeight: 700,
+          fontFamily: t.fontLabel, fontSize: 9, fontWeight: 500,
           letterSpacing: 0.22, color: t.textFaint, textTransform: 'uppercase',
         }}>
           <LockW color={t.statusOk} size={10}/>
@@ -216,7 +215,7 @@ function FieldLabelW({ t, children, optional, required }) {
   return (
     <label style={{
       display: 'flex', alignItems: 'baseline', gap: 6,
-      fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700,
+      fontFamily: t.fontLabel, fontSize: 10, fontWeight: 500,
       letterSpacing: 0.18, color: t.textSoft, textTransform: 'uppercase',
       marginBottom: 6,
     }}>
@@ -273,7 +272,7 @@ function StepSsh({ t, setup, sshKey, onKey, page, onApply }) {
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}
           style={primaryBtnStyle(t, !canApply)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
@@ -307,7 +306,7 @@ function HintW({ t, label, command }) {
       <FieldLabelW t={t}>{label}</FieldLabelW>
       <code style={{
         display: 'block', userSelect: 'all', padding: `${SPACE[3]}px ${SPACE[4]}px`,
-        background: t.panel, border: `1px solid ${t.border}`, borderRadius: RADIUS[2],
+        background: t.surface, border: `1px solid ${t.border}`, borderRadius: RADIUS[3],
         fontFamily: t.fontLabel, fontSize: 12, color: t.text, wordBreak: 'break-all',
       }}>{command}</code>
     </div>
@@ -317,14 +316,14 @@ function CheckRowW({ t, check }) {
   return (
     <div data-check={check.name} data-ok={check.ok} style={{
       padding: `${SPACE[3]}px ${SPACE[4]}px`, background: t.panel,
-      border: `1px solid ${check.ok ? t.border : t.statusAlarm}`, borderRadius: RADIUS[2],
+      border: `1px solid ${check.ok ? t.border : t.statusAlarm}`, borderRadius: RADIUS[3],
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: SPACE[3] }}>
         <span style={{ marginTop: 2 }}>
           {check.ok ? <CheckW color={t.statusOk} size={14}/> : <FailW color={t.statusAlarm} size={14}/>}
         </span>
         <div>
-          <div style={{ fontFamily: t.fontBody, fontSize: 13, fontWeight: 600,
+          <div style={{ fontFamily: t.fontBody, fontSize: 13, fontWeight: 500,
                         color: check.ok ? t.text : t.statusAlarm }}>{check.name}</div>
           <div style={{ fontFamily: t.fontLabel, fontSize: 12, color: t.textMid, marginTop: 2,
                         wordBreak: 'break-all' }}>{check.detail}</div>
@@ -337,14 +336,11 @@ function CheckRowW({ t, check }) {
 
 // ─── Shared step shell (title + blurb + children) ────────────────────
 function StepShellW({ t, title, blurb, children }) {
-  const isSov = t.name === 'sovereign';
   return (
     <div>
       <div style={{
-        fontFamily: t.fontHeading, fontSize: 32,
-        fontWeight: isSov ? 400 : 600,
-        letterSpacing: isSov ? 0.8 : -0.3,
-        textTransform: isSov ? 'uppercase' : 'none',
+        fontFamily: t.fontHeading, fontSize: 32, fontWeight: 400,
+        letterSpacing: 1.3, textTransform: 'uppercase',
         color: t.text, lineHeight: 1.05,
       }}>{title}</div>
       {blurb && (
@@ -393,7 +389,6 @@ function ThemeToggleW({ t, isDark, onToggle }) {
 
 // ─── Top header ─────────────────────────────────────────────────────
 function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
-  const isSov = t.name === 'sovereign';
   const idx = steps.findIndex(s => s.id === current);
   const isPreflight = current === 'preflight';
   return (
@@ -403,38 +398,28 @@ function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
       display: 'flex', alignItems: 'center', gap: SPACE[4],
       background: t.bg,
     }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: RADIUS[2],
-        background: t.accent,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2">
-          <path d="M4 18 L12 4 L20 18 M7 14 H17"/>
-        </svg>
-      </div>
+      <BrandMarkW t={t} size={40}/>
       <div style={{ flex: 1 }}>
         <div style={{
-          fontFamily: t.fontHeading, fontSize: 18,
-          fontWeight: isSov ? 400 : 600,
-          letterSpacing: isSov ? 1.4 : 0,
-          textTransform: isSov ? 'uppercase' : 'none',
+          fontFamily: t.fontHeading, fontSize: 22, fontWeight: 400,
+          letterSpacing: 2.2, textTransform: 'uppercase',
           color: t.text, lineHeight: 1,
         }}>ARCNODE</div>
         <div style={{
           fontFamily: t.fontLabel, fontSize: 10,
           letterSpacing: 0.22, textTransform: 'uppercase',
-          color: t.textSoft, marginTop: 3, fontWeight: 700,
+          color: t.textSoft, marginTop: 3, fontWeight: 500,
         }}>First-boot setup</div>
       </div>
       {deployment && (
         <span data-deployment={deployment} style={{
           padding: '4px 10px', border: `1px solid ${t.borderSoft}`, borderRadius: 999,
-          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 700, letterSpacing: 0.2,
+          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 500, letterSpacing: 0.2,
           color: t.textMid, textTransform: 'uppercase',
         }}>{deployment}</span>
       )}
       <div style={{
-        fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
+        fontFamily: t.fontLabel, fontSize: 11, fontWeight: 500, letterSpacing: 0.2,
         color: t.textSoft, textTransform: 'uppercase',
       }}>
         {isPreflight
@@ -472,10 +457,11 @@ function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
           appearance: 'none',
           cursor: backDisabled ? 'not-allowed' : 'pointer',
           height: 40, padding: '0 16px',
-          background: 'transparent',
-          border: `1px solid ${t.border}`,
+          // Portal .action-secondary
+          background: t.panel,
+          border: `1px solid ${t.borderSoft}`,
           borderRadius: RADIUS[2],
-          fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.18,
+          fontFamily: t.fontLabel, fontSize: 11, fontWeight: 500, letterSpacing: 1.5,
           color: backDisabled ? t.textFaint : t.text,
           textTransform: 'uppercase',
           display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -498,7 +484,7 @@ function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
 
       {isDone ? (
         <button disabled style={primaryBtnStyle(t, true)}>
-          <CheckW color="#fff" size={13}/>
+          <CheckW color={t.textSoft} size={13}/>
           Complete
         </button>
       ) : (
@@ -506,7 +492,7 @@ function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
           disabled={!stepVerified}
           style={primaryBtnStyle(t, !stepVerified)}>
           {nextLabel}
-          <ChevronW color="#fff" size={12}/>
+          <ChevronW color={stepVerified ? t.onPrimary : t.textSoft} size={12}/>
         </button>
       )}
     </div>
@@ -525,19 +511,29 @@ function formatApplyError(detail) {
   }
   return null;
 }
+// Portal .action-primary (amber, dark text); disabled is its .action-disabled
+// (transparent, dashed border).
 function primaryBtnStyle(t, disabled) {
   return {
     appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
     height: 40, padding: '0 18px',
-    background: disabled ? t.accentDim : t.accent,
-    border: `1px solid ${disabled ? t.accentDim : t.accent}`,
-    color: '#fff',
+    background: disabled ? 'transparent' : t.statusWarn,
+    border: disabled ? `1px dashed ${t.borderSoft}` : `1px solid ${t.statusWarn}`,
+    color: disabled ? t.textSoft : t.onPrimary,
     borderRadius: RADIUS[2],
     display: 'inline-flex', alignItems: 'center', gap: 8,
-    fontFamily: t.fontLabel, fontSize: 11, fontWeight: 700, letterSpacing: 0.18,
+    fontFamily: t.fontLabel, fontSize: 11, fontWeight: 500, letterSpacing: 1.5,
     textTransform: 'uppercase',
-    opacity: disabled ? 0.85 : 1,
   };
+}
+
+// The ARCNODE mark, as the portal draws it (amber, currentColor).
+function BrandMarkW({ t, size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 512 512" fill={t.statusWarn} aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path fillRule="evenodd" clipRule="evenodd" d={BRAND_MARK_PATH}/>
+    </svg>
+  );
 }
 
 // ─── Main wizard body ───────────────────────────────────────────────

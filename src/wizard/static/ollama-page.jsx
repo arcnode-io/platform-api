@@ -63,7 +63,7 @@ function ProgressRowW({ t, id, label, detail, fraction, failed, finished }) {
       border: `1px solid ${failed ? t.statusAlarm : t.border}`, borderRadius: RADIUS[2],
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: SPACE[3] }}>
-        <span style={{ fontFamily: t.fontLabel, fontSize: 13, fontWeight: 600, color: t.text }}>{label}</span>
+        <span style={{ fontFamily: t.fontLabel, fontSize: 13, fontWeight: 500, color: t.text }}>{label}</span>
         <span style={{ fontFamily: t.fontLabel, fontSize: 12, color: failed ? t.statusAlarm : t.textMid }}>{detail}</span>
       </div>
       <div style={{ height: 6, marginTop: SPACE[2], background: t.bg, borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
@@ -107,7 +107,7 @@ function StepOllama({ t, page, downloads, onApply }) {
       {!isDone && (
         <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
           style={primaryBtnStyle(t, isApplying)}>
-          {isApplying && <SpinnerW color="#fff" size={13}/>}
+          {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>
       )}
