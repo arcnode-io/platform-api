@@ -1,18 +1,10 @@
 """Pydantic DTOs for the first-boot setup wizard."""
 
-from enum import StrEnum
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 import re
 
 from pydantic import model_validator, BaseModel, Field, field_validator
-
-
-class Deployment(StrEnum):
-    """Where this box runs — decides who sets up SSH access."""
-
-    CLOUD = "cloud"  # EC2: the key pair chosen at launch already works
-    ON_PREM = "on-prem"  # appliance: the wizard creates the key pair
 
 
 class HardwareMinimums(BaseModel):
@@ -36,35 +28,11 @@ class OllamaSettings(BaseModel):
     context_length: int
 
 
-class Variant(StrEnum):
-    """Which cloud product this box is: commercial or defense. Only cloud has one."""
-
-    COMMERCIAL = "commercial"
-    DEFENSE = "defense"
-
-
-class Badge(StrEnum):
-    """The label in the wizard header: where the box runs and which product it is."""
-
-    ON_PREM = "🖥️ On-Prem"
-    COMMERCIAL = "☁️ Commercial"
-    DEFENSE = "🛡️ Defense"
-
-
-def badge_for(deployment: Deployment, variant: Variant) -> Badge:
-    """On-prem is always On-Prem; cloud is Commercial or Defense by variant."""
-    if deployment == Deployment.ON_PREM:
-        return Badge.ON_PREM
-    return Badge.DEFENSE if variant == Variant.DEFENSE else Badge.COMMERCIAL
-
-
 class WizardConfig(BaseModel):
-    """/etc/arcnode/wizard-cfg.yml, written by the provisioning path."""
+    """/etc/arcnode/wizard-cfg.yml, written by setup.sh."""
 
-    deployment: Deployment
-    variant: Variant = Variant.COMMERCIAL  # cloud only; on-prem ignores it
     hardware: HardwareMinimums
-    ollama: OllamaSettings | None = None  # on-prem only
+    ollama: OllamaSettings
 
 
 class SshAccount(BaseModel):
@@ -125,8 +93,6 @@ class ApplyResult(BaseModel):
 class SetupInfo(BaseModel):
     """GET /api/config — what the UI needs before apply."""
 
-    deployment: Deployment
-    badge: Badge
     account: str
     completed: list[str]
 
@@ -184,21 +150,6 @@ class BrokerPasswords(BaseModel):
     viewer: str = Field(min_length=8)
 
     @field_validator("service", "operator", "viewer")
-    @classmethod
-    def password_meets_complexity(cls, value: str) -> str:
-        """Same policy as the daemon passwords."""
-        return check_complexity(value)
-
-
-class CloudSecrets(BaseModel):
-    """POST /api/cloud-secrets body — the three passwords the cloud customer sets,
-    the same ones the on-prem box asks for on its own pages."""
-
-    operator_password: str = Field(min_length=8)
-    viewer_password: str = Field(min_length=8)
-    grafana_password: str = Field(min_length=8)
-
-    @field_validator("operator_password", "viewer_password", "grafana_password")
     @classmethod
     def password_meets_complexity(cls, value: str) -> str:
         """Same policy as the daemon passwords."""
@@ -283,7 +234,7 @@ class DeviceApiSecrets(BaseModel):
 
 
 class SshLockdownRequest(BaseModel):
-    """The last on-prem page: key-only SSH. Checked by default; unchecking is allowed."""
+    """The last page: key-only SSH. Checked by default; unchecking is allowed."""
 
     disable_password_login: bool = True
 

@@ -25,7 +25,6 @@ from src.wizard.system_runner import LineStream, Runner
 from src.wizard.wizard_record import (
     Command,
     CommandOutput,
-    Deployment,
     HardwareMinimums,
     OllamaSettings,
 )
@@ -160,10 +159,9 @@ def test_real_ollama_on_dockers_gateway_passes_every_check(
 ) -> None:
     # Arrange: the Docker page first — it creates the network Ollama listens on
     run = _container_runner(installed)
-    tracker = StepTracker(steps_dir=tmp_path / "steps", deployment=Deployment.ON_PREM)
+    tracker = StepTracker(steps_dir=tmp_path / "steps")
     assert (
         DockerService(
-            deployment=Deployment.ON_PREM,
             tracker=tracker,
             account=SshAccount(name="joe", home=Path("/home/joe"), uid=1000, gid=1000),
             run=run,

@@ -1,4 +1,4 @@
-"""Which wizard pages exist per deployment, and which are done.
+"""Which wizard pages exist, and which are done.
 
 One page per daemon, in install-dependency order. Each page writes its own
 done marker when its verification passes, so setup survives a reboot
@@ -8,38 +8,31 @@ mid-way and resumes at the first unfinished page.
 from pathlib import Path
 from typing import Final
 
-from src.wizard.wizard_record import Deployment
-
-STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
-    # The hardware check is the root of the dependency graph — first everywhere.
-    Deployment.ON_PREM: (
-        "preflight",
-        # Right after the hardware check: the customer confirms this is their site's
-        # ISO, which hands the order to every EMS container that runs later.
-        "site",
-        "ssh",
-        "docker",
-        "postgres",
-        "neo4j",
-        "ollama",
-        "hivemq",
-        "telemetry",
-        "device_api",
-        "der_control_api",
-        "industrial_gateway",
-        "hmi",
-        "mlflow",
-        "analyst_model",
-        "analyst_server",
-        "prometheus",
-        "grafana",
-        # Last on purpose: password SSH stays as the recovery path until everything else is in.
-        "ssh_lockdown",
-    ),
-    # EC2 set SSH + Docker up; databases are managed services in the cloud,
-    # the LLM is Bedrock.
-    Deployment.CLOUD: ("preflight", "cloud_secrets"),
-}
+STEPS: Final[tuple[str, ...]] = (
+    # The hardware check is the root of the dependency graph.
+    "preflight",
+    # Right after the hardware check: the customer confirms this is their site's
+    # ISO, which hands the order to every EMS container that runs later.
+    "site",
+    "ssh",
+    "docker",
+    "postgres",
+    "neo4j",
+    "ollama",
+    "hivemq",
+    "telemetry",
+    "device_api",
+    "der_control_api",
+    "industrial_gateway",
+    "hmi",
+    "mlflow",
+    "analyst_model",
+    "analyst_server",
+    "prometheus",
+    "grafana",
+    # Last on purpose: password SSH stays as the recovery path until everything else is in.
+    "ssh_lockdown",
+)
 
 
 class StepAlreadyDoneError(Exception):
@@ -50,9 +43,9 @@ class StepAlreadyDoneError(Exception):
 class StepTracker:
     """Done markers for the wizard's pages, one file per page."""
 
-    def __init__(self, *, steps_dir: Path, deployment: Deployment) -> None:
+    def __init__(self, *, steps_dir: Path) -> None:
         self._steps_dir = steps_dir
-        self.steps: tuple[str, ...] = STEPS_BY_DEPLOYMENT[deployment]
+        self.steps: tuple[str, ...] = STEPS
 
     def is_done(self, step: str) -> bool:
         """True once this page's verification has passed."""
@@ -68,6 +61,5 @@ class StepTracker:
         return [step for step in self.steps if self.is_done(step)]
 
     def all_done(self) -> bool:
-        """The whole wizard is finished — it 404s from here on. A deployment
-        with no pages is never 'finished'; its page says there's nothing to do."""
-        return bool(self.steps) and all(self.is_done(step) for step in self.steps)
+        """The whole wizard is finished — it 404s from here on."""
+        return all(self.is_done(step) for step in self.steps)

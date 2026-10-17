@@ -2,34 +2,30 @@
 // Served by FastAPI at http://<ip>:8080; runs once, then the URL 404s.
 // One page per daemon: its input, apply, and verification rows together —
 // Continue unlocks only when every check is green. The hardware check comes
-// first everywhere (preflight-page.jsx). Then SSH, on-prem only: paste the
-// public half of your own .pem. In the cloud EC2 already set SSH up.
+// first (preflight-page.jsx).
 
 const { useState: useStateW, useEffect: useEffectW } = React;
 
 // ─── Steps definition ────────────────────────────────────────────────
-// Each step lists the deployments it exists in — the body filters to this
-// box's deployment. SSH is on-prem only: in the cloud EC2 already set it up.
 const ALL_STEPS = [
-  { id: 'site',     n: 1, title: 'Site',       sub: 'Confirm your order',        deployments: ['on-prem'] },
-  { id: 'ssh',      n: 2, title: 'SSH access', sub: 'Add + verify your key',    deployments: ['on-prem'] },
-  { id: 'docker',   n: 3, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
-  { id: 'postgres', n: 4, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
-  { id: 'neo4j',    n: 5, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
-  { id: 'ollama',   n: 6, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
-  { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts',           deployments: ['on-prem'] },
-  { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements', deployments: ['on-prem'] },
-  { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology', deployments: ['on-prem'] },
-  { id: 'cloud_secrets', n: 1, title: 'Passwords', sub: 'Operator, viewer, Grafana', deployments: ['cloud'] },
-  { id: 'der_control_api', n: 10, title: 'DER control API', sub: 'Utility link', deployments: ['on-prem'] },
-  { id: 'industrial_gateway', n: 11, title: 'Industrial gateway', sub: 'Device bridge', deployments: ['on-prem'] },
-  { id: 'hmi',      n: 12, title: 'HMI',        sub: 'Operator screen',           deployments: ['on-prem'] },
-  { id: 'mlflow',   n: 13, title: 'MLflow',     sub: 'Experiment tracking',       deployments: ['on-prem'] },
-  { id: 'analyst_model', n: 14, title: 'Analyst model', sub: 'Daily forecast',    deployments: ['on-prem'] },
-  { id: 'analyst_server', n: 15, title: 'Analyst server', sub: 'Chat + weather keys', deployments: ['on-prem'] },
-  { id: 'prometheus', n: 16, title: 'Prometheus', sub: 'Metrics',                 deployments: ['on-prem'] },
-  { id: 'grafana',  n: 17, title: 'Grafana',    sub: 'Dashboards',                deployments: ['on-prem'] },
-  { id: 'ssh_lockdown', n: 18, title: 'SSH lockdown', sub: 'Key-only login',     deployments: ['on-prem'] },
+  { id: 'site',     n: 1, title: 'Site',       sub: 'Confirm your order' },
+  { id: 'ssh',      n: 2, title: 'SSH access', sub: 'Add + verify your key' },
+  { id: 'docker',   n: 3, title: 'Docker',     sub: 'Container network' },
+  { id: 'postgres', n: 4, title: 'PostgreSQL', sub: 'Password + databases' },
+  { id: 'neo4j',    n: 5, title: 'Neo4j',      sub: 'Password + graph' },
+  { id: 'ollama',   n: 6, title: 'Ollama',     sub: 'AI models' },
+  { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts' },
+  { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements' },
+  { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology' },
+  { id: 'der_control_api', n: 10, title: 'DER control API', sub: 'Utility link' },
+  { id: 'industrial_gateway', n: 11, title: 'Industrial gateway', sub: 'Device bridge' },
+  { id: 'hmi',      n: 12, title: 'HMI',        sub: 'Operator screen' },
+  { id: 'mlflow',   n: 13, title: 'MLflow',     sub: 'Experiment tracking' },
+  { id: 'analyst_model', n: 14, title: 'Analyst model', sub: 'Daily forecast' },
+  { id: 'analyst_server', n: 15, title: 'Analyst server', sub: 'Chat + weather keys' },
+  { id: 'prometheus', n: 16, title: 'Prometheus', sub: 'Metrics' },
+  { id: 'grafana',  n: 17, title: 'Grafana',    sub: 'Dashboards' },
+  { id: 'ssh_lockdown', n: 18, title: 'SSH lockdown', sub: 'Key-only login' },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -388,7 +384,7 @@ function ThemeToggleW({ t, isDark, onToggle }) {
 }
 
 // ─── Top header ─────────────────────────────────────────────────────
-function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
+function HeaderW({ t, steps, current, isDark, onToggleTheme }) {
   const idx = steps.findIndex(s => s.id === current);
   const isPreflight = current === 'preflight';
   return (
@@ -411,13 +407,6 @@ function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
           color: t.textSoft, marginTop: 3, fontWeight: 500,
         }}>First-boot setup</div>
       </div>
-      {deployment && (
-        <span data-deployment={deployment} style={{
-          padding: '4px 10px', border: `1px solid ${t.borderSoft}`, borderRadius: 999,
-          fontFamily: t.fontLabel, fontSize: 10, fontWeight: 500, letterSpacing: 0.2,
-          color: t.textMid, textTransform: 'uppercase',
-        }}>{deployment}</span>
-      )}
       <div style={{
         fontFamily: t.fontLabel, fontSize: 11, fontWeight: 500, letterSpacing: 0.2,
         color: t.textSoft, textTransform: 'uppercase',
@@ -437,9 +426,8 @@ function HeaderW({ t, steps, deployment, current, isDark, onToggleTheme }) {
 function FooterW({ t, steps, current, stepVerified, onBack, onNext }) {
   const idx = steps.findIndex(s => s.id === current);
   const isPreflight = current === 'preflight';
-  // Preflight isn't in `steps` (the rail shows it above the count); with no
-  // steps after it (cloud, today) it's the last page.
-  const isLast = isPreflight ? steps.length === 0 : idx === steps.length - 1;
+  // Preflight isn't in `steps` (the rail shows it above the count).
+  const isLast = !isPreflight && idx === steps.length - 1;
   const isDone = isLast && stepVerified;
   const nextLabel = isPreflight ? 'Begin setup' : 'Continue';
 
@@ -574,7 +562,7 @@ function SetupCompleteW({ t }) {
 }
 
 function SetupWizardBody({ t, isDark, onToggleTheme }) {
-  // { deployment, badge: 'On-Prem' | 'Commercial' | 'Defense', account, completed } from GET /api/config
+  // { account, completed } from GET /api/config
   const [setup, setSetup] = useStateW(null);
   const [current, setCurrent] = useStateW(null);
   const [completed, setCompleted] = useStateW(new Set());
@@ -584,7 +572,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
   const [grafanaPassword, setGrafanaPassword] = useStateW('');
-  // The order this ISO was built for, shown read-only on the Site page (on-prem only).
+  // The order this ISO was built for, shown read-only on the Site page.
   const [siteInfo, setSiteInfo] = useStateW(null);
   // Checked by default: key-only SSH is the recommended end state.
   const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
@@ -600,8 +588,6 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [derLfdis, setDerLfdis] = useStateW('');
   // The box's utility identity: client certificate, its key, and the utility CA bundle (PEM).
   const [derPems, setDerPems] = useStateW({});
-  // The cloud box's three customer passwords.
-  const [cloudPasswords, setCloudPasswords] = useStateW({});
   // { [model]: latest download progress } while the Ollama page streams
   const [downloads, setDownloads] = useStateW({});
 
@@ -609,8 +595,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     fetch('/api/config').then(r => r.json()).then(setSetup);
   }, []);
   // Numbered by position, so adding a page never means renumbering the rest.
-  const steps = setup ? ALL_STEPS.filter(s => s.deployments.includes(setup.deployment)).map((s, i) => ({ ...s, n: i + 1 })) : [];
-  // Page order: the hardware check, then this deployment's steps.
+  const steps = setup ? ALL_STEPS.map((s, i) => ({ ...s, n: i + 1 })) : [];
+  // Page order: the hardware check, then the daemon pages.
   const order = ['preflight', ...steps.map(s => s.id)];
   // Resume where setup left off: done pages from the server, first unfinished page current.
   useEffectW(() => {
@@ -710,7 +696,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
     if (idx > 0) setCurrent(order[idx - 1]);
   };
   useEffectW(() => {
-    if (!setup || setup.deployment !== 'on-prem') return;
+    if (!setup) return;
     fetch('/api/site').then(r => (r.ok ? r.json() : null)).then(setSiteInfo).catch(() => setSiteInfo(null));
   }, [setup]);
   const onJump = (id) => setCurrent(id);
@@ -725,7 +711,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
       fontFamily: t.fontBody, color: t.text,
       minHeight: '100%',
     }}>
-      <HeaderW t={t} steps={steps} deployment={setup?.badge} current={current}
+      <HeaderW t={t} steps={steps} current={current}
         isDark={isDark} onToggleTheme={onToggleTheme}/>
       {setup && (
         <FooterW t={t} steps={steps} current={current} stepVerified={completed.has(current)}
@@ -794,11 +780,6 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           {shown === 'mlflow' && (
             <StepMlflow t={t} page={pageOf('mlflow')}
               onApply={() => applyStep('mlflow', '/api/mlflow', {})}/>
-          )}
-          {shown === 'cloud_secrets' && (
-            <StepCloudSecrets t={t} page={pageOf('cloud_secrets')} passwords={cloudPasswords}
-              onPassword={(k, v) => setCloudPasswords(s => ({ ...s, [k]: v }))}
-              onApply={() => applyStep('cloud_secrets', '/api/cloud-secrets', cloudPasswords)}/>
           )}
           {shown === 'der_control_api' && (
             <StepDerControl t={t} page={pageOf('der_control_api')} url={derControlUrl}

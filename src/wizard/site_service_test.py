@@ -5,13 +5,10 @@ A box with no order says so."""
 import shutil
 from pathlib import Path
 
-import pytest
 import yaml
 
 from src.wizard.site_fixtures import TEST_ORDER, make_site_service
-from src.wizard.site_service import SiteStepNotAvailableError
 from src.wizard.wizard_fixtures import tracker
-from src.wizard.wizard_record import Deployment
 
 
 def _yaml(path: Path) -> object:
@@ -134,14 +131,3 @@ def test_a_box_with_no_order_says_where_to_get_one(tmp_path: Path) -> None:
     assert "delivery portal" in actual.checks[0].detail
     assert not (tmp_path / "opt-arcnode").exists()
     assert "site" not in tracker(tmp_path).completed()
-
-
-def test_cloud_has_no_site_page(tmp_path: Path) -> None:
-    # Arrange
-    service = make_site_service(tmp_path, deployment=Deployment.CLOUD)
-
-    # Act / Assert
-    with pytest.raises(SiteStepNotAvailableError):
-        service.info()
-    with pytest.raises(SiteStepNotAvailableError):
-        service.apply()

@@ -177,30 +177,6 @@ class CfnService:
                     "Value": {"Ref": "EmsEip"},
                     "Description": "EMS HMI is reachable on https://<PublicIp>/ (self-signed cert until the site name is issued one)",
                 },
-                "SetupUrl": {
-                    "Value": (
-                        f"https://{site_callback.hostname}:8080/"
-                        if site_callback
-                        else {"Fn::Sub": "https://${EmsEip}:8080/"}
-                    ),
-                    "Description": (
-                        "The setup page. Open it, paste the setup token, and configure the box. "
-                        "The DNS name can take a few minutes to start working; until its "
-                        "certificate is issued your browser warns about a self-signed one."
-                    ),
-                },
-                "SetupToken": {
-                    "Value": {
-                        "Fn::Sub": (
-                            "aws secretsmanager get-secret-value --secret-id "
-                            "arcnode-ems-${AWS::StackName}/setup-token --query SecretString --output text"
-                        ),
-                    },
-                    "Description": (
-                        "Setup token. Run the command shown in this output, then paste the value "
-                        "into the SetupUrl page before you configure anything."
-                    ),
-                },
                 "SiteId": {
                     "Value": site_id,
                     "Description": "MQTT topic scope: sites/<SiteId>/...",

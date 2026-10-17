@@ -91,16 +91,6 @@ publish_compose:
   only:
     - main
 
-# The cloud wizard bundle: cloud boxes run stock Amazon Linux 2023 and download this at
-# boot (EC2 UserData), so no custom AMI is built. Excludes keep test files out of the bucket.
-publish_wizard:
-  stage: publish
-  script:
-    - tar -czf wizard-src.tar.gz --exclude "__pycache__" --exclude "*_test.py" src/__init__.py src/customer_inputs.py src/wizard
-    - aws s3 cp wizard-src.tar.gz s3://arcnode-public/wizard/wizard-src.tar.gz
-  only:
-    - main
-
 publish_iso:
   # The appliance ISO: stock Debian netinst + preseed late_command hook.
   # Built in a throwaway Debian container (xorriso, no root on the runner);

@@ -1,5 +1,4 @@
-"""Loads the wizard's cfg.yml — written by whichever provisioning path set
-up the box (setup.sh on-prem, EC2 UserData in the cloud)."""
+"""Loads the wizard's cfg.yml, which setup.sh writes."""
 
 from pathlib import Path
 

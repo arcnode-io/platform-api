@@ -19,7 +19,6 @@ from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     DerControlRequest,
     StepResult,
     VerifyCheck,
@@ -45,24 +44,18 @@ LOG_HINT: Final[str] = (
 )
 
 
-class DerControlStepNotAvailableError(Exception):
-    """No DER control API page in the cloud — UserData writes its overlay there."""
-
-
 class DerControlService:
     """Writes der-control-api's per-site overlay and starts the service."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         order_dir: Path,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._order_dir = order_dir
         self._secrets_env_path = secrets_env_path
@@ -71,10 +64,6 @@ class DerControlService:
 
     def apply(self, request: DerControlRequest) -> StepResult:
         """Write the overlay, start, wait for the allowlist line, verify health — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise DerControlStepNotAvailableError(
-                "no DER control API page in the cloud"
-            )
         if self._tracker.is_done("der_control_api"):
             raise StepAlreadyDoneError("the DER control API is already set up")
         site = OrderSite.model_validate(
@@ -131,10 +120,6 @@ class DerControlService:
         """Mark the page done without starting the service: the utility isn't connected yet.
         The customer adds the link later, so nothing here can block the rest of setup.
         """
-        if self._deployment == Deployment.CLOUD:
-            raise DerControlStepNotAvailableError(
-                "no DER control API page in the cloud"
-            )
         self._tracker.mark_done("der_control_api")
         return StepResult(
             verified=True,

@@ -29,7 +29,6 @@ from src.wizard.ollama_verify import verify_ollama
 from src.wizard.system_runner import LineStream, Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     DockerNetwork,
     OllamaSettings,
     StepResult,
@@ -40,10 +39,6 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 DROP_IN: Final[str] = "/etc/systemd/system/ollama.service.d/arcnode.conf"
 # Poll interval for the readiness gate below — not a timeout.
 POLL_SECONDS: Final[float] = 0.5
-
-
-class OllamaStepNotAvailableError(Exception):
-    """No Ollama page in the cloud — the LLM is Bedrock."""
 
 
 class OllamaService:
@@ -67,12 +62,9 @@ class OllamaService:
     def apply(self) -> Iterator[OllamaPageEvent]:
         """Refuse up front (before any streaming starts), then return the
         page's event stream: progress lines, then one result."""
-        settings = self._config.ollama
-        if self._config.deployment == Deployment.CLOUD or settings is None:
-            raise OllamaStepNotAvailableError("no Ollama step in the cloud")
         if self._tracker.is_done("ollama"):
             raise StepAlreadyDoneError("Ollama is already set up")
-        return self._page(settings)
+        return self._page(self._config.ollama)
 
     def _page(self, settings: OllamaSettings) -> Iterator[OllamaPageEvent]:
         network = read_network(self._run)

@@ -3,11 +3,9 @@ gateway only, the customer's password, GRAPH_URL saved like the cloud's."""
 
 from pathlib import Path
 
-import pytest
 
-from src.wizard.neo4j_service import Neo4jStepNotAvailableError
 from src.wizard.wizard_fixtures import FakeRunner, make_neo4j_service, ok, tracker
-from src.wizard.wizard_record import CommandOutput, Deployment, PasswordRequest
+from src.wizard.wizard_record import CommandOutput, PasswordRequest
 
 PASSWORD = "Ne-4j'pass 1!"  # a quote and a space: must survive Cypher + the URL
 DENIED = CommandOutput(
@@ -181,12 +179,3 @@ def test_no_docker_network_stops_before_touching_neo4j(tmp_path: Path) -> None:
         ("Docker's arcnode network", False)
     ]
     assert not [c for c in runner.calls if c.args[0] in ("sed", "systemctl")]
-
-
-def test_cloud_has_no_neo4j_step(tmp_path: Path) -> None:
-    # Arrange: the cloud's graph is Aura (commercial) or Neptune (defense)
-    service = make_neo4j_service(tmp_path, deployment=Deployment.CLOUD)
-
-    # Act / Assert
-    with pytest.raises(Neo4jStepNotAvailableError):
-        service.apply(PasswordRequest(password=PASSWORD))

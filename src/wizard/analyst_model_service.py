@@ -11,7 +11,7 @@ from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.ems_cfg import ANALYST_MODEL_CFG_FILE, AnalystModelCfg, write_yaml
 from src.wizard.order_record import SITE_FILE, OrderSite
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Command, Deployment, StepResult, VerifyCheck
+from src.wizard.wizard_record import Command, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 ANALYST_MODEL_SERVICE: Final[str] = "analyst-model"
@@ -25,23 +25,17 @@ LOG_HINT: Final[str] = (
 )
 
 
-class AnalystModelStepNotAvailableError(Exception):
-    """No analyst model page in the cloud — UserData starts it there."""
-
-
 class AnalystModelService:
     """Starts the model that trains and publishes the daily price forecast."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         order_dir: Path,
         ems_dir: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._order_dir = order_dir
         self._ems_dir = ems_dir
@@ -49,10 +43,6 @@ class AnalystModelService:
 
     def apply(self) -> StepResult:
         """Write the overlay, start, wait for the scheduler, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise AnalystModelStepNotAvailableError(
-                "no analyst model page in the cloud"
-            )
         if self._tracker.is_done("analyst_model"):
             raise StepAlreadyDoneError("the analyst model is already set up")
         site = OrderSite.model_validate(

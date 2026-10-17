@@ -9,7 +9,7 @@ from pathlib import Path
 from src.wizard.neo4j_service import Neo4jService
 from src.wizard.postgres_service import PostgresService
 from src.wizard.ssh_service import SshService
-from src.wizard.wizard_record import Command, CommandOutput, Deployment, SshAccount
+from src.wizard.wizard_record import Command, CommandOutput, SshAccount
 from src.wizard.wizard_steps import StepTracker
 
 SSH_KEYGEN = shutil.which("ssh-keygen")
@@ -202,34 +202,30 @@ def account(tmp_path: Path) -> SshAccount:
     return SshAccount(name="joe", home=home, uid=os.getuid(), gid=os.getgid())
 
 
-def tracker(tmp_path: Path, deployment: Deployment = Deployment.ON_PREM) -> StepTracker:
+def tracker(tmp_path: Path) -> StepTracker:
     """The page-done markers under tmp_path (same dir every call)."""
-    return StepTracker(steps_dir=tmp_path / "steps", deployment=deployment)
+    return StepTracker(steps_dir=tmp_path / "steps")
 
 
 def make_ssh_service(
     tmp_path: Path,
-    deployment: Deployment = Deployment.ON_PREM,
     runner: FakeRunner | None = None,
 ) -> SshService:
     """An SshService on tmp_path with a healthy (or given) fake runner."""
     return SshService(
         account=account(tmp_path),
-        deployment=deployment,
-        tracker=tracker(tmp_path, deployment),
+        tracker=tracker(tmp_path),
         run=runner or FakeRunner(),
     )
 
 
 def make_postgres_service(
     tmp_path: Path,
-    deployment: Deployment = Deployment.ON_PREM,
     runner: FakeRunner | None = None,
 ) -> PostgresService:
     """A PostgresService on tmp_path with a healthy (or given) fake runner."""
     return PostgresService(
-        deployment=deployment,
-        tracker=tracker(tmp_path, deployment),
+        tracker=tracker(tmp_path),
         secrets_env_path=tmp_path / "secrets.env",
         run=runner or FakeRunner(),
     )
@@ -237,13 +233,11 @@ def make_postgres_service(
 
 def make_neo4j_service(
     tmp_path: Path,
-    deployment: Deployment = Deployment.ON_PREM,
     runner: FakeRunner | None = None,
 ) -> Neo4jService:
     """A Neo4jService on tmp_path with a healthy (or given) fake runner."""
     return Neo4jService(
-        deployment=deployment,
-        tracker=tracker(tmp_path, deployment),
+        tracker=tracker(tmp_path),
         secrets_env_path=tmp_path / "secrets.env",
         run=runner or FakeRunner(),
     )

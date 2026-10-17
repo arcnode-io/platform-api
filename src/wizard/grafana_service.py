@@ -12,7 +12,6 @@ from src.wizard.secrets_env import save_secrets, saved_check
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     PasswordRequest,
     StepResult,
     VerifyCheck,
@@ -32,23 +31,17 @@ LOG_HINT: Final[str] = (
 )
 
 
-class GrafanaStepNotAvailableError(Exception):
-    """No Grafana page in the cloud — UserData starts it there."""
-
-
 class GrafanaService:
     """Starts the dashboards, behind the admin password the customer set."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._secrets_env_path = secrets_env_path
@@ -56,8 +49,6 @@ class GrafanaService:
 
     def apply(self, request: PasswordRequest) -> StepResult:
         """Save the password, start, wait for listen, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise GrafanaStepNotAvailableError("no Grafana page in the cloud")
         if self._tracker.is_done("grafana"):
             raise StepAlreadyDoneError("Grafana is already set up")
         # Reason: compose reads the env file itself, so the password goes in before `up`.

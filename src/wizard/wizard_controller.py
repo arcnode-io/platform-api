@@ -7,76 +7,57 @@ package.
 """
 
 from pathlib import Path
-from collections.abc import Callable
-from typing import Annotated, Final
+from typing import Final
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from src.wizard.device_api_service import (
     DeviceApiService,
-    DeviceApiStepNotAvailableError,
 )
-from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
-from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
+from src.wizard.grafana_service import GrafanaService
+from src.wizard.hmi_service import HmiService
 from src.wizard.ssh_lockdown_service import (
     SshKeyNotProvenError,
     SshLockdownService,
-    SshLockdownStepNotAvailableError,
 )
 from src.wizard.industrial_gateway_service import (
     IndustrialGatewayService,
-    IndustrialGatewayStepNotAvailableError,
 )
-from src.wizard.docker_service import DockerService, DockerStepNotAvailableError
-from src.wizard.hivemq_service import HivemqService, HivemqStepNotAvailableError
-from src.wizard.neo4j_service import Neo4jService, Neo4jStepNotAvailableError
-from src.wizard.ollama_service import OllamaService, OllamaStepNotAvailableError
-from src.wizard.postgres_service import PostgresService, PostgresStepNotAvailableError
+from src.wizard.docker_service import DockerService
+from src.wizard.hivemq_service import HivemqService
+from src.wizard.neo4j_service import Neo4jService
+from src.wizard.ollama_service import OllamaService
+from src.wizard.postgres_service import PostgresService
 from src.wizard.analyst_server_service import (
     AnalystServerService,
-    AnalystServerStepNotAvailableError,
-)
-from src.wizard.cloud_secrets_service import (
-    CloudSecretsService,
-    CloudSecretsStepNotAvailableError,
 )
 from src.wizard.der_control_service import (
     DerControlService,
-    DerControlStepNotAvailableError,
 )
 from src.wizard.analyst_model_service import (
     AnalystModelService,
-    AnalystModelStepNotAvailableError,
 )
-from src.wizard.mlflow_service import MlflowService, MlflowStepNotAvailableError
+from src.wizard.mlflow_service import MlflowService
 from src.wizard.preflight_service import PreflightService
 from src.wizard.prometheus_service import (
     PrometheusService,
-    PrometheusStepNotAvailableError,
 )
-from src.wizard.site_service import SiteService, SiteStepNotAvailableError
+from src.wizard.site_service import SiteService
 from src.wizard.telemetry_writer_service import (
     TelemetryWriterService,
-    TelemetryWriterStepNotAvailableError,
 )
 from src.wizard.ssh_service import (
     InvalidSshKeyError,
     SshService,
-    SshStepNotAvailableError,
 )
 from src.wizard.analyst_server_progress import StageProgress
-from src.wizard.setup_token import TOKEN_HEADER
 from src.wizard.wizard_record import (
-    Variant,
-    badge_for,
-    CloudSecrets,
     DerControlRequest,
     AnalystServerKeys,
     ApplyRequest,
     ApplyResult,
     BrokerPasswords,
-    Deployment,
     DeviceApiSecrets,
     PasswordRequest,
     SetupInfo,
@@ -94,25 +75,10 @@ _STATIC_DIR: Final[Path] = Path(__file__).parent / "static"
 _NO_CACHE: Final[dict[str, str]] = {"Cache-Control": "no-cache"}
 
 
-def _require_setup_token(expected: str) -> Callable[[str | None], None]:
-    """A dependency that refuses any change whose X-Setup-Token header isn't the stack owner's."""
-
-    def check(
-        setup_token: Annotated[str | None, Header(alias=TOKEN_HEADER)] = None,
-    ) -> None:
-        if setup_token != expected:
-            raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED, detail="setup token missing or wrong"
-            )
-
-    return check
-
-
 class WizardController:
-    """GET / (+ its static assets), GET /api/config, and one POST per page:
-    /api/preflight (everywhere), /api/ssh, /api/docker, /api/postgres,
-    /api/neo4j, /api/ollama, /api/site (on-prem only). The wizard has its own
-    port (8080), so it lives at the root — no path prefix."""
+    """GET / (+ its static assets), GET /api/config, and one POST per page
+    (/api/preflight, /api/site, /api/ssh, ...). The wizard has its own port
+    (8080), so it lives at the root — no path prefix."""
 
     def __init__(
         self,
@@ -131,17 +97,13 @@ class WizardController:
         analyst_model: AnalystModelService,
         analyst_server: AnalystServerService,
         der_control: DerControlService,
-        cloud_secrets: CloudSecretsService,
         device_api: DeviceApiService,
         industrial_gateway: IndustrialGatewayService,
         hmi: HmiService,
         grafana: GrafanaService,
         ssh_lockdown: SshLockdownService,
         tracker: StepTracker,
-        deployment: Deployment,
         account: SshAccount,
-        setup_token: str | None = None,
-        variant: Variant = Variant.COMMERCIAL,
     ) -> None:
         self._preflight = preflight
         self._ssh = ssh
@@ -157,18 +119,14 @@ class WizardController:
         self._analyst_model = analyst_model
         self._analyst_server = analyst_server
         self._der_control = der_control
-        self._cloud_secrets = cloud_secrets
         self._device_api = device_api
         self._industrial_gateway = industrial_gateway
         self._hmi = hmi
         self._grafana = grafana
         self._ssh_lockdown = ssh_lockdown
         self._tracker = tracker
-        self._deployment = deployment
-        self._variant = variant
         self._account = account
         self.router = APIRouter()
-        token_deps = [Depends(_require_setup_token(setup_token))] if setup_token else []
         # Reason: FastAPI takes each route's response model from the handler's
         # return annotation and its description from the docstring.
         routes = [
@@ -192,7 +150,6 @@ class WizardController:
             ("GET", "/api/analyst-server/progress", self.analyst_server_progress),
             ("POST", "/api/der-control", self.der_control),
             ("POST", "/api/der-control/skip", self.der_control_skip),
-            ("POST", "/api/cloud-secrets", self.cloud_secrets),
             ("POST", "/api/device-api", self.device_api),
             ("POST", "/api/industrial-gateway", self.industrial_gateway),
             ("POST", "/api/hmi", self.hmi),
@@ -200,12 +157,7 @@ class WizardController:
             ("POST", "/api/ssh-lockdown", self.ssh_lockdown),
         ]
         for method, path, handler in routes:
-            self.router.add_api_route(
-                path,
-                handler,
-                methods=[method],
-                dependencies=token_deps if method == "POST" else [],
-            )
+            self.router.add_api_route(path, handler, methods=[method])
 
     def index(self) -> HTMLResponse:
         """Entry point the person's browser loads."""
@@ -225,12 +177,10 @@ class WizardController:
         return FileResponse(path, headers=_NO_CACHE)
 
     def config(self) -> SetupInfo:
-        """Deployment, login account, and which pages are already done —
+        """Login account and which pages are already done —
         so a reload resumes at the first unfinished page."""
         self._refuse_if_applied()
         return SetupInfo(
-            deployment=self._deployment,
-            badge=badge_for(self._deployment, self._variant),
             account=self._account.name,
             completed=self._tracker.completed(),
         )
@@ -246,7 +196,7 @@ class WizardController:
         """The on-prem SSH page — see SshService.apply."""
         try:
             return self._ssh.apply(request)
-        except (StepAlreadyDoneError, SshStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         except InvalidSshKeyError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -255,21 +205,21 @@ class WizardController:
         """The on-prem Docker page — see DockerService.apply."""
         try:
             return self._docker.apply()
-        except (StepAlreadyDoneError, DockerStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def postgres(self, request: PasswordRequest) -> StepResult:
         """The on-prem PostgreSQL page — see PostgresService.apply."""
         try:
             return self._postgres.apply(request)
-        except (StepAlreadyDoneError, PostgresStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def neo4j(self, request: PasswordRequest) -> StepResult:
         """The on-prem Neo4j page — see Neo4jService.apply."""
         try:
             return self._neo4j.apply(request)
-        except (StepAlreadyDoneError, Neo4jStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def ollama(self) -> StreamingResponse:
@@ -277,7 +227,7 @@ class WizardController:
         downloads take minutes to hours, so progress streams as it happens."""
         try:
             events = self._ollama.apply()
-        except (StepAlreadyDoneError, OllamaStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         # Reason: a sync iterator — Starlette runs it in a worker thread, so
         # the blocking curl reads don't stall the event loop.
@@ -286,83 +236,73 @@ class WizardController:
 
     def site_info(self) -> SiteInfo:
         """The order this ISO was built for — see SiteService.info."""
-        try:
-            return self._site.info()
-        except SiteStepNotAvailableError as exc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        return self._site.info()
 
     def site(self) -> StepResult:
         """The on-prem Site page: the customer confirms the order — see SiteService.apply."""
         try:
             return self._site.apply()
-        except (StepAlreadyDoneError, SiteStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def hivemq(self, request: BrokerPasswords) -> StepResult:
         """The on-prem HiveMQ page — see HivemqService.apply."""
         try:
             return self._hivemq.apply(request)
-        except (StepAlreadyDoneError, HivemqStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def telemetry(self) -> StepResult:
         """The on-prem Telemetry writer page — see TelemetryWriterService.apply."""
         try:
             return self._telemetry.apply()
-        except (StepAlreadyDoneError, TelemetryWriterStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def prometheus(self) -> StepResult:
         """The on-prem Prometheus page — see PrometheusService.apply."""
         try:
             return self._prometheus.apply()
-        except (StepAlreadyDoneError, PrometheusStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def mlflow(self) -> StepResult:
         """The on-prem MLflow page — see MlflowService.apply."""
         try:
             return self._mlflow.apply()
-        except (StepAlreadyDoneError, MlflowStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def analyst_model(self) -> StepResult:
         """The on-prem analyst model page — see AnalystModelService.apply."""
         try:
             return self._analyst_model.apply()
-        except (StepAlreadyDoneError, AnalystModelStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def analyst_server(self, request: AnalystServerKeys) -> StreamingResponse:
         """The on-prem analyst server page: streams its stages as NDJSON while it seeds, then the verdict."""
         try:
             self._analyst_server.ensure_startable()
-        except (StepAlreadyDoneError, AnalystServerStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         return StreamingResponse(
             self._analyst_server.start_stream(request),
             media_type="application/x-ndjson",
         )
 
-    def cloud_secrets(self, request: CloudSecrets) -> StepResult:
-        """The cloud password page — see CloudSecretsService.apply."""
-        try:
-            return self._cloud_secrets.apply(request)
-        except (StepAlreadyDoneError, CloudSecretsStepNotAvailableError) as exc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
     def der_control_skip(self) -> StepResult:
         """Skip the DER page for now: the utility isn't connected yet."""
         try:
             return self._der_control.skip()
-        except (StepAlreadyDoneError, DerControlStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def der_control(self, request: DerControlRequest) -> StepResult:
         """The on-prem DER control API page — see DerControlService.apply."""
         try:
             return self._der_control.apply(request)
-        except (StepAlreadyDoneError, DerControlStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def analyst_server_progress(self) -> list[StageProgress]:
@@ -373,35 +313,35 @@ class WizardController:
         """The on-prem Device API page — see DeviceApiService.apply."""
         try:
             return self._device_api.apply(request)
-        except (StepAlreadyDoneError, DeviceApiStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def industrial_gateway(self) -> StepResult:
         """The on-prem Industrial gateway page — see IndustrialGatewayService.apply."""
         try:
             return self._industrial_gateway.apply()
-        except (StepAlreadyDoneError, IndustrialGatewayStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def hmi(self) -> StepResult:
         """The on-prem HMI page — see HmiService.apply."""
         try:
             return self._hmi.apply()
-        except (StepAlreadyDoneError, HmiStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def grafana(self, request: PasswordRequest) -> StepResult:
         """The on-prem Grafana page — see GrafanaService.apply."""
         try:
             return self._grafana.apply(request)
-        except (StepAlreadyDoneError, GrafanaStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def ssh_lockdown(self, request: SshLockdownRequest) -> StepResult:
         """The last on-prem page — see SshLockdownService.apply."""
         try:
             return self._ssh_lockdown.apply(request)
-        except (StepAlreadyDoneError, SshLockdownStepNotAvailableError) as exc:
+        except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
         except SshKeyNotProvenError as exc:
             raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc

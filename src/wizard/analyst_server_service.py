@@ -21,7 +21,6 @@ from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     AnalystServerKeys,
     Command,
-    Deployment,
     StepResult,
     VerifyCheck,
 )
@@ -39,23 +38,17 @@ LOG_HINT: Final[str] = (
 )
 
 
-class AnalystServerStepNotAvailableError(Exception):
-    """No analyst server page in the cloud — UserData starts it there."""
-
-
 class AnalystServerService:
     """Starts the analyst server the HMI chats with."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._secrets_env_path = secrets_env_path
@@ -63,10 +56,6 @@ class AnalystServerService:
 
     def apply(self, request: AnalystServerKeys) -> StepResult:
         """Save the keys, start, wait for uvicorn, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError(
-                "no analyst server page in the cloud"
-            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
         # Reason: compose reads the env file itself, so the keys go in before `up`.
@@ -91,10 +80,6 @@ class AnalystServerService:
 
     def ensure_startable(self) -> None:
         """Refuse a start that can't happen, before the response begins streaming."""
-        if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError(
-                "no analyst server page in the cloud"
-            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
 
@@ -102,10 +87,6 @@ class AnalystServerService:
         """Start the analyst and stream its stages as JSON lines while it seeds, then one
         verdict line. Streaming keeps the request alive; the page reads it like Ollama's pull.
         """
-        if self._deployment == Deployment.CLOUD:
-            raise AnalystServerStepNotAvailableError(
-                "no analyst server page in the cloud"
-            )
         if self._tracker.is_done("analyst_server"):
             raise StepAlreadyDoneError("the analyst server is already set up")
         save_secrets(

@@ -24,7 +24,6 @@ from src.wizard.secrets_env import read_secret, save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     DockerNetwork,
     PasswordRequest,
     StepResult,
@@ -37,22 +36,16 @@ DEFAULT_PASSWORD: Final[str] = "neo4j"  # noqa: S105  # nosec B105
 POLL_SECONDS: Final[float] = 0.5
 
 
-class Neo4jStepNotAvailableError(Exception):
-    """No Neo4j page in the cloud — the graph is Aura or Neptune."""
-
-
 class Neo4jService:
     """Everything the EMS containers need from the host's Neo4j."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._secrets_env_path = secrets_env_path
         self._run = run
@@ -60,8 +53,6 @@ class Neo4jService:
     def apply(self, request: PasswordRequest) -> StepResult:
         """Configure, then verify — the page is only marked done when every
         check passes. Every step is idempotent, so a retry is safe."""
-        if self._deployment == Deployment.CLOUD:
-            raise Neo4jStepNotAvailableError("no Neo4j step in the cloud")
         if self._tracker.is_done("neo4j"):
             raise StepAlreadyDoneError("Neo4j is already set up")
         network = read_network(self._run)

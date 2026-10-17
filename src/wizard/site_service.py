@@ -22,13 +22,8 @@ from src.wizard.ems_cfg import (
     write_yaml,
 )
 from src.wizard.order_record import DTM_FILE, SITE_FILE, OrderDtm, OrderSite
-from src.wizard.wizard_record import Deployment, SiteInfo, StepResult, VerifyCheck
+from src.wizard.wizard_record import SiteInfo, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
-
-
-class SiteStepNotAvailableError(Exception):
-    """No Site page in the cloud — the stack's parameters name the site and
-    UserData writes these files from the order."""
 
 
 class SiteService:
@@ -37,13 +32,11 @@ class SiteService:
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         order_dir: Path,
         ems_dir: Path,
         analyst_cfg_path: Path,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._order_dir = order_dir
         self._ems_dir = ems_dir
@@ -51,8 +44,6 @@ class SiteService:
 
     def info(self) -> SiteInfo:
         """What this ISO was built for, from /etc/arcnode/order/site.yml."""
-        if self._deployment == Deployment.CLOUD:
-            raise SiteStepNotAvailableError("no Site page in the cloud")
         site = OrderSite.model_validate(
             yaml.safe_load((self._order_dir / SITE_FILE).read_text())
         )
@@ -68,8 +59,6 @@ class SiteService:
         """The customer confirmed it's their site: save the order for every
         container, then verify. Rewrites the same files on a retry, so it's
         safe to repeat."""
-        if self._deployment == Deployment.CLOUD:
-            raise SiteStepNotAvailableError("no Site page in the cloud")
         if self._tracker.is_done("site"):
             raise StepAlreadyDoneError("the site is already set up")
         site_path = self._order_dir / SITE_FILE

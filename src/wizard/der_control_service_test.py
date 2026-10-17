@@ -11,12 +11,11 @@ from src.wizard.der_control_service import DerControlService, lfdi_from_cert_pem
 from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE
 from src.wizard.site_fixtures import TEST_ORDER
 from src.wizard.wizard_fixtures import FakeRunner, ok, tracker
-from src.wizard.wizard_record import Deployment, DerControlRequest
+from src.wizard.wizard_record import DerControlRequest
 
 
 def make_der_control(tmp_path: Path) -> DerControlService:
     return DerControlService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         order_dir=TEST_ORDER,
         ems_dir=tmp_path / "opt",
@@ -186,7 +185,6 @@ def test_the_box_confirms_the_lfdi_it_loaded_matches_its_certificate(
         f"Started Application in 13 seconds\nutility TLS identity loaded from /app/tls/utility: LFDI {lfdi}\n"
     )
     service = DerControlService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         order_dir=TEST_ORDER,
         ems_dir=tmp_path / "opt",

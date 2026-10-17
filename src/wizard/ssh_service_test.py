@@ -1,5 +1,4 @@
-"""Unit tests for WizardService's SSH step — on-prem only: bring your own
-key. In the cloud the step doesn't exist (EC2 already set up SSH)."""
+"""Unit tests for the SSH step: bring your own key."""
 
 from pathlib import Path
 
@@ -7,10 +6,9 @@ import pytest
 
 from src.wizard.wizard_steps import StepAlreadyDoneError
 from src.wizard.wizard_fixtures import ec2_style_pem, make_ssh_service, tracker
-from src.wizard.wizard_record import ApplyRequest, Deployment
+from src.wizard.wizard_record import ApplyRequest
 from src.wizard.ssh_service import (
     InvalidSshKeyError,
-    SshStepNotAvailableError,
 )
 
 
@@ -78,20 +76,6 @@ def test_apply_refuses_text_that_is_not_a_public_key(tmp_path: Path) -> None:
     # Act / Assert
     with pytest.raises(InvalidSshKeyError):
         service.apply(ApplyRequest(ssh_public_key="ssh-rsa not-base64-garbage"))
-
-
-def test_cloud_has_no_ssh_step(tmp_path: Path) -> None:
-    # Arrange: EC2 already put the launch key pair in authorized_keys
-    service = make_ssh_service(tmp_path, deployment=Deployment.CLOUD)
-    ssh_dir = tmp_path / "home" / "joe" / ".ssh"
-    ssh_dir.mkdir()
-    (ssh_dir / "authorized_keys").write_text("ssh-rsa AAAAec2launchkey my-ec2-key\n")
-
-    # Act / Assert: refused outright, and EC2's key is untouched
-    with pytest.raises(SshStepNotAvailableError):
-        service.apply(ApplyRequest(ssh_public_key="ssh-rsa AAAAanything"))
-    actual = (ssh_dir / "authorized_keys").read_text()
-    assert actual == "ssh-rsa AAAAec2launchkey my-ec2-key\n"
 
 
 def test_apply_marks_applied_and_second_call_raises(tmp_path: Path) -> None:

@@ -11,12 +11,8 @@ from src.wizard.telemetry_writer_verify import (
     TELEMETRY_SERVICE,
     verify_telemetry,
 )
-from src.wizard.wizard_record import Deployment, StepResult
+from src.wizard.wizard_record import StepResult
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
-
-
-class TelemetryWriterStepNotAvailableError(Exception):
-    """No Telemetry writer page in the cloud — UserData starts it there."""
 
 
 class TelemetryWriterService:
@@ -25,13 +21,11 @@ class TelemetryWriterService:
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._secrets_env_path = secrets_env_path
@@ -39,10 +33,6 @@ class TelemetryWriterService:
 
     def apply(self) -> StepResult:
         """Start, wait for the subscription, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise TelemetryWriterStepNotAvailableError(
-                "no Telemetry writer page in the cloud"
-            )
         if self._tracker.is_done("telemetry"):
             raise StepAlreadyDoneError("Telemetry writer is already set up")
         self._run(compose_command(self._ems_dir, "up", "-d", TELEMETRY_SERVICE))

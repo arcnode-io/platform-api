@@ -5,7 +5,7 @@ from pathlib import Path
 
 from src.wizard.grafana_service import GrafanaService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment, PasswordRequest
+from src.wizard.wizard_record import PasswordRequest
 
 PASSWORD = "Grafana-pw-1!"
 
@@ -13,7 +13,6 @@ PASSWORD = "Grafana-pw-1!"
 def make_grafana_service(tmp_path: Path, runner: FakeRunner) -> GrafanaService:
     """A GrafanaService on tmp_path."""
     return GrafanaService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         secrets_env_path=tmp_path / "secrets.env",

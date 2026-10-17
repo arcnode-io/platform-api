@@ -8,7 +8,6 @@ from typing import Final
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     SshAccount,
     SshLockdownRequest,
     StepResult,
@@ -30,10 +29,6 @@ KEEP_HINT: Final[str] = (
 )
 
 
-class SshLockdownStepNotAvailableError(Exception):
-    """No lockdown page in the cloud — EC2 never had password login."""
-
-
 class SshKeyNotProvenError(Exception):
     """The key page hasn't passed yet; turning passwords off now could lock the person out."""
 
@@ -44,13 +39,11 @@ class SshLockdownService:
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         account: SshAccount,
         sshd_config_dir: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._account = account
         self._sshd_config_dir = sshd_config_dir
@@ -58,8 +51,6 @@ class SshLockdownService:
 
     def apply(self, request: SshLockdownRequest) -> StepResult:
         """Write the sshd drop-in, reload, verify — or record that passwords stay on."""
-        if self._deployment == Deployment.CLOUD:
-            raise SshLockdownStepNotAvailableError("no SSH lockdown page in the cloud")
         if self._tracker.is_done("ssh_lockdown"):
             raise StepAlreadyDoneError("SSH lockdown is already done")
         if not self._tracker.is_done("ssh"):

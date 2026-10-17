@@ -9,7 +9,6 @@ from src.wizard.ollama_service import OllamaService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     HardwareMinimums,
     OllamaSettings,
     WizardConfig,
@@ -17,7 +16,6 @@ from src.wizard.wizard_record import (
 
 # What setup.sh writes into wizard-cfg.yml.
 PRODUCTION: Final[WizardConfig] = WizardConfig(
-    deployment=Deployment.ON_PREM,
     hardware=HardwareMinimums(
         vcpus=8, memory_gib=64, gpus=1, gpu_memory_gb=48, disk_gb=1000, disk_nvme=True
     ),
@@ -69,7 +67,7 @@ def make_ollama_service(
     """An OllamaService on tmp_path with a healthy (or given) runner + stream."""
     return OllamaService(
         config=config,
-        tracker=tracker(tmp_path, config.deployment),
+        tracker=tracker(tmp_path),
         analyst_cfg_path=tmp_path / "analyst-cfg.customer.yml",
         run=runner or FakeRunner(),
         stream=stream or FakeStream(),

@@ -23,7 +23,6 @@ from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
     CommandOutput,
-    Deployment,
     PasswordRequest,
 )
 from src.wizard.wizard_steps import StepTracker
@@ -101,16 +100,14 @@ def test_real_postgres_on_dockers_range_passes_every_check(
 ) -> None:
     # Arrange: the Docker page first — it creates the network Postgres trusts
     run = _container_runner(installed)
-    tracker = StepTracker(steps_dir=tmp_path / "steps", deployment=Deployment.ON_PREM)
+    tracker = StepTracker(steps_dir=tmp_path / "steps")
     docker_page = DockerService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker,
         account=SshAccount(name="joe", home=Path("/home/joe"), uid=1000, gid=1000),
         run=run,
     )
     assert docker_page.apply().verified
     service = PostgresService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker,
         secrets_env_path=tmp_path / "secrets.env",
         run=run,

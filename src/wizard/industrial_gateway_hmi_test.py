@@ -5,13 +5,11 @@ from pathlib import Path
 from src.wizard.hmi_service import HmiService
 from src.wizard.industrial_gateway_service import IndustrialGatewayService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment
 
 
 def test_industrial_gateway_starts_and_verifies(tmp_path: Path) -> None:
     # Arrange
     service = IndustrialGatewayService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         secrets_env_path=tmp_path / "secrets.env",
@@ -38,7 +36,6 @@ def test_hmi_serves_plain_http_on_port_80_with_no_ingress_and_no_cert(
     # Arrange
     runner = FakeRunner()
     service = HmiService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         run=runner,

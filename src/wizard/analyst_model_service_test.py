@@ -10,13 +10,11 @@ from src.wizard.analyst_model_service import AnalystModelService
 from src.wizard.ems_cfg import ANALYST_MODEL_CFG_FILE
 from src.wizard.site_fixtures import TEST_ORDER
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment
 
 
 def test_analyst_model_writes_its_overlay_and_verifies(tmp_path: Path) -> None:
     # Arrange
     service = AnalystModelService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         order_dir=TEST_ORDER,
         ems_dir=tmp_path / "opt",

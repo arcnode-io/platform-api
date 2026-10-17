@@ -8,7 +8,7 @@ from typing import Final
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Command, Deployment, StepResult, VerifyCheck
+from src.wizard.wizard_record import Command, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 HMI_SERVICE: Final[str] = "hmi"
@@ -23,30 +23,22 @@ LOG_HINT: Final[str] = (
 )
 
 
-class HmiStepNotAvailableError(Exception):
-    """No HMI page in the cloud — UserData starts it there."""
-
-
 class HmiService:
     """Starts the operator screen that the box's browsers open, over plain HTTP."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._run = run
 
     def apply(self) -> StepResult:
         """Start, wait for nginx, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise HmiStepNotAvailableError("no HMI page in the cloud")
         if self._tracker.is_done("hmi"):
             raise StepAlreadyDoneError("HMI is already set up")
         self._run(compose_command(self._ems_dir, "up", "-d", HMI_SERVICE))

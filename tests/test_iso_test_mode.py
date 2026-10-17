@@ -79,7 +79,6 @@ def test_as_root_lowers_the_minimums_and_restarts_the_wizard(
 ) -> None:
     # Arrange
     expected = (
-        "deployment: on-prem\n"
         "hardware:\n"
         "  vcpus: 4\n"
         "  memory_gib: 16\n"

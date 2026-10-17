@@ -7,9 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from src.wizard.postgres_service import PostgresStepNotAvailableError
 from src.wizard.wizard_fixtures import FakeRunner, make_postgres_service, ok, tracker
-from src.wizard.wizard_record import CommandOutput, Deployment, PasswordRequest
+from src.wizard.wizard_record import CommandOutput, PasswordRequest
 
 PASSWORD = "Pg-pass'1 ok"  # a quote and a space: must survive psql + the URLs
 SAVED = "DOCUMENT_URL, VECTOR_URL, TIMESERIES_URL, DER_CONTROL_URL"
@@ -175,15 +174,6 @@ def test_a_container_that_cant_connect_says_why(tmp_path: Path) -> None:
         "sudo ss -ltnp | grep 5432; "
         "sudo tail -n 50 /var/log/postgresql/postgresql-17-main.log"
     )
-
-
-def test_cloud_has_no_postgres_step(tmp_path: Path) -> None:
-    # Arrange: cloud databases are managed services
-    service = make_postgres_service(tmp_path, deployment=Deployment.CLOUD)
-
-    # Act / Assert
-    with pytest.raises(PostgresStepNotAvailableError):
-        service.apply(PasswordRequest(password=PASSWORD))
 
 
 def test_weak_password_is_rejected() -> None:

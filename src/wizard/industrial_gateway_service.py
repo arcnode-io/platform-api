@@ -7,7 +7,7 @@ from typing import Final
 
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Deployment, StepResult, VerifyCheck
+from src.wizard.wizard_record import StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 GATEWAY_SERVICE: Final[str] = "industrial-gateway"
@@ -19,23 +19,17 @@ LOG_HINT: Final[str] = (
 )
 
 
-class IndustrialGatewayStepNotAvailableError(Exception):
-    """No Industrial gateway page in the cloud — UserData starts it there."""
-
-
 class IndustrialGatewayService:
     """Starts the gateway that bridges the devices onto the broker."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._secrets_env_path = secrets_env_path
@@ -43,10 +37,6 @@ class IndustrialGatewayService:
 
     def apply(self) -> StepResult:
         """Start, wait for its subscriptions, verify — done only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise IndustrialGatewayStepNotAvailableError(
-                "no Industrial gateway page in the cloud"
-            )
         if self._tracker.is_done("industrial_gateway"):
             raise StepAlreadyDoneError("Industrial gateway is already set up")
         self._run(compose_command(self._ems_dir, "up", "-d", GATEWAY_SERVICE))

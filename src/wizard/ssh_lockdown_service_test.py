@@ -12,7 +12,7 @@ from src.wizard.ssh_lockdown_service import (
     SshLockdownService,
 )
 from src.wizard.wizard_fixtures import FakeRunner, account, ok, tracker
-from src.wizard.wizard_record import Deployment, SshLockdownRequest
+from src.wizard.wizard_record import SshLockdownRequest
 
 
 def _service(
@@ -22,7 +22,6 @@ def _service(
     if key_done:
         steps.mark_done("ssh")
     return SshLockdownService(
-        deployment=Deployment.ON_PREM,
         tracker=steps,
         account=account(tmp_path),
         sshd_config_dir=tmp_path / "sshd_config.d",

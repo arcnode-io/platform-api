@@ -14,7 +14,6 @@ from src.wizard.neo4j_service import Neo4jService
 from src.wizard.ollama_service import OllamaService
 from src.wizard.postgres_service import PostgresService
 from src.wizard.analyst_model_service import AnalystModelService
-from src.wizard.cloud_secrets_service import CloudSecretsService
 from src.wizard.der_control_service import DerControlService
 from src.wizard.analyst_server_service import AnalystServerService
 from src.wizard.mlflow_service import MlflowService
@@ -41,7 +40,7 @@ class WizardModule:
     ``analyst_cfg_path`` is ems-analyst's cfg.customer.yml (same path as the
     cloud's); ``ems_dir`` is where every other file the containers mount
     goes (``/opt/arcnode``, as in the cloud); ``account`` is whose authorized_keys the SSH key goes into;
-    ``config`` is wizard-cfg.yml (deployment + hardware minimums); ``run`` runs the install and
+    ``config`` is wizard-cfg.yml (hardware minimums + Ollama models); ``run`` runs the install and
     verification commands and ``stream`` the long downloads (fakes in tests).
     """
 
@@ -56,30 +55,22 @@ class WizardModule:
         config: WizardConfig,
         run: Runner,
         stream: LineStream,
-        setup_token: str | None = None,
         sshd_config_dir: Path = SSHD_CONFIG_DIR,
     ) -> None:
-        deployment = config.deployment
-        tracker = StepTracker(steps_dir=base_dir / "steps", deployment=deployment)
+        tracker = StepTracker(steps_dir=base_dir / "steps")
         self.preflight = PreflightService(
             tracker=tracker,
             minimums=config.hardware,
             run=run,
         )
-        self.ssh = SshService(
-            account=account, deployment=deployment, tracker=tracker, run=run
-        )
-        self.docker = DockerService(
-            deployment=deployment, tracker=tracker, account=account, run=run
-        )
+        self.ssh = SshService(account=account, tracker=tracker, run=run)
+        self.docker = DockerService(tracker=tracker, account=account, run=run)
         self.postgres = PostgresService(
-            deployment=deployment,
             tracker=tracker,
             secrets_env_path=secrets_env_path,
             run=run,
         )
         self.neo4j = Neo4jService(
-            deployment=deployment,
             tracker=tracker,
             secrets_env_path=secrets_env_path,
             run=run,
@@ -93,87 +84,64 @@ class WizardModule:
         )
         # The per-order ISO's /order, copied there at install.
         self.site = SiteService(
-            deployment=deployment,
             tracker=tracker,
             order_dir=base_dir / "order",
             ems_dir=ems_dir,
             analyst_cfg_path=analyst_cfg_path,
         )
         self.hivemq = HivemqService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
         self.telemetry = TelemetryWriterService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
-        self.prometheus = PrometheusService(
-            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
-        )
-        self.mlflow = MlflowService(
-            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
-        )
+        self.prometheus = PrometheusService(tracker=tracker, ems_dir=ems_dir, run=run)
+        self.mlflow = MlflowService(tracker=tracker, ems_dir=ems_dir, run=run)
         self.analyst_model = AnalystModelService(
-            deployment=deployment,
             tracker=tracker,
             order_dir=base_dir / "order",
             ems_dir=ems_dir,
             run=run,
         )
         self.device_api = DeviceApiService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
         self.industrial_gateway = IndustrialGatewayService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
-        self.hmi = HmiService(
-            deployment=deployment, tracker=tracker, ems_dir=ems_dir, run=run
-        )
+        self.hmi = HmiService(tracker=tracker, ems_dir=ems_dir, run=run)
         self.grafana = GrafanaService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
         self.analyst_server = AnalystServerService(
-            deployment=deployment,
             tracker=tracker,
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
         self.der_control = DerControlService(
-            deployment=deployment,
             tracker=tracker,
             order_dir=base_dir / "order",
             ems_dir=ems_dir,
             secrets_env_path=secrets_env_path,
             run=run,
         )
-        self.cloud_secrets = CloudSecretsService(
-            deployment=deployment,
-            tracker=tracker,
-            secrets_env_path=secrets_env_path,
-            ems_dir=ems_dir,
-            run=run,
-        )
         self.ssh_lockdown = SshLockdownService(
-            deployment=deployment,
             tracker=tracker,
             account=account,
             sshd_config_dir=sshd_config_dir,
@@ -194,15 +162,11 @@ class WizardModule:
             analyst_model=self.analyst_model,
             analyst_server=self.analyst_server,
             der_control=self.der_control,
-            cloud_secrets=self.cloud_secrets,
-            variant=config.variant,
             device_api=self.device_api,
             industrial_gateway=self.industrial_gateway,
             hmi=self.hmi,
             grafana=self.grafana,
             ssh_lockdown=self.ssh_lockdown,
             tracker=tracker,
-            deployment=deployment,
             account=account,
-            setup_token=setup_token,
         ).router

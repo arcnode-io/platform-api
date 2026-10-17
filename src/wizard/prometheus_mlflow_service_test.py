@@ -6,13 +6,11 @@ from pathlib import Path
 from src.wizard.mlflow_service import MlflowService
 from src.wizard.prometheus_service import PrometheusService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment
 
 
 def test_prometheus_starts_and_verifies(tmp_path: Path) -> None:
     # Arrange
     service = PrometheusService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         run=FakeRunner(),
@@ -30,7 +28,6 @@ def test_prometheus_starts_and_verifies(tmp_path: Path) -> None:
 def test_mlflow_starts_and_verifies(tmp_path: Path) -> None:
     # Arrange
     service = MlflowService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         run=FakeRunner(),
@@ -52,7 +49,6 @@ def test_prometheus_data_dir_is_owned_by_the_prometheus_user(tmp_path: Path) -> 
     # Arrange
     runner = FakeRunner()
     service = PrometheusService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         run=runner,

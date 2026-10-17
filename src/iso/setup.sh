@@ -79,15 +79,13 @@ echo "==> [8/9] Setting up the first-boot setup wizard (native)"
 # Debian package, so wizard_controller.py uses plain FastAPI APIRouter.
 # Runs as root: it writes the customer's key into their ~/.ssh.
 apt-get install -y python3 python3-fastapi python3-uvicorn python3-pydantic python3-yaml
-# On-prem: the wizard installs the customer's own SSH key. (Cloud boxes get
-# `deployment: cloud` from EC2 UserData — their launch key pair already
-# works.) Hardware minimums ≈ g6e.2xlarge (1x L40S 48 GB, 8 vCPU, 64 GiB).
+# The wizard installs the customer's own SSH key.
+# Hardware minimums ≈ g6e.2xlarge (1x L40S 48 GB, 8 vCPU, 64 GiB).
 # GPU budget, calibrated against `ollama ps` on a real box, at 128k context,
 # 2 parallel, f16 KV, both models resident: gemma4:26b 24.9 GB +
 # qwen3-embedding:4b 8.3 GB (at its own 8k context) +15% headroom = 38 GB,
 # so 48 GB is the next real card size.
 cat > /etc/arcnode/wizard-cfg.yml <<'EOF'
-deployment: on-prem
 hardware:
   vcpus: 8
   memory_gib: 64

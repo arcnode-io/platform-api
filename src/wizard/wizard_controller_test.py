@@ -4,11 +4,9 @@ FastAPI's request validation, not the services called directly."""
 import json
 from pathlib import Path
 
-import pytest
 
 from src.wizard.controller_fixtures import wizard_client
 from src.wizard.wizard_fixtures import FakeRunner, ec2_style_pem, ok
-from src.wizard.wizard_record import Deployment
 
 # Only the signing key: operator and viewer passwords come from the HiveMQ page.
 DEVICE_API_SECRETS: dict[str, str] = {"jwt_secret": "x" * 40}
@@ -47,30 +45,6 @@ def test_hardware_check_returns_every_row_with_its_debug_command(
     }
 
 
-def test_cloud_closes_once_the_passwords_are_set(tmp_path: Path) -> None:
-    # Arrange
-    client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
-
-    # Act — the hardware check alone doesn't close the cloud wizard
-    assert client.post("/api/preflight").json()["verified"] is True
-    still_open = client.get("/").status_code
-
-    # Act — the customer's passwords do
-    secrets = client.post(
-        "/api/cloud-secrets",
-        json={
-            "operator_password": "Operator-pw-1!",
-            "viewer_password": "Viewer-pw-1!",
-            "grafana_password": "Grafana-pw-1!",
-        },
-    )
-
-    # Assert
-    assert still_open == 200
-    assert secrets.json()["verified"] is True
-    assert client.get("/").status_code == 404
-
-
 def test_wizard_stays_open_after_ssh_and_reports_it_done(tmp_path: Path) -> None:
     # Arrange: SSH is only the second on-prem page
     client = wizard_client(tmp_path)
@@ -87,21 +61,16 @@ def test_wizard_stays_open_after_ssh_and_reports_it_done(tmp_path: Path) -> None
     assert config.json()["completed"] == ["preflight", "ssh"]
 
 
-def test_config_tells_the_ui_where_it_runs(tmp_path: Path) -> None:
+def test_config_names_the_login_account_and_the_done_pages(tmp_path: Path) -> None:
     # Arrange
-    client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
+    client = wizard_client(tmp_path)
 
     # Act
     response = client.get("/api/config")
 
     # Assert
     assert response.status_code == 200
-    assert response.json() == {
-        "deployment": "cloud",
-        "badge": "☁️ Commercial",
-        "account": "joe",
-        "completed": [],
-    }
+    assert response.json() == {"account": "joe", "completed": []}
 
 
 def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
@@ -164,30 +133,6 @@ def test_docker_page_reports_the_range_docker_picked(tmp_path: Path) -> None:
     # Assert
     assert response.status_code == 200
     assert response.json()["checks"][1]["detail"] == "172.23.0.0/16, gateway 172.23.0.1"
-
-
-def test_cloud_has_no_hivemq_route(tmp_path: Path) -> None:
-    # Arrange: UserData starts the broker in the cloud
-    client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
-    # Act
-    response = client.post("/api/hivemq", json=BROKER_PASSWORDS)
-
-    # Assert
-    assert response.status_code == 404
-
-
-@pytest.mark.parametrize(
-    "route", ["/api/docker", "/api/postgres", "/api/neo4j", "/api/ollama", "/api/site"]
-)
-def test_cloud_has_no_daemon_routes(tmp_path: Path, route: str) -> None:
-    # Arrange: EC2 sets up Docker; databases + LLM are managed services
-    client = wizard_client(tmp_path, deployment=Deployment.CLOUD)
-
-    # Act
-    response = client.post(route, json={"password": "Pg-pass1!"})
-
-    # Assert
-    assert response.status_code == 404
 
 
 def test_wizard_files_are_revalidated_on_every_load(tmp_path: Path) -> None:

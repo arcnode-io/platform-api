@@ -5,7 +5,6 @@ from pathlib import Path
 
 from src.wizard.telemetry_writer_service import TelemetryWriterService
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment
 
 
 def make_telemetry_service(
@@ -14,7 +13,6 @@ def make_telemetry_service(
     """A service on tmp_path with the Postgres URL already saved by its page."""
     (tmp_path / "secrets.env").write_text("TIMESERIES_URL=postgres://x\n")
     return TelemetryWriterService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         secrets_env_path=tmp_path / "secrets.env",

@@ -12,7 +12,6 @@ from src.wizard.wizard_record import (
     AnalystServerKeys,
     Command,
     CommandOutput,
-    Deployment,
 )
 
 KEYS = AnalystServerKeys(
@@ -23,7 +22,6 @@ KEYS = AnalystServerKeys(
 
 def make_analyst_server(tmp_path: Path, runner: FakeRunner) -> AnalystServerService:
     return AnalystServerService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         secrets_env_path=tmp_path / "secrets.env",

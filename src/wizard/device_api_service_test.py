@@ -8,7 +8,7 @@ from src.wizard.device_api_service import DeviceApiService
 from src.wizard.secrets_env import save_secrets
 from src.wizard.site_fixtures import TEST_ORDER
 from src.wizard.wizard_fixtures import FakeRunner, ok, tracker
-from src.wizard.wizard_record import Deployment, DeviceApiSecrets
+from src.wizard.wizard_record import DeviceApiSecrets
 
 SECRETS = DeviceApiSecrets(jwt_secret="x" * 40)
 # The HiveMQ page saved these before this page runs: one password per role.
@@ -34,7 +34,6 @@ def make_device_api_service(tmp_path: Path, runner: FakeRunner) -> DeviceApiServ
         **{k: v for k, v in runner.queries.items() if k != topology_key},
     }
     return DeviceApiService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=ems_dir,
         secrets_env_path=tmp_path / "secrets.env",

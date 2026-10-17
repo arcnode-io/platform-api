@@ -64,7 +64,6 @@ AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     (OPERATOR_LOGIN.slot, OPERATOR_LOGIN.env_name),
     (VIEWER_LOGIN.slot, VIEWER_LOGIN.env_name),
     (GRAFANA_ADMIN.slot, GRAFANA_ADMIN.env_name),
-    ("setup-token", "SETUP_TOKEN"),
 )
 
 # Static artifacts the EMS team publishes per release to arcnode-public.
@@ -75,15 +74,10 @@ ARCNODE_PUBLIC_BASE_URL: Final[str] = (
 
 # Latest stock Amazon Linux 2023 x86_64 AMI in any region, GovCloud included. CFN resolves
 # this public SSM parameter against `--region` at deploy time, so the template is region-portable
-# without a Mappings table that would go stale every AMI revision. The wizard and its deps
-# are downloaded at boot, so no custom image is needed.
+# without a Mappings table that would go stale every AMI revision.
 AMI_SSM_PARAMETER: Final[str] = (
     "{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}"
 )
-# The wizard bundle CI publishes per release: src/__init__.py, customer_inputs.py, src/wizard/.
-WIZARD_BUNDLE_URL: Final[str] = f"{ARCNODE_PUBLIC_BASE_URL}/wizard/wizard-src.tar.gz"
-WIZARD_SRC_DIR: Final[str] = "/opt/arcnode-wizard-src"
-WIZARD_VENV_DIR: Final[str] = "/opt/arcnode-wizard-venv"
 EMS_SERVICES: Final[tuple[str, ...]] = (
     "ems-device-api",
     "ems-hmi",
@@ -224,14 +218,6 @@ def network_resources() -> dict[str, object]:
                         "IpProtocol": "tcp",
                         "FromPort": 443,
                         "ToPort": 443,
-                        "CidrIp": "0.0.0.0/0",
-                    },
-                    # The setup wizard, over TLS (token-gated). Never opened before, so a
-                    # cloud customer could not reach it at all.
-                    {
-                        "IpProtocol": "tcp",
-                        "FromPort": 8080,
-                        "ToPort": 8080,
                         "CidrIp": "0.0.0.0/0",
                     },
                     # der-control-ingress — mTLS terminator for the utility/
@@ -586,52 +572,6 @@ def build_userdata(
         f'--query SecretString --output text)" >> /opt/arcnode/secrets.env'
         for slot, env_name in url_slots
     )
-    # The cloud setup wizard: the same baked source as the ISO, configured for cloud
-    # with m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU). It starts after secrets.env
-    # holds SETUP_TOKEN, so the gate is never open.
-    wizard_block = (
-        # Stock AL2023 has no python 3.13, and the wizard needs it. pipefail (set above)
-        # makes a failed download stop the boot instead of installing a partial bundle.
-        "dnf install -y python3.13\n"
-        f"mkdir -p {WIZARD_SRC_DIR}\n"
-        f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {WIZARD_BUNDLE_URL} "
-        f"| tar -xz -C {WIZARD_SRC_DIR}\n"
-        f"python3.13 -m venv {WIZARD_VENV_DIR}\n"
-        f"{WIZARD_VENV_DIR}/bin/pip install -r {WIZARD_SRC_DIR}/src/wizard/requirements.txt\n"
-        "mkdir -p /etc/arcnode\n"
-        "cat > /etc/arcnode/wizard-cfg.yml <<YML\n"
-        "deployment: cloud\n"
-        f"variant: {'commercial' if is_commercial else 'defense'}\n"
-        "hardware:\n"
-        "  vcpus: 8\n"
-        "  memory_gib: 32\n"
-        "  gpus: 0\n"
-        "  gpu_memory_gb: 0\n"
-        "  disk_gb: 50\n"
-        "  disk_nvme: false\n"
-        "YML\n"
-        "cat > /etc/systemd/system/arcnode-wizard.service <<UNIT\n"
-        "[Unit]\n"
-        "Description=arcnode setup wizard\n"
-        "After=network-online.target docker.service\n"
-        "[Service]\n"
-        "WorkingDirectory=/opt/arcnode-wizard-src\n"
-        "Environment=PYTHONPATH=/opt/arcnode-wizard-src\n"
-        "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main\n"
-        "Restart=on-failure\n"
-        "[Install]\n"
-        "WantedBy=multi-user.target\n"
-        "UNIT\n"
-        "systemctl daemon-reload\n"
-        "systemctl enable --now arcnode-wizard\n"
-    )
-    # Commercial waits for the wizard: the containers start once the customer saves
-    # their passwords. e2e has no wizard, and defense never had one, so both start here.
-    compose_up_line = (
-        ""
-        if (not e2e)
-        else f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
-    )
     # LFDI allowlist: Secrets Manager holds it multi-line, so newlines become
     # spaces (der-control-api takes whitespace-separated LFDIs) on one secrets.env line.
     lfdi_allowlist_line = (
@@ -889,7 +829,6 @@ def build_userdata(
         f"{lfdi_allowlist_line}"
         "# https-ingress TLS assets (self-signed cert for the Elastic IP) and config.\n"
         f"{https_ingress_block}"
-        f"{wizard_block}"
         "# Broker File RBAC credentials.xml (bind-mounted into hivemq).\n"
         f"{credentials_block}"
         "# der-control-ingress mTLS assets (self-signed server cert, truststore).\n"
@@ -916,7 +855,7 @@ def build_userdata(
         f"{site_cert_block}"
         "# Start the EMS stack — init containers seed DBs\n"
         "# long-runners (hivemq, device-api, hmi, analyst-*) boot.\n"
-        f"{compose_up_line}"
+        f"cd /opt/arcnode && docker compose {compose_files_flag} up -d\n"
         # Give services 60s to settle (or fail) before snapshotting state.
         # Without this, the snapshot catches every container as
         # "Created/Starting" — useless for diagnosis. With it, crashed

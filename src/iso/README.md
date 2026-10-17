@@ -55,10 +55,8 @@ preseeded Debian netinst, proven in small increments on real hardware.
 - **Wizard** — `src/wizard/`, SSH access → review → install. Validates
   the pasted public key with `ssh-keygen` (refuses a pasted private key),
   appends it to `~/.ssh/authorized_keys` of the account created in the
-  installer (UID 1000), then the wizard 404s for good. Reads `deployment: cloud | on-prem` from
-  `/etc/arcnode/wizard-cfg.yml` (`setup.sh` writes `on-prem`); the SSH
-  step is on-prem only — in the cloud EC2 already set SSH up, so the step
-  doesn't exist (`POST /api/ssh` 404s).
+  installer (UID 1000), then the wizard 404s for good. Hardware minimums and
+  Ollama models come from `/etc/arcnode/wizard-cfg.yml`, which `setup.sh` writes.
 
 ## Build + flash
 

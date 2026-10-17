@@ -8,7 +8,7 @@ from src.wizard.hivemq_fixtures import TEMPLATE_TEXT
 from src.wizard.hivemq_service import HivemqService
 from src.wizard.secrets_env import read_secret
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import BrokerPasswords, Deployment
+from src.wizard.wizard_record import BrokerPasswords
 
 PASSWORDS = BrokerPasswords(
     service="Service-pw-1!",
@@ -22,7 +22,6 @@ def make_hivemq_service(tmp_path: Path, runner: FakeRunner) -> HivemqService:
     (tmp_path / "opt").mkdir(exist_ok=True)
     (tmp_path / "opt" / "credentials.template.xml").write_text(TEMPLATE_TEXT)
     return HivemqService(
-        deployment=Deployment.ON_PREM,
         tracker=tracker(tmp_path),
         ems_dir=tmp_path / "opt",
         secrets_env_path=tmp_path / "secrets.env",

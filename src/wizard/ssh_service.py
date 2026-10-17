@@ -11,7 +11,6 @@ from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 from src.wizard.wizard_record import (
     ApplyRequest,
     ApplyResult,
-    Deployment,
     SshAccount,
 )
 
@@ -25,14 +24,9 @@ class InvalidSshKeyError(Exception):
     """The pasted text isn't a single OpenSSH public key."""
 
 
-class SshStepNotAvailableError(Exception):
-    """The SSH step doesn't exist in the cloud — EC2 already set up SSH."""
-
-
 class SshService:
-    """The on-prem SSH step: authorizes the customer's own public key,
-    verifies SSH, and only then disables the wizard. Doesn't exist in the
-    cloud, where the EC2 launch key pair already works.
+    """The SSH step: authorizes the customer's own public key,
+    verifies SSH, and only then disables the wizard.
 
     ``run`` runs the system checks (systemctl, ssh-keyscan, sshd -T) —
     injected because they need root and a real sshd.
@@ -42,12 +36,10 @@ class SshService:
         self,
         *,
         account: SshAccount,
-        deployment: Deployment,
         tracker: StepTracker,
         run: Runner,
     ) -> None:
         self._account = account
-        self._deployment = deployment
         self._tracker = tracker
         self._run = run
 
@@ -56,8 +48,6 @@ class SshService:
         gate: only when every check passes is the wizard marked applied. A
         failed check leaves it open so the person can fix sshd and retry
         (re-applying is safe)."""
-        if self._deployment == Deployment.CLOUD:
-            raise SshStepNotAvailableError("no SSH step in the cloud — EC2 set it up")
         if self._tracker.is_done("ssh"):
             raise StepAlreadyDoneError("SSH is already set up")
         key = request.ssh_public_key.strip()

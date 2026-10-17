@@ -1,5 +1,5 @@
-// preflight-page.jsx — the hardware check, the wizard's first page in
-// every deployment. Hard block: no "continue anyway". Each failed row
+// preflight-page.jsx — the hardware check, the wizard's first page.
+// Hard block: no "continue anyway". Each failed row
 // carries the console command that shows why (from preflight_verify.py).
 
 function StepPreflight({ t, page, onApply }) {

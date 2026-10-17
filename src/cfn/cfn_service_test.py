@@ -10,6 +10,7 @@ Server-side validation (live image pulls, IAM evaluation, real launch)
 happens when the operator actually runs the stack — out of scope here.
 """
 
+import pytest
 import yaml
 from cfnlint import api as cfnlint_api
 
@@ -151,8 +152,7 @@ def test_render_template_ec2_instance_wires_to_subnet_iam_and_ssm_ami() -> None:
 
 
 def test_render_template_userdata_installs_docker_and_starts_compose() -> None:
-    """UserData bootstraps docker + compose, fetches artifacts, and starts the stack.
-    e2e starts at boot; real deploys wait for the wizard."""
+    """UserData bootstraps docker + compose, fetches artifacts, and starts the stack."""
     # Arrange + Act
     rendered = _render(e2e=True)
 
@@ -619,32 +619,9 @@ def test_cloud_instance_is_m7i_2xlarge() -> None:
     assert "InstanceType: m7i.2xlarge" in rendered
 
 
-def test_stack_output_tells_the_owner_where_the_setup_token_is() -> None:
-    """The setup token is a generated secret; the stack Outputs show the exact
-    command to read it and where to paste it. CFN can't show a generated value."""
-    # Arrange + Act
-    rendered = _render(DeploymentContext.COMMERCIAL)
-
-    # Assert
-    assert "SetupToken:" in rendered
-    assert "aws secretsmanager get-secret-value" in rendered
-    assert "arcnode-ems-${AWS::StackName}/setup-token" in rendered
-
-
-def test_userdata_writes_the_setup_token_for_the_wizard() -> None:
-    """The wizard reads the token from secrets.env, the same way the services
-    read their own secrets."""
-    # Arrange + Act
-    rendered = _render(DeploymentContext.COMMERCIAL)
-
-    # Assert
-    assert "SETUP_TOKEN=$(" in rendered
-
-
 def test_cloud_instance_uses_the_stock_al2023_ami_for_every_variant() -> None:
-    """Every cloud variant boots the stock Amazon Linux 2023 AMI, GovCloud included.
-    The box downloads the wizard at boot, so there is no custom image to build or copy.
-    """
+    """Every cloud variant boots the stock Amazon Linux 2023 AMI, GovCloud included,
+    so there is no custom image to build or copy."""
     # Arrange + Act
     commercial = _render(DeploymentContext.COMMERCIAL)
     defense = _render(DeploymentContext.DEFENSE_FORWARD)
@@ -656,59 +633,20 @@ def test_cloud_instance_uses_the_stock_al2023_ami_for_every_variant() -> None:
     assert "base-ami-id" not in commercial
 
 
-def test_userdata_starts_the_cloud_wizard_after_the_secrets_are_written() -> None:
-    """The cloud box downloads the wizard at boot and runs it as a service, configured
-    for cloud with the m7i.2xlarge minimums (8 vCPU, 32 GiB, no GPU), after secrets.env exists.
-    """
+@pytest.mark.parametrize(
+    "context", [DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD]
+)
+def test_userdata_starts_the_containers_once_secrets_env_is_written(
+    context: DeploymentContext,
+) -> None:
+    """The stack's parameters carry every customer input, so the box starts the EMS at boot."""
     # Arrange + Act
-    rendered = _render(DeploymentContext.COMMERCIAL)
-
-    # Assert — configured as cloud, with CPU-only minimums
-    assert "deployment: cloud" in rendered
-    assert "vcpus: 8" in rendered
-    assert "gpus: 0" in rendered
-    # Assert — the bundle and its pinned deps come from arcnode-public at boot, not a baked image
-    assert f"{ARCNODE_PUBLIC_BASE_URL}/wizard/wizard-src.tar.gz" in rendered
-    assert "dnf install -y python3.13" in rendered
-    assert "python3.13 -m venv /opt/arcnode-wizard-venv" in rendered
-    assert (
-        "/opt/arcnode-wizard-venv/bin/pip install -r "
-        "/opt/arcnode-wizard-src/src/wizard/requirements.txt"
-    ) in rendered
-    # Assert — the unit runs the downloaded source, and starts after the token is written
-    assert (
-        "ExecStart=/opt/arcnode-wizard-venv/bin/python -m src.wizard.main" in rendered
-    )
-    assert "systemctl enable --now arcnode-wizard" in rendered
-    assert rendered.index("pip install -r") < rendered.index(
-        "systemctl enable --now arcnode-wizard"
-    )
-    assert rendered.index("SETUP_TOKEN=$(") < rendered.index(
-        "systemctl enable --now arcnode-wizard"
-    )
-
-
-def test_commercial_userdata_leaves_the_containers_to_the_wizard() -> None:
-    """On cloud, the containers start after the customer saves their passwords
-    in the wizard, not at boot with the stack's values."""
-    # Arrange + Act
-    rendered = _render(DeploymentContext.COMMERCIAL)
+    rendered = _render(context)
 
     # Assert
-    assert "docker-compose.yaml up -d" not in rendered
-
-
-def test_defense_userdata_leaves_the_containers_to_the_wizard_and_names_its_variant() -> (
-    None
-):
-    """Defense waits for the wizard like commercial does, and its wizard config
-    says it's defense so the header badge reads Defense."""
-    # Arrange + Act
-    rendered = _render(DeploymentContext.DEFENSE_FORWARD)
-
-    # Assert
-    assert "docker-compose.yaml up -d" not in rendered
-    assert "variant: defense" in rendered
+    assert rendered.index(": > /opt/arcnode/secrets.env") < rendered.index(
+        "docker compose -f docker-compose.yaml up -d"
+    )
 
 
 def test_hmi_overlay_routes_chat_through_the_same_origin_api() -> None:
@@ -739,8 +677,7 @@ def test_userdata_prepares_the_https_ingress_with_a_self_signed_cert_for_the_eip
 
 def test_userdata_hands_the_observability_data_dirs_to_the_containers_users() -> None:
     """Prometheus (uid 65534) and Grafana (uid 472) don't run as root, so a root-owned
-    data dir crash-loops them with 'permission denied'. Found on the first real stock-AMI
-    stack: the wizard fixes this on-prem, the cloud path never did."""
+    data dir crash-loops them with 'permission denied'."""
     # Arrange + Act
     rendered = _render(DeploymentContext.COMMERCIAL)
 
@@ -751,9 +688,8 @@ def test_userdata_hands_the_observability_data_dirs_to_the_containers_users() ->
 
 
 def test_the_instance_firewall_opens_https_for_the_ingress() -> None:
-    """Port 80 redirects to HTTPS and the ingress listens on 443, so the security group has to
-    let 443 in or every customer lands on a dead redirect (found on the first real defense
-    stack: 80 answered 301 → https://<ip>/ and 443 timed out)."""
+    """Port 80 redirects to HTTPS, the ingress listens on 443, and 8443 is the DER control
+    mTLS intake. Nothing else is open."""
     # Arrange + Act
     rendered = _render(DeploymentContext.COMMERCIAL)
     template = yaml.safe_load(rendered)
@@ -762,7 +698,7 @@ def test_the_instance_firewall_opens_https_for_the_ingress() -> None:
     ]
 
     # Assert
-    assert sorted(rule["FromPort"] for rule in ingress) == [80, 443, 8080, 8443]
+    assert sorted(rule["FromPort"] for rule in ingress) == [80, 443, 8443]
     assert all(rule["CidrIp"] == "0.0.0.0/0" for rule in ingress)
 
 
@@ -806,27 +742,11 @@ def test_without_a_callback_the_stack_keeps_the_self_signed_certificate_only() -
     assert "SITE_TOKEN" not in rendered
 
 
-def test_the_certificate_is_written_before_the_wizard_starts() -> None:
-    """The cloud wizard serves HTTPS from the box's certificate, so the self-signed one has to
-    exist before its service starts (it crash-looped otherwise)."""
-    # Arrange + Act
-    rendered = _render(site_callback=CALLBACK)
-
-    # Assert
-    assert rendered.index("-out /opt/arcnode/tls/server.pem") < rendered.index(
-        "systemctl enable --now arcnode-wizard"
-    )
-
-
 def test_the_outputs_point_at_the_dns_name_when_there_is_one() -> None:
     # Arrange + Act
     outputs = yaml.safe_load(_render(site_callback=CALLBACK))["Outputs"]
 
     # Assert
-    assert (
-        outputs["SetupUrl"]["Value"]
-        == "https://nevada-facility-2-abc123.arcnode.io:8080/"
-    )
     assert (
         outputs["BrokerWsUrl"]["Value"]
         == "wss://nevada-facility-2-abc123.arcnode.io/mqtt"
@@ -841,21 +761,6 @@ def test_the_outputs_fall_back_to_the_elastic_ip_over_tls_without_one() -> None:
     # Arrange + Act
     outputs = yaml.safe_load(_render())["Outputs"]
 
-    # Assert — still TLS, never the plain ws:// / http:// the stack used to print
-    assert outputs["SetupUrl"]["Value"] == {"Fn::Sub": "https://${EmsEip}:8080/"}
+    # Assert
     assert outputs["BrokerWsUrl"]["Value"] == {"Fn::Sub": "wss://${EmsEip}/mqtt"}
     assert outputs["DeviceApiUrl"]["Value"] == {"Fn::Sub": "https://${EmsEip}/api"}
-
-
-def test_the_firewall_lets_the_customer_reach_the_wizard_over_tls() -> None:
-    """The wizard listens on 8080 and was never opened: a customer could not reach it at all."""
-    # Arrange
-    ingress = yaml.safe_load(_render())["Resources"]["EmsSecurityGroup"]["Properties"][
-        "SecurityGroupIngress"
-    ]
-
-    # Act
-    ports = sorted(rule["FromPort"] for rule in ingress)
-
-    # Assert
-    assert ports == [80, 443, 8080, 8443]

@@ -5,8 +5,8 @@
 #                        box's address, wait for the DNS name to resolve to it, get a certificate
 #   site-cert.sh renew   weekly: renew if due, install if it changed
 #
-# Until `issue` succeeds the box keeps the self-signed certificate it booted with. The wizard
-# (port 8080) and the HTTPS ingress both read /opt/arcnode/tls/server{,-key}.pem.
+# Until `issue` succeeds the box keeps the self-signed certificate it booted with. The HTTPS
+# ingress reads /opt/arcnode/tls/server{,-key}.pem.
 # Settings come from /etc/arcnode/site-cert.env (UserData writes it):
 #   SITE_HOST, SITE_ADDRESS, SITE_CALLBACK_URL, SITE_TOKEN
 set -euo pipefail
@@ -63,8 +63,7 @@ install_certificate() {
   fi
   install -m 0644 "$LIVE/fullchain.pem" "$TLS_DIR/server.pem"
   install -m 0600 "$LIVE/privkey.pem" "$TLS_DIR/server-key.pem"
-  # The wizard reads its certificate at start; the ingress at reload.
-  systemctl restart arcnode-wizard
+  # The ingress reads its certificate at reload.
   local ingress
   ingress="$(ingress_container)"
   if [ -n "$ingress" ]; then

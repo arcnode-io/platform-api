@@ -21,7 +21,6 @@ from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     BrokerPasswords,
-    Deployment,
     StepResult,
 )
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
@@ -34,23 +33,17 @@ CONFIG_FILE: Final[str] = "config.env"
 STARTED_LINE: Final[str] = "Started HiveMQ"
 
 
-class HivemqStepNotAvailableError(Exception):
-    """No HiveMQ page in the cloud — UserData starts the broker there."""
-
-
 class HivemqService:
     """Everything the EMS containers need from the on-prem broker."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         ems_dir: Path,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._ems_dir = ems_dir
         self._secrets_env_path = secrets_env_path
@@ -59,8 +52,6 @@ class HivemqService:
     def apply(self, request: BrokerPasswords) -> StepResult:
         """Write the files, start the broker, verify — the page is only marked
         done when every check passes. Every step is idempotent, so a retry is safe."""
-        if self._deployment == Deployment.CLOUD:
-            raise HivemqStepNotAvailableError("no HiveMQ step in the cloud")
         if self._tracker.is_done("hivemq"):
             raise StepAlreadyDoneError("HiveMQ is already set up")
         self._write_files(request)

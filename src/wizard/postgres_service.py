@@ -19,7 +19,6 @@ from src.wizard.secrets_env import save_secrets
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import (
     Command,
-    Deployment,
     DockerNetwork,
     PasswordRequest,
     StepResult,
@@ -48,22 +47,16 @@ PSQL_SCRIPT: Final[list[str]] = [
 ]  # fmt: skip
 
 
-class PostgresStepNotAvailableError(Exception):
-    """No PostgreSQL page in the cloud — databases are managed services."""
-
-
 class PostgresService:
     """Everything the EMS containers need from the host's PostgreSQL."""
 
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         secrets_env_path: Path,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._secrets_env_path = secrets_env_path
         self._run = run
@@ -71,8 +64,6 @@ class PostgresService:
     def apply(self, request: PasswordRequest) -> StepResult:
         """Configure, then verify — the page is only marked done when every
         check passes. Every step is idempotent, so a retry is safe."""
-        if self._deployment == Deployment.CLOUD:
-            raise PostgresStepNotAvailableError("no PostgreSQL step in the cloud")
         if self._tracker.is_done("postgres"):
             raise StepAlreadyDoneError("PostgreSQL is already set up")
         network = read_network(self._run)

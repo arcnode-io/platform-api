@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from src.wizard.docker_service import DockerService, DockerStepNotAvailableError
+from src.wizard.docker_service import DockerService
 from src.wizard.wizard_fixtures import FakeRunner, account, ok, tracker
-from src.wizard.wizard_record import Command, CommandOutput, Deployment
+from src.wizard.wizard_record import Command, CommandOutput
 from src.wizard.wizard_steps import StepAlreadyDoneError
 
 
@@ -28,12 +28,9 @@ class FreshDocker(FakeRunner):
         return output
 
 
-def _service(
-    tmp_path: Path, runner: FakeRunner, deployment: Deployment = Deployment.ON_PREM
-) -> DockerService:
+def _service(tmp_path: Path, runner: FakeRunner) -> DockerService:
     return DockerService(
-        deployment=deployment,
-        tracker=tracker(tmp_path, deployment),
+        tracker=tracker(tmp_path),
         account=account(tmp_path),
         run=runner,
     )
@@ -87,22 +84,12 @@ def test_done_page_refuses_a_redo(tmp_path: Path) -> None:
         service.apply()
 
 
-def test_no_docker_page_in_the_cloud(tmp_path: Path) -> None:
-    # Arrange
-    service = _service(tmp_path, FakeRunner(), Deployment.CLOUD)
-
-    # Act / Assert
-    with pytest.raises(DockerStepNotAvailableError):
-        service.apply()
-
-
 def test_the_installer_account_joins_the_docker_group(tmp_path: Path) -> None:
     """The customer can run docker without sudo after setup, same as the account they created."""
     # Arrange
     runner = FakeRunner()
     service = DockerService(
-        deployment=Deployment.ON_PREM,
-        tracker=tracker(tmp_path, Deployment.ON_PREM),
+        tracker=tracker(tmp_path),
         account=account(tmp_path),
         run=runner,
     )

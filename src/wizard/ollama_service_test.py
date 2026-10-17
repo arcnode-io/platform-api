@@ -4,13 +4,10 @@ download."""
 
 from pathlib import Path
 
-import pytest
 import yaml
 
-from src.wizard.ollama_fixtures import PRODUCTION, FakeStream, make_ollama_service
-from src.wizard.ollama_service import OllamaStepNotAvailableError
+from src.wizard.ollama_fixtures import FakeStream, make_ollama_service
 from src.wizard.wizard_fixtures import FakeRunner, tracker
-from src.wizard.wizard_record import Deployment
 
 
 def test_healthy_box_streams_progress_then_a_verified_result(tmp_path: Path) -> None:
@@ -92,13 +89,3 @@ def test_a_failed_download_stops_before_preparing_anything(tmp_path: Path) -> No
     assert not any("/api/create" in c for c in called)
     assert not (tmp_path / "analyst-cfg.customer.yml").exists()
     assert events[-1].result is not None and not events[-1].result.verified
-
-
-def test_cloud_has_no_ollama_page(tmp_path: Path) -> None:
-    # Arrange
-    cloud = PRODUCTION.model_copy(update={"deployment": Deployment.CLOUD})
-    service = make_ollama_service(tmp_path, config=cloud)
-
-    # Act / Assert — refused up front, before any stream starts
-    with pytest.raises(OllamaStepNotAvailableError):
-        service.apply()

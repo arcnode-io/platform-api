@@ -3,12 +3,8 @@ itself was installed at install time by src/iso/phases/docker.sh."""
 
 from src.wizard.docker_verify import DOCKER_NETWORK, inspect_network, verify_docker
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import SshAccount, Command, Deployment, StepResult
+from src.wizard.wizard_record import SshAccount, Command, StepResult
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
-
-
-class DockerStepNotAvailableError(Exception):
-    """No Docker page in the cloud — EC2 UserData sets Docker up."""
 
 
 class DockerService:
@@ -17,12 +13,10 @@ class DockerService:
     def __init__(
         self,
         *,
-        deployment: Deployment,
         tracker: StepTracker,
         account: SshAccount,
         run: Runner,
     ) -> None:
-        self._deployment = deployment
         self._tracker = tracker
         self._account = account
         self._run = run
@@ -30,8 +24,6 @@ class DockerService:
     def apply(self) -> StepResult:
         """Create arcnode if missing, then verify — the page is marked done
         only when every check passes."""
-        if self._deployment == Deployment.CLOUD:
-            raise DockerStepNotAvailableError("no Docker step in the cloud")
         if self._tracker.is_done("docker"):
             raise StepAlreadyDoneError("Docker is already set up")
         # Reason: never recreate it — a new network can get a new range, and
