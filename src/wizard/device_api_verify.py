@@ -1,5 +1,6 @@
 """Playbook-style checks for the Device API page: it answers, an operator can
-log in, the topology it loaded matches the order's, it reached the broker."""
+log in with the password the HiveMQ page set, the topology it loaded matches
+the order's, it reached the broker."""
 
 import json
 from pathlib import Path
@@ -8,9 +9,9 @@ from typing import Final
 from src.customer_inputs import OPERATOR_LOGIN, VIEWER_LOGIN
 from src.wizard.containers_compose import compose_command
 from src.wizard.docker_verify import DOCKER_NETWORK
-from src.wizard.secrets_env import saved_check
+from src.wizard.secrets_env import read_secret, saved_check
 from src.wizard.system_runner import Runner
-from src.wizard.wizard_record import Command, DeviceApiSecrets, VerifyCheck
+from src.wizard.wizard_record import Command, VerifyCheck
 
 DEVICE_API_SERVICE: Final[str] = "device-api"
 BASE_URL: Final[str] = "http://device-api:3000"
@@ -29,13 +30,13 @@ LOG_HINT: Final[str] = (
 
 
 def verify_device_api(
-    run: Runner, secrets: DeviceApiSecrets, secrets_env_path: Path, ems_dir: Path
+    run: Runner, secrets_env_path: Path, ems_dir: Path
 ) -> list[VerifyCheck]:
     """Answers → operator login → topology matches the order → broker connected → saved."""
     return [
         _answers(run),
         _spec_served(run),
-        _operator_login(run, secrets),
+        _operator_login(run, secrets_env_path),
         _topology(run, ems_dir),
         _broker_connected(run, ems_dir),
         saved_check(secrets_env_path, SAVED_NAMES),
@@ -88,10 +89,18 @@ def _spec_served(run: Runner) -> VerifyCheck:
     )
 
 
-def _operator_login(run: Runner, secrets: DeviceApiSecrets) -> VerifyCheck:
-    body = json.dumps(
-        {"username": OPERATOR_USERNAME, "password": secrets.operator_password}
-    )
+def _operator_login(run: Runner, secrets_env_path: Path) -> VerifyCheck:
+    """Logs in with the operator password the HiveMQ page saved — the same one
+    the operator's broker account uses."""
+    password = read_secret(secrets_env_path, OPERATOR_LOGIN.env_name)
+    if password is None:
+        return VerifyCheck(
+            name="Operator can log in",
+            ok=False,
+            detail="no operator password saved — the HiveMQ page sets it",
+            hint=f"sudo cut -d= -f1 {secrets_env_path}",
+        )
+    body = json.dumps({"username": OPERATOR_USERNAME, "password": password})
     out = run(
         _probe(
             [

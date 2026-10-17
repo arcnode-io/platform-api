@@ -174,9 +174,10 @@ class DockerNetwork(BaseModel):
 
 
 class BrokerPasswords(BaseModel):
-    """POST /api/hivemq body — the customer's three broker passwords. The four
-    service accounts share `service`; operator and viewer are people. Nothing
-    is generated (customer-sets-all-secrets)."""
+    """POST /api/hivemq body — the customer's three passwords. The four service
+    accounts share `service`; operator and viewer are people, and each one's
+    password is both their HMI login and their broker account (one password per
+    role). Nothing is generated (customer-sets-all-secrets)."""
 
     service: str = Field(min_length=8)
     operator: str = Field(min_length=8)
@@ -274,18 +275,11 @@ class AnalystServerKeys(BaseModel):
 
 
 class DeviceApiSecrets(BaseModel):
-    """POST /api/device-api body — the auth secrets the Device API signs and
-    checks logins with. The customer sets all three."""
+    """POST /api/device-api body — the key the Device API signs sessions with.
+    The operator and viewer passwords it checks logins against were set on the
+    HiveMQ page (one password per role)."""
 
     jwt_secret: str = Field(min_length=32)
-    operator_password: str = Field(min_length=8)
-    viewer_password: str = Field(min_length=8)
-
-    @field_validator("operator_password", "viewer_password")
-    @classmethod
-    def password_meets_complexity(cls, value: str) -> str:
-        """Same policy as the daemon passwords."""
-        return check_complexity(value)
 
 
 class SshLockdownRequest(BaseModel):

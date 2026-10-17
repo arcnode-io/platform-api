@@ -10,11 +10,8 @@ from src.wizard.controller_fixtures import wizard_client
 from src.wizard.wizard_fixtures import FakeRunner, ec2_style_pem, ok
 from src.wizard.wizard_record import Deployment
 
-DEVICE_API_SECRETS: dict[str, str] = {
-    "jwt_secret": "x" * 40,
-    "operator_password": "Operator-pw-1!",
-    "viewer_password": "Viewer-pw-1!",
-}
+# Only the signing key: operator and viewer passwords come from the HiveMQ page.
+DEVICE_API_SECRETS: dict[str, str] = {"jwt_secret": "x" * 40}
 ANALYST_SERVER_KEYS: dict[str, str] = {
     "openweathermap_api_key": "owm-key-1234",
     "gridstatus_api_key": "grid-key-1234",

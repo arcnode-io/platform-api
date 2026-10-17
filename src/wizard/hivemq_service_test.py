@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.wizard.hivemq_fixtures import TEMPLATE_TEXT
 from src.wizard.hivemq_service import HivemqService
+from src.wizard.secrets_env import read_secret
 from src.wizard.wizard_fixtures import FakeRunner, tracker
 from src.wizard.wizard_record import BrokerPasswords, Deployment
 
@@ -60,6 +61,24 @@ def test_service_password_fills_all_four_service_accounts(tmp_path: Path) -> Non
     credentials = (tmp_path / "opt" / "credentials.xml").read_text()
     assert credentials.count(PASSWORDS.service) == 4
     assert PASSWORDS.operator in credentials and PASSWORDS.viewer in credentials
+
+
+def test_the_operator_and_viewer_passwords_are_also_their_hmi_logins(
+    tmp_path: Path,
+) -> None:
+    """One password per role: what the operator types into the HMI is what their
+    broker account uses, so the wizard asks for it once, here."""
+    # Arrange
+    service = make_hivemq_service(tmp_path, FakeRunner())
+
+    # Act
+    service.apply(PASSWORDS)
+
+    # Assert
+    secrets_env = tmp_path / "secrets.env"
+    assert read_secret(secrets_env, "AUTH_OPERATOR_PW") == PASSWORDS.operator
+    assert read_secret(secrets_env, "AUTH_VIEWER_PW") == PASSWORDS.viewer
+    assert read_secret(secrets_env, "MQTT_OPERATOR_PASSWORD") == PASSWORDS.operator
 
 
 def test_no_password_reaches_argv(tmp_path: Path) -> None:

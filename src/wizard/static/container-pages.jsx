@@ -65,13 +65,14 @@ function StepSite({ t, page, info, onApply }) {
 window.StepSite = StepSite;
 
 // ─── HiveMQ ──────────────────────────────────────────────────────────
-// One password per broker account. The EMS services log in with these, so
-// the page takes all six before it starts the broker.
-// The four EMS services share one service password; operator and viewer are people.
+// Three passwords, taken before the broker starts. The four EMS services share
+// one service password; operator and viewer are people, and each one's password
+// is both their HMI login and their broker account (one password per role), so
+// the Device API page asks for neither.
 const BROKER_ACCOUNTS = [
   { key: 'service',  label: 'Service password (gateway, Device API, telemetry, DER control)' },
-  { key: 'operator', label: 'Operator' },
-  { key: 'viewer',   label: 'Viewer' },
+  { key: 'operator', label: 'Operator password (HMI login and broker)' },
+  { key: 'viewer',   label: 'Viewer password (HMI login and broker)' },
 ];
 
 function StepHivemq({ t, page, passwords, onPassword, onApply }) {
@@ -84,7 +85,7 @@ function StepHivemq({ t, page, passwords, onPassword, onApply }) {
     : page.state === 'unverified' ? 'Try again' : 'Install & verify';
   return (
     <StepShellW t={t} title="HiveMQ"
-      blurb="Set one password for each account that connects to the MQTT broker. The EMS services log in with these, and each account can only do what its job needs.">
+      blurb="Set one password for the EMS services and one each for the operator and viewer. The operator and viewer passwords log them in to the HMI and to the MQTT broker, and each account can only do what its job needs.">
       {BROKER_ACCOUNTS.map(a => {
         const value   = passwords[a.key] || '';
         const problem = value ? passwordProblem(value) : null;
@@ -221,37 +222,24 @@ function StepMlflow({ t, page, onApply }) {
 
 
 // ─── Device API ──────────────────────────────────────────────────────
-// The signing key and the two login passwords the Device API checks against.
+// The signing key only: the operator and viewer passwords it checks logins
+// against were set on the HiveMQ page (one password per role).
 function StepDeviceApi({ t, page, secrets, onSecret, onApply }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
   const jwtOk      = secrets.jwt_secret && secrets.jwt_secret.length >= 32;
-  const opProblem  = secrets.operator_password ? passwordProblem(secrets.operator_password) : null;
-  const viProblem  = secrets.viewer_password ? passwordProblem(secrets.viewer_password) : null;
-  const canApply   = !isApplying && !isDone && jwtOk && secrets.operator_password && secrets.viewer_password && !opProblem && !viProblem;
+  const canApply   = !isApplying && !isDone && jwtOk;
   const buttonLabel = isApplying ? 'Verifying'
     : page.state === 'unverified' ? 'Try again' : 'Install & verify';
   return (
     <StepShellW t={t} title="Device API"
-      blurb="The signing key that logs people in to the HMI, plus the operator and viewer passwords. The Device API serves your site's topology and checks these logins.">
+      blurb="The key that signs HMI sessions. The Device API serves your site's topology and checks logins against the operator and viewer passwords you set on the HiveMQ page.">
       <div style={{ marginBottom: SPACE[4] }}>
         <FieldLabelW t={t} required>JWT signing key</FieldLabelW>
         <PasswordInputW t={t} label="JWT signing key" value={secrets.jwt_secret || ''}
           onChange={v => onSecret('jwt_secret', v)} disabled={isApplying || isDone}
           error={!!secrets.jwt_secret && !jwtOk}/>
         <HelperW t={t} error={!!secrets.jwt_secret && !jwtOk}>At least 32 characters.</HelperW>
-      </div>
-      <div style={{ marginBottom: SPACE[4] }}>
-        <FieldLabelW t={t} required>Operator password</FieldLabelW>
-        <PasswordInputW t={t} label="Operator password" value={secrets.operator_password || ''}
-          onChange={v => onSecret('operator_password', v)} disabled={isApplying || isDone} error={!!opProblem}/>
-        {opProblem && <HelperW t={t} error>{opProblem}</HelperW>}
-      </div>
-      <div style={{ marginBottom: SPACE[4] }}>
-        <FieldLabelW t={t} required>Viewer password</FieldLabelW>
-        <PasswordInputW t={t} label="Viewer password" value={secrets.viewer_password || ''}
-          onChange={v => onSecret('viewer_password', v)} disabled={isApplying || isDone} error={!!viProblem}/>
-        {viProblem && <HelperW t={t} error>{viProblem}</HelperW>}
       </div>
       {!isDone && (
         <button onClick={canApply ? onApply : undefined} disabled={!canApply}

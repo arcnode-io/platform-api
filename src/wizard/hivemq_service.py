@@ -1,11 +1,14 @@
-"""The on-prem HiveMQ page: write the broker's account file from the six
-passwords the customer sets, save those passwords for the EMS services, start
-the broker on the arcnode network, verify every login. Docker was set up by
-the Docker page; the compose file is the cloud's, from arcnode-public."""
+"""The on-prem HiveMQ page: write the broker's account file from the three
+passwords the customer sets, save them for the EMS services, start the broker
+on the arcnode network, verify every login. The operator and viewer passwords
+are also their HMI logins (one password per role), so they're saved under both
+names here and the Device API page asks for neither. Docker was set up by the
+Docker page; the compose file is the cloud's, from arcnode-public."""
 
 from pathlib import Path
 from typing import Final
 
+from src.customer_inputs import OPERATOR_LOGIN, VIEWER_LOGIN
 from src.wizard.containers_compose import (
     ONPREM_OVERRIDE,
     ONPREM_OVERRIDE_FILE,
@@ -89,10 +92,14 @@ class HivemqService:
         (self._ems_dir / ONPREM_OVERRIDE_FILE).write_text(ONPREM_OVERRIDE)
 
     def _env_values(self, request: BrokerPasswords) -> dict[str, str]:
-        """The six MQTT_*_PASSWORD names the cloud's secrets.env uses."""
+        """The six MQTT_*_PASSWORD names the cloud's secrets.env uses, plus the
+        two HMI login names: one password per role."""
         return {
             env: getattr(request, password_field)
             for _, _, env, password_field in ACCOUNTS
+        } | {
+            OPERATOR_LOGIN.env_name: request.operator,
+            VIEWER_LOGIN.env_name: request.viewer,
         }
 
     def _wait_for_started(self) -> bool:

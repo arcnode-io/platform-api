@@ -2,14 +2,15 @@
 anonymous logins, every account's password logs in, and the passwords are
 saved for the EMS services. Each check's hint is the command that debugs it."""
 
+from pathlib import Path
 from typing import Final
 
+from src.customer_inputs import OPERATOR_LOGIN, VIEWER_LOGIN
 from src.wizard.containers_compose import compose_command
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.secrets_env import saved_check
 from src.wizard.system_runner import Runner
 from src.wizard.wizard_record import BrokerPasswords, Command, VerifyCheck
-from pathlib import Path
 
 HIVEMQ_SERVICE: Final[str] = "hivemq"
 BROKER_HOST: Final[str] = "hivemq"
@@ -42,6 +43,12 @@ ACCOUNTS: Final[tuple[tuple[str, str, str, str], ...]] = (
         "service",
     ),
 )
+# What the page leaves in secrets.env: every broker account, and the operator
+# and viewer HMI logins, which are the same passwords (one password per role).
+SAVED_NAMES: Final[list[str]] = [env for _, _, env, _ in ACCOUNTS] + [
+    OPERATOR_LOGIN.env_name,
+    VIEWER_LOGIN.env_name,
+]
 
 
 def verify_hivemq(
@@ -52,7 +59,7 @@ def verify_hivemq(
         _container_running(run, ems_dir),
         _anonymous_refused(run),
         _logins_accepted(run, passwords),
-        saved_check(secrets_env_path, [env for _, _, env, _ in ACCOUNTS]),
+        saved_check(secrets_env_path, SAVED_NAMES),
     ]
 
 
