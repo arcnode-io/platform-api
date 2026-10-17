@@ -218,9 +218,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
                 for a in final.edp_artifacts
                 if a.kind == ArtifactKind.BOM and a.format == "json"
             )
-            assert ls.url in bom_json.url, (
-                f"expected platform-api to re-archive into LocalStack S3; got {bom_json.url}"
-            )
+            assert (
+                ls.url in bom_json.url
+            ), f"expected platform-api to re-archive into LocalStack S3; got {bom_json.url}"
 
             # Assert — bytes actually landed in the bucket (artifacts + portal)
             s3 = boto3.client(
@@ -264,9 +264,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
                 if VALID_PAYLOAD["contact_email"]
                 in m.get("Destination", {}).get("ToAddresses", [])
             ]
-            assert len(delivery_emails) == 1, (
-                f"expected one delivery email; got {len(delivery_emails)}"
-            )
+            assert (
+                len(delivery_emails) == 1
+            ), f"expected one delivery email; got {len(delivery_emails)}"
             body = delivery_emails[0].get("Body", {}).get("text_part", "")
             portal_url = _extract_portal_url(body)
             # Reason: the emailed portal link is presigned, so check its path and its 7-day expiry.
@@ -298,9 +298,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             for f in files:
                 resp = httpx.get(f.url)
                 assert resp.status_code == 200, f"{f.url}: {resp.status_code}"
-                assert len(resp.content) == f.size_bytes, (
-                    f"{f.url}: manifest says {f.size_bytes} bytes, served {len(resp.content)}"
-                )
+                assert (
+                    len(resp.content) == f.size_bytes
+                ), f"{f.url}: manifest says {f.size_bytes} bytes, served {len(resp.content)}"
 
             # Assert — every archived artifact is served as what it is, so the browser
             # opens it (order 51de5d81 shipped all 23 of them as application/json)
@@ -326,9 +326,9 @@ def test_order_full_pipeline_publishes_portal_and_emails_link(tmp_path: Path) ->
             with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
                 assert sorted(archive.namelist()) == sorted(e.path for e in expected)
                 for entry in expected:
-                    assert archive.read(entry.path) == httpx.get(entry.url).content, (
-                        entry.path
-                    )
+                    assert (
+                        archive.read(entry.path) == httpx.get(entry.url).content
+                    ), entry.path
 
 
 # All 4 deployment-profile combinations the resolver supports today.
@@ -407,16 +407,16 @@ def test_all_profile_combinations_reach_complete(tmp_path: Path) -> None:
                         "deployment_site_name": f"site-{ctx}-{coupling}",
                     }
                     submit = client.post("/platform-api/orders", json=payload)
-                    assert submit.status_code == 202, (
-                        f"{ctx}/{coupling}/{partition}: {submit.text}"
-                    )
+                    assert (
+                        submit.status_code == 202
+                    ), f"{ctx}/{coupling}/{partition}: {submit.text}"
                     order_id = submit.json()["order_id"]
 
                     final = _poll_until_complete(client, order_id)
                     label = f"{ctx}/{coupling}/{partition}"
-                    assert final.status.value == "complete", (
-                        f"{label}: {final.model_dump()}"
-                    )
+                    assert (
+                        final.status.value == "complete"
+                    ), f"{label}: {final.model_dump()}"
                     assert final.ems_delivery is not None, label
                     assert final.ems_delivery.path.value == expected_path, label
                     kinds = {a.kind for a in final.edp_artifacts}
