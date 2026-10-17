@@ -12,12 +12,12 @@ def test_on_prem_closes_only_after_every_page_is_done(tmp_path: Path) -> None:
 
     # Act
     tracker.mark_done("preflight")
-    tracker.mark_done("identity")
+    tracker.mark_done("site")
     tracker.mark_done("ssh")
 
-    # Assert: the hardware check, the identity and SSH aren't the whole wizard
+    # Assert: the hardware check, the order's site and SSH aren't the whole wizard
     assert (tracker.completed(), tracker.all_done()) == (
-        ["preflight", "identity", "ssh"],
+        ["preflight", "site", "ssh"],
         False,
     )
     tracker.mark_done("docker")
@@ -26,8 +26,6 @@ def test_on_prem_closes_only_after_every_page_is_done(tmp_path: Path) -> None:
     tracker.mark_done("neo4j")
     assert not tracker.all_done()
     tracker.mark_done("ollama")
-    assert not tracker.all_done()
-    tracker.mark_done("site")
     assert not tracker.all_done()
     tracker.mark_done("hivemq")
     assert not tracker.all_done()

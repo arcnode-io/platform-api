@@ -12,17 +12,16 @@ from src.wizard.wizard_record import Deployment
 
 STEPS_BY_DEPLOYMENT: Final[dict[Deployment, tuple[str, ...]]] = {
     # The hardware check is the root of the dependency graph — first everywhere.
-    # Then the order's site, which every EMS container reads.
     Deployment.ON_PREM: (
         "preflight",
-        # Right after the hardware check: the customer confirms this is their site's ISO.
-        "identity",
+        # Right after the hardware check: the customer confirms this is their site's
+        # ISO, which hands the order to every EMS container that runs later.
+        "site",
         "ssh",
         "docker",
         "postgres",
         "neo4j",
         "ollama",
-        "site",
         "hivemq",
         "telemetry",
         "device_api",

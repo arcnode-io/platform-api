@@ -19,7 +19,6 @@ from src.wizard.device_api_service import (
 )
 from src.wizard.grafana_service import GrafanaService, GrafanaStepNotAvailableError
 from src.wizard.hmi_service import HmiService, HmiStepNotAvailableError
-from src.wizard.identity_service import IdentityService, IdentityStepNotAvailableError
 from src.wizard.ssh_lockdown_service import (
     SshKeyNotProvenError,
     SshLockdownService,
@@ -79,9 +78,9 @@ from src.wizard.wizard_record import (
     BrokerPasswords,
     Deployment,
     DeviceApiSecrets,
-    IdentityInfo,
     PasswordRequest,
     SetupInfo,
+    SiteInfo,
     SshAccount,
     SshLockdownRequest,
     StepResult,
@@ -138,7 +137,6 @@ class WizardController:
         hmi: HmiService,
         grafana: GrafanaService,
         ssh_lockdown: SshLockdownService,
-        identity: IdentityService,
         tracker: StepTracker,
         deployment: Deployment,
         account: SshAccount,
@@ -165,7 +163,6 @@ class WizardController:
         self._hmi = hmi
         self._grafana = grafana
         self._ssh_lockdown = ssh_lockdown
-        self._identity = identity
         self._tracker = tracker
         self._deployment = deployment
         self._variant = variant
@@ -178,15 +175,14 @@ class WizardController:
             ("GET", "/", self.index),
             ("GET", "/{filename}", self.static_asset),
             ("GET", "/api/config", self.config),
-            ("GET", "/api/identity", self.identity_info),
-            ("POST", "/api/identity", self.identity),
             ("POST", "/api/preflight", self.preflight),
+            ("GET", "/api/site", self.site_info),
+            ("POST", "/api/site", self.site),
             ("POST", "/api/ssh", self.ssh),
             ("POST", "/api/docker", self.docker),
             ("POST", "/api/postgres", self.postgres),
             ("POST", "/api/neo4j", self.neo4j),
             ("POST", "/api/ollama", self.ollama),
-            ("POST", "/api/site", self.site),
             ("POST", "/api/hivemq", self.hivemq),
             ("POST", "/api/telemetry", self.telemetry),
             ("POST", "/api/prometheus", self.prometheus),
@@ -288,8 +284,15 @@ class WizardController:
         lines = (event.model_dump_json(exclude_none=True) + "\n" for event in events)
         return StreamingResponse(lines, media_type="application/x-ndjson")
 
+    def site_info(self) -> SiteInfo:
+        """The order this ISO was built for — see SiteService.info."""
+        try:
+            return self._site.info()
+        except SiteStepNotAvailableError as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
     def site(self) -> StepResult:
-        """The on-prem Site page — see SiteService.apply."""
+        """The on-prem Site page: the customer confirms the order — see SiteService.apply."""
         try:
             return self._site.apply()
         except (StepAlreadyDoneError, SiteStepNotAvailableError) as exc:
@@ -392,20 +395,6 @@ class WizardController:
         try:
             return self._grafana.apply(request)
         except (StepAlreadyDoneError, GrafanaStepNotAvailableError) as exc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-    def identity_info(self) -> IdentityInfo:
-        """The site identity this ISO was built for — see IdentityService.info."""
-        try:
-            return self._identity.info()
-        except IdentityStepNotAvailableError as exc:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-
-    def identity(self) -> StepResult:
-        """The customer confirms the identity — see IdentityService.confirm."""
-        try:
-            return self._identity.confirm()
-        except (StepAlreadyDoneError, IdentityStepNotAvailableError) as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     def ssh_lockdown(self, request: SshLockdownRequest) -> StepResult:

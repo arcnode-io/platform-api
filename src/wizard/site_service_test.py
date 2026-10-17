@@ -1,5 +1,6 @@
-"""Unit tests for the Site page — the order lands as the same files the
-cloud's UserData writes, and a box with no order says so."""
+"""Unit tests for the Site page — it shows the order the configurator baked into
+this ISO, and confirming lands it as the same files the cloud's UserData writes.
+A box with no order says so."""
 
 import shutil
 from pathlib import Path
@@ -15,6 +16,40 @@ from src.wizard.wizard_record import Deployment
 
 def _yaml(path: Path) -> object:
     return yaml.safe_load(path.read_text())
+
+
+def test_info_reports_what_the_configurator_baked_into_the_iso(tmp_path: Path) -> None:
+    # Arrange
+    service = make_site_service(tmp_path)
+
+    # Act
+    info = service.info()
+
+    # Assert
+    assert (info.customer, info.site, info.order_id) == (
+        "Test customer",
+        "Test site",
+        "test-mode",
+    )
+    assert info.market == "ercot · HB_HOUSTON"
+
+
+def test_an_order_without_identity_fields_still_reports_its_site_id(
+    tmp_path: Path,
+) -> None:
+    """Older orders carry only the original three fields."""
+    # Arrange
+    order = tmp_path / "old-order"
+    shutil.copytree(TEST_ORDER, order)
+    (order / "site.yml").write_text("site_id: test_site\nmarket_region: ercot\n")
+    service = make_site_service(tmp_path, order=order)
+
+    # Act
+    info = service.info()
+
+    # Assert
+    assert (info.customer, info.site, info.order_id) == (None, "test_site", None)
+    assert info.market == "ercot"
 
 
 def test_saves_the_orders_site_for_every_ems_container(tmp_path: Path) -> None:
@@ -106,5 +141,7 @@ def test_cloud_has_no_site_page(tmp_path: Path) -> None:
     service = make_site_service(tmp_path, deployment=Deployment.CLOUD)
 
     # Act / Assert
+    with pytest.raises(SiteStepNotAvailableError):
+        service.info()
     with pytest.raises(SiteStepNotAvailableError):
         service.apply()

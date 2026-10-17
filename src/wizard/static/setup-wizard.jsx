@@ -11,13 +11,12 @@ const { useState: useStateW, useEffect: useEffectW } = React;
 // Each step lists the deployments it exists in — the body filters to this
 // box's deployment. SSH is on-prem only: in the cloud EC2 already set it up.
 const ALL_STEPS = [
-  { id: 'identity', n: 1, title: 'Site identity', sub: 'Confirm your order', deployments: ['on-prem'] },
-  { id: 'ssh',      n: 1, title: 'SSH access', sub: 'Add + verify your key',    deployments: ['on-prem'] },
-  { id: 'docker',   n: 2, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
-  { id: 'postgres', n: 3, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
-  { id: 'neo4j',    n: 4, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
-  { id: 'ollama',   n: 5, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
-  { id: 'site',     n: 6, title: 'Site',       sub: 'From your order',           deployments: ['on-prem'] },
+  { id: 'site',     n: 1, title: 'Site',       sub: 'Confirm your order',        deployments: ['on-prem'] },
+  { id: 'ssh',      n: 2, title: 'SSH access', sub: 'Add + verify your key',    deployments: ['on-prem'] },
+  { id: 'docker',   n: 3, title: 'Docker',     sub: 'Container network',         deployments: ['on-prem'] },
+  { id: 'postgres', n: 4, title: 'PostgreSQL', sub: 'Password + databases',      deployments: ['on-prem'] },
+  { id: 'neo4j',    n: 5, title: 'Neo4j',      sub: 'Password + graph',          deployments: ['on-prem'] },
+  { id: 'ollama',   n: 6, title: 'Ollama',     sub: 'AI models',                 deployments: ['on-prem'] },
   { id: 'hivemq',   n: 7, title: 'HiveMQ',     sub: 'Broker accounts',           deployments: ['on-prem'] },
   { id: 'telemetry', n: 8, title: 'Telemetry writer', sub: 'Saves measurements', deployments: ['on-prem'] },
   { id: 'device_api', n: 9, title: 'Device API', sub: 'Login + topology', deployments: ['on-prem'] },
@@ -589,8 +588,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [pgPassword, setPgPassword] = useStateW('');
   const [neo4jPassword, setNeo4jPassword] = useStateW('');
   const [grafanaPassword, setGrafanaPassword] = useStateW('');
-  // The order's identity, shown read-only on the first page (on-prem only).
-  const [identity, setIdentity] = useStateW(null);
+  // The order this ISO was built for, shown read-only on the Site page (on-prem only).
+  const [siteInfo, setSiteInfo] = useStateW(null);
   // Checked by default: key-only SSH is the recommended end state.
   const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
   // One password per MQTT broker account, keyed as the API expects.
@@ -716,7 +715,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   };
   useEffectW(() => {
     if (!setup || setup.deployment !== 'on-prem') return;
-    fetch('/api/identity').then(r => (r.ok ? r.json() : null)).then(setIdentity).catch(() => setIdentity(null));
+    fetch('/api/site').then(r => (r.ok ? r.json() : null)).then(setSiteInfo).catch(() => setSiteInfo(null));
   }, [setup]);
   const onJump = (id) => setCurrent(id);
   // Every page verified: show the end screen instead of the last page.
@@ -769,7 +768,7 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
             <StepOllama t={t} page={pageOf('ollama')} downloads={downloads} onApply={applyOllama}/>
           )}
           {shown === 'site' && (
-            <StepSite t={t} page={pageOf('site')}
+            <StepSite t={t} page={pageOf('site')} info={siteInfo}
               onApply={() => applyStep('site', '/api/site', {})}/>
           )}
           {shown === 'prometheus' && (
@@ -786,10 +785,6 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {shown === 'hmi' && (
             <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
-          )}
-          {shown === 'identity' && (
-            <StepIdentity t={t} page={pageOf('identity')} identity={identity}
-              onApply={() => applyStep('identity', '/api/identity', {})}/>
           )}
           {shown === 'ssh_lockdown' && (
             <StepSshLockdown t={t} page={pageOf('ssh_lockdown')} checked={lockdownPasswords} onChecked={setLockdownPasswords}

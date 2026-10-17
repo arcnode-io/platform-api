@@ -6,7 +6,6 @@ from typing import Final
 from src.wizard.device_api_service import DeviceApiService
 from src.wizard.docker_service import DockerService
 from src.wizard.grafana_service import GrafanaService
-from src.wizard.identity_service import IdentityService
 from src.wizard.ssh_lockdown_service import SshLockdownService
 from src.wizard.hmi_service import HmiService
 from src.wizard.industrial_gateway_service import IndustrialGatewayService
@@ -180,9 +179,6 @@ class WizardModule:
             sshd_config_dir=sshd_config_dir,
             run=run,
         )
-        self.identity = IdentityService(
-            deployment=deployment, tracker=tracker, order_dir=base_dir / "order"
-        )
         self.router = WizardController(
             preflight=self.preflight,
             ssh=self.ssh,
@@ -205,7 +201,6 @@ class WizardModule:
             hmi=self.hmi,
             grafana=self.grafana,
             ssh_lockdown=self.ssh_lockdown,
-            identity=self.identity,
             tracker=tracker,
             deployment=deployment,
             account=account,

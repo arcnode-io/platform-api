@@ -294,9 +294,9 @@ class SshLockdownRequest(BaseModel):
     disable_password_login: bool = True
 
 
-class IdentityInfo(BaseModel):
-    """The first page's read-only facts, from the order the configurator baked in.
-    None where the order doesn't carry the field (generic ISO / test mode)."""
+class SiteInfo(BaseModel):
+    """The Site page's read-only rows, from the order the configurator baked in.
+    None where the order doesn't carry the field (older orders)."""
 
     customer: str | None
     site: str

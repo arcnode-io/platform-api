@@ -1,5 +1,7 @@
-"""The on-prem Site page: the per-order ISO carried the order's site and
-device topology to /etc/arcnode/order; this page hands them to the EMS
+"""The on-prem Site page, right after the hardware check. The per-order ISO
+carried the order's site and device topology to /etc/arcnode/order. The page
+shows whose order it is (customer, site, market, order id) so the customer
+stops here if it's the wrong ISO; confirming hands the order to the EMS
 containers as the same files the cloud's UserData writes."""
 
 import shutil
@@ -20,16 +22,17 @@ from src.wizard.ems_cfg import (
     write_yaml,
 )
 from src.wizard.order_record import DTM_FILE, SITE_FILE, OrderDtm, OrderSite
-from src.wizard.wizard_record import Deployment, StepResult, VerifyCheck
+from src.wizard.wizard_record import Deployment, SiteInfo, StepResult, VerifyCheck
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
 
 class SiteStepNotAvailableError(Exception):
-    """No Site page in the cloud — UserData writes these files from the order."""
+    """No Site page in the cloud — the stack's parameters name the site and
+    UserData writes these files from the order."""
 
 
 class SiteService:
-    """Order → dtm.json + gateway/HMI/analyst cfg files in /opt/arcnode."""
+    """Order → the page's rows, then dtm.json + gateway/HMI/analyst cfg files in /opt/arcnode."""
 
     def __init__(
         self,
@@ -46,11 +49,27 @@ class SiteService:
         self._ems_dir = ems_dir
         self._analyst_cfg_path = analyst_cfg_path
 
-    def apply(self) -> StepResult:
-        """Save the order's site for every container, then verify. Rewrites
-        the same files on a retry, so it's safe to repeat."""
+    def info(self) -> SiteInfo:
+        """What this ISO was built for, from /etc/arcnode/order/site.yml."""
         if self._deployment == Deployment.CLOUD:
-            raise SiteStepNotAvailableError("no Site step in the cloud")
+            raise SiteStepNotAvailableError("no Site page in the cloud")
+        site = OrderSite.model_validate(
+            yaml.safe_load((self._order_dir / SITE_FILE).read_text())
+        )
+        market = " · ".join(filter(None, (site.market_region, site.settlement_point)))
+        return SiteInfo(
+            customer=site.customer,
+            site=site.site_name or site.site_id,
+            market=market or None,
+            order_id=site.order_id,
+        )
+
+    def apply(self) -> StepResult:
+        """The customer confirmed it's their site: save the order for every
+        container, then verify. Rewrites the same files on a retry, so it's
+        safe to repeat."""
+        if self._deployment == Deployment.CLOUD:
+            raise SiteStepNotAvailableError("no Site page in the cloud")
         if self._tracker.is_done("site"):
             raise StepAlreadyDoneError("the site is already set up")
         site_path = self._order_dir / SITE_FILE
