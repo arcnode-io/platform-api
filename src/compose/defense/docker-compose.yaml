@@ -2,13 +2,12 @@
 #
 # Persistence: Aurora only — document slice (device-api topology) +
 # timeseries slice with pg_partman for `measurements` (live broker
-# ingest, fed by telemetry-writer). Analyst stack (ercot-solar
-# reference data, vector, graph) will land alongside ems-analyst-model
-# when it's integrated; that service self-seeds its own domain tables
-# from public S3, so platform-api just provisions Aurora.
+# ingest, fed by telemetry-writer). The analyst stack self-seeds its
+# domain tables (ercot-solar reference data, vector, graph) from public
+# S3, so platform-api just provisions Aurora.
 #
 # Boot order:
-#   1. hivemq + mock-modbus-server start
+#   1. hivemq starts
 #   2. device-api seeds topology from /opt/arcnode/dtm.json (idempotent)
 #   3. telemetry-writer subscribes to MQTT, INSERTs into measurements
 #   4. industrial-gateway publishes telemetry, hmi serves UI
