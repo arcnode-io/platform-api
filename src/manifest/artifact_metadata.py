@@ -105,14 +105,11 @@ MOCK_SYSTEM_IMAGE_TEMPLATES: Final[dict[str, ArtifactMetadata]] = {
         subtitle="Android 7.0+ · APK",
     ),
     # On-prem: the generic installer with this order's site + devices baked
-    # in (src/iso/iso_service.py). Presigned, so the link expires.
+    # in (src/iso/iso_service.py).
     "appliance_iso": ArtifactMetadata(
         section=ManifestSection.SYSTEM_IMAGES,
         name="Appliance Installer",
-        subtitle=(
-            "Debian 13 USB installer · x86-64 · carries your site's devices · "
-            "link valid 7 days"
-        ),
+        subtitle=("Debian 13 USB installer · x86-64 · carries your site's devices"),
     ),
     # Copy per delivery-portal-cloud.jsx (C2).
     "aws_deployment": ArtifactMetadata(

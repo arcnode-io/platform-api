@@ -45,7 +45,7 @@ from src.orders.orders_record import (
 from src.portal.portal_service import PortalService
 from src.wizard.order_record import OrderSite
 
-# Reason: SigV4 caps a presigned link at 7 days; the portal link is the only gate.
+# Reason: SigV4 caps a presigned link at 7 days, which matches the bucket rule deleting the files.
 DELIVERY_LINK_EXPIRY_S: Final[int] = 604800
 
 
@@ -190,7 +190,7 @@ class OrchestratorService:
         """Render + upload per-order delivery artifacts; expose their S3 URLs.
 
         ISO path: the base ISO with the order's site + DTM baked into /order.
-        CFN paths: yaml + presigned DTM URL — operator runs from their partition.
+        CFN paths: yaml + the DTM's plain URL — operator runs from their partition.
         Both get the site from `_order_site`, so they can't disagree.
         """
         path = derive_delivery_path(payload.aws_partition)
@@ -202,10 +202,9 @@ class OrchestratorService:
                 path=path, iso_url=baked.url, iso_size_bytes=baked.size_bytes
             )
         dtm_key = f"orders/{order_id}/dtm.json"
-        dtm_presigned_url = await self._s3.generate_presigned_url(dtm_key)
         template = self._cfn.render_template(
             deployment_uuid=order_id,
-            dtm_url=dtm_presigned_url,
+            dtm_url=self._s3.public_url(dtm_key),
             site_id=site.site_id,
             market_region=site.market_region,
             settlement_point=site.settlement_point,
@@ -239,7 +238,7 @@ class OrchestratorService:
         body links to).
         """
         system_artifacts = await self._build_system_artifacts(delivery)
-        # Reason: the zip is plain; the presigned portal link is the gate, and it expires.
+        # Reason: every file link is plain; only the portal page link is signed.
         bundle_url = self._s3.public_url(f"orders/{order_id}/arcnode.zip")
         manifest = self._manifest.build(
             bundle_url=bundle_url,
@@ -256,7 +255,7 @@ class OrchestratorService:
         await self._s3.upload_json(f"orders/{order_id}/manifest.json", manifest_json)
         index_key = f"orders/{order_id}/index.html"
         await self._s3.upload_html(index_key, html)
-        # Reason: retention. The portal link dies after 7 days (SigV4 cap), and the files go with it.
+        # Reason: the portal link dies at 7 days, the same day the bucket rule deletes the files.
         return await self._s3.generate_presigned_url(
             index_key, expiration_seconds=DELIVERY_LINK_EXPIRY_S
         )

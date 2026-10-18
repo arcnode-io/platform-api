@@ -37,7 +37,7 @@ class OrderEmsDelivery(BaseModel):
 
     Path derived from `aws_partition`. CFN paths: a per-order CFN template at
     `template_url`. ISO path: the appliance installer with the order baked
-    in (src/iso/iso_service.py) at `iso_url`, a 7-day presigned link.
+    in (src/iso/iso_service.py) at `iso_url`, a plain link.
     """
 
     path: DeliveryPath

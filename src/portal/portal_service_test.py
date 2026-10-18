@@ -237,14 +237,13 @@ def test_render_drops_signed_badge_when_unsigned() -> None:
     assert "SIGNED" not in html
 
 
-def test_render_footer_pre_signed_url_notice() -> None:
-    """Footer states the 7-day expiration policy on pre-signed URLs."""
+def test_render_footer_states_the_7_day_file_retention() -> None:
+    """Footer says the files go away 7 days after delivery (the bucket rule)."""
     # Arrange + Act
     html = PortalService().render(manifest=_manifest())
 
     # Assert
-    assert "Pre-signed URLs" in html
-    assert "expire 7 days" in html
+    assert "Files are deleted 7 days after delivery" in html
 
 
 def test_render_loads_required_fonts() -> None:

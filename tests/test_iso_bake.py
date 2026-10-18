@@ -43,3 +43,5 @@ def test_bake_adds_the_order_to_the_base_iso(tmp_path: Path) -> None:
     assert (out / "order" / "dtm.json").read_text() == dtm
     assert (out / "preseed.cfg").exists()
     assert baked.size_bytes == downloaded.stat().st_size
+    # Same plain link as every other file on the portal; the bucket rule deletes it at 7 days.
+    assert baked.url == s3.public_url(f"orders/{ORDER_ID}/arcnode-ems.iso")

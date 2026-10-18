@@ -835,7 +835,7 @@ def build_userdata(
         "-o /opt/arcnode/docker-compose.yaml\n"
         f"{fixtures_fetch_line}"
         f"{observability_lines}\n"
-        "# Fetch the Device Topology Manifest via presigned URL (valid 24h).\n"
+        "# Fetch the Device Topology Manifest from the order's delivery files (deleted 7 days after delivery).\n"
         "# device-api bind-mounts this file read-only at /app/dtm.json and reads\n"
         "# it on boot per system_adr §22 - fatal here so compose never starts\n"
         "# with a missing/stale DTM.\n"

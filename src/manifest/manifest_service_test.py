@@ -11,9 +11,7 @@ from src.manifest.manifest_record import (
 from src.manifest.manifest_service import ManifestService
 
 BUILT_AT: datetime = datetime(2026, 4, 29, 18, 42, tzinfo=UTC)
-BUNDLE_URL: str = (
-    "https://bucket.s3.amazonaws.com/orders/x/arcnode.zip?X-Amz-Signature=abc"
-)
+BUNDLE_URL: str = "https://bucket.s3.amazonaws.com/orders/x/arcnode.zip"
 
 
 def _service() -> ManifestService:
@@ -154,8 +152,8 @@ def test_build_reports_unsigned_until_manifest_signing_exists() -> None:
     assert m.key_id is None
 
 
-def test_build_puts_the_presigned_bundle_url_in_the_header_and_curl_line() -> None:
-    """The bundle link is the presigned URL the orchestrator signed, shown as-is."""
+def test_build_puts_the_bundle_url_in_the_header_and_curl_line() -> None:
+    """The bundle link is the zip's plain URL, shown as-is."""
     # Arrange + Act
     m = _service().build(
         bundle_url=BUNDLE_URL,

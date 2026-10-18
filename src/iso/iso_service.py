@@ -18,13 +18,10 @@ from src.aws.s3_service import S3Service
 from src.wizard.order_record import DTM_FILE, SITE_FILE, OrderSite
 
 ISO_CONTENT_TYPE: Final[str] = "application/x-iso9660-image"
-# S3's SigV4 maximum. Reason: the ISO holds the order's topology, so it
-# can't be public; a never-expiring link needs portal login first.
-LINK_SECONDS: Final[int] = 7 * 24 * 3600
 
 
 class BakedIso(BaseModel):
-    """The per-order ISO's download link + size (for the portal's chip)."""
+    """The per-order ISO's plain download link + size (for the portal's chip)."""
 
     url: str
     size_bytes: int
@@ -62,7 +59,7 @@ class IsoService:
             await _check_order(baked, order, work / "check")
             key = f"orders/{order_id}/arcnode-ems.iso"
             size = await self._s3.upload_file(key, baked, ISO_CONTENT_TYPE)
-        url = await self._s3.generate_presigned_url(key, LINK_SECONDS)
+        url = self._s3.public_url(key)
         logging.info("baked order %s into %s (%d bytes)", order_id, key, size)
         return BakedIso(url=url, size_bytes=size)
 
