@@ -285,13 +285,12 @@ def test_hmi_is_only_reached_through_the_https_ingress(variant_path: Path) -> No
     assert "/opt/arcnode/acme:/var/www/acme:ro" in ingress["volumes"]
 
 
-def test_der_control_api_reads_its_customer_config() -> None:
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_der_control_api_reads_its_customer_config(variant_path: Path) -> None:
     """der-control-api merges its per-deployment keys (siteId, utilityMirrorUrl,
     publicBaseUrl) over its ENV block from a file mounted read-only."""
     # Arrange + Act
-    service = yaml.safe_load(COMMERCIAL_COMPOSE.read_text())["services"][
-        "der-control-api"
-    ]
+    service = yaml.safe_load(variant_path.read_text())["services"]["der-control-api"]
 
     # Assert
     assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
