@@ -9,7 +9,8 @@ Reads ``Slices`` from the CFN custom resource properties (e.g.
   2. Installs the per-slice extension when needed (``pgvector`` for vector,
      ``pg_partman`` for timeseries).
   3. For timeseries: hardcoded SQL creates the ``measurements`` parent table
-     (partitioned by RANGE on ``ts``) and registers it with pg_partman.
+     (partitioned by RANGE on ``ts``), registers it with pg_partman, and
+     schedules pg_partman's hourly maintenance with pg_cron.
   4. Writes each slice's connection URL to Secrets Manager under
      ``arcnode-ems-{STACK}/<slice>-url``. Every URL logs in as the master
      user with the customer's database password, same as on-prem: one
@@ -43,9 +44,9 @@ SLICE_SPECS: dict[str, tuple[str, str | None]] = {
 # measurements — the broker-ingest landing table. Every MQTT publish a
 # gateway sends gets written here by the telemetry-writer sidecar. JSONB value column
 # matches the polymorphic MQTT payload (float | bool | enum). Hourly
-# partitions managed by pg_partman with 7-day retention (rolled-off
-# partitions dropped, not archived). Analyst-API consumers read from this
-# same table.
+# partitions managed by pg_partman; telemetry-writer sets the retention
+# window the customer picked (expired partitions are dropped, not archived).
+# Analyst-API consumers read from this same table.
 MEASUREMENTS_SCHEMA_SQL: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS measurements (
@@ -69,15 +70,31 @@ MEASUREMENTS_SCHEMA_SQL: tuple[str, ...] = (
         WHERE parent_table = 'public.measurements'
     )
     """,
+    # Reason: keep making partitions on schedule even through a gap in telemetry.
     """
     UPDATE partman.part_config
-       SET retention = '7 days',
-           retention_keep_table = false
+       SET infinite_time_partitions = true
      WHERE parent_table = 'public.measurements'
     """,
     """
     CREATE INDEX IF NOT EXISTS idx_measurements_lookup
         ON measurements (site_id, device_id, measurement, ts DESC)
+    """,
+)
+
+
+# pg_partman only makes and drops partitions when its maintenance runs. pg_cron
+# keeps its jobs in the postgres db (Aurora's cron.database_name) and runs this
+# one in ems_timeseries. Same job name → re-running updates it, no duplicate.
+PARTITION_MAINTENANCE_SQL: tuple[str, ...] = (
+    "CREATE EXTENSION IF NOT EXISTS pg_cron",
+    """
+    SELECT cron.schedule_in_database(
+        'partman-maintenance',
+        '@hourly',
+        'CALL partman.run_maintenance_proc()',
+        'ems_timeseries'
+    )
     """,
 )
 
@@ -148,6 +165,9 @@ def _create(event: dict) -> dict:
         finally:
             slice_conn.close()
 
+    if "timeseries" in slices:
+        _run_in_postgres_db(cluster_endpoint, master_user, master_pw)
+
     # Phase 3 — write per-slice connection URLs to Secrets Manager.
     # Reason: the customer picks the password, so it's percent-encoded to survive the URL.
     user = urllib.parse.quote(master_user, safe="")
@@ -170,6 +190,20 @@ def _create_db_if_missing(cur: Any, db_name: str) -> None:
     cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db_name,))
     if cur.fetchone() is None:
         cur.execute(f"CREATE DATABASE {db_name}")
+
+
+def _run_in_postgres_db(cluster_endpoint: str, user: str, password: str) -> None:
+    """Schedule partition maintenance from the postgres db, where pg_cron lives."""
+    conn = psycopg2.connect(
+        host=cluster_endpoint, user=user, password=password, dbname="postgres"
+    )
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            for stmt in PARTITION_MAINTENANCE_SQL:
+                cur.execute(stmt)
+    finally:
+        conn.close()
 
 
 def _put_secret(sm: Any, name: str, value: str) -> None:

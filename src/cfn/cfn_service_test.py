@@ -761,3 +761,19 @@ def test_the_outputs_fall_back_to_the_elastic_ip_over_tls_without_one() -> None:
     # Assert
     assert outputs["BrokerWsUrl"]["Value"] == {"Fn::Sub": "wss://${EmsEip}/mqtt"}
     assert outputs["DeviceApiUrl"]["Value"] == {"Fn::Sub": "https://${EmsEip}/api"}
+
+
+@pytest.mark.parametrize(
+    "context", [DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD]
+)
+def test_the_customer_picks_the_telemetry_window(context: DeploymentContext) -> None:
+    """TelemetryRetentionDays defaults to 7 and lands in telemetry-writer's overlay."""
+    # Arrange + Act
+    rendered = _render(context)
+    template = yaml.safe_load(rendered)
+
+    # Assert
+    param = template["Parameters"]["TelemetryRetentionDays"]
+    assert (param["Type"], param["Default"], param["MinValue"]) == ("Number", 7, 1)
+    assert "cat > /opt/arcnode/telemetry-writer-cfg.customer.yml" in rendered
+    assert "retention_days: ${TelemetryRetentionDays}" in rendered

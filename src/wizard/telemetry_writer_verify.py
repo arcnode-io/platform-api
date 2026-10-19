@@ -18,13 +18,15 @@ LOG_HINT: Final[str] = (
 
 
 def verify_telemetry(
-    run: Runner, secrets_env_path: Path, ems_dir: Path
+    run: Runner, secrets_env_path: Path, ems_dir: Path, retention_days: int
 ) -> list[VerifyCheck]:
-    """Running → subscribed to the broker → the database URL it writes to is saved."""
+    """Running → subscribed to the broker → the database URL it writes to is
+    saved → the database drops measurements past the customer's window."""
     return [
         _running(run, ems_dir),
         _subscribed(run, ems_dir),
         _timeseries_saved(secrets_env_path),
+        _retention(run, ems_dir, retention_days),
     ]
 
 
@@ -69,4 +71,16 @@ def _timeseries_saved(secrets_env_path: Path) -> VerifyCheck:
             else f"{TIMESERIES_URL} missing — finish the PostgreSQL page"
         ),
         hint=f"sudo cut -d= -f1 {secrets_env_path}",
+    )
+
+
+def _retention(run: Runner, ems_dir: Path, days: int) -> VerifyCheck:
+    # The writer logs this after it sets the database's retention policy.
+    line = f"measurements retention: {days} days"
+    applied = line in run(compose_command(ems_dir, "logs", TELEMETRY_SERVICE)).stdout
+    return VerifyCheck(
+        name=f"Keeps {days} days of measurements",
+        ok=applied,
+        detail=line if applied else "the writer hasn't set this window yet",
+        hint=LOG_HINT,
     )

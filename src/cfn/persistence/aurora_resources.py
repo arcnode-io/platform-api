@@ -6,8 +6,18 @@ private subnets is a future hardening step (introduces NAT, changes
 cost; out of scope here).
 """
 
-from pathlib import Path
 from typing import Final
+
+from src.cfn.persistence.aurora_bootstrap_resources import (
+    DEFAULT_LAMBDA_RUNTIME,
+    MASTER_USERNAME,
+    PSYCOPG2_LAYER_ARN_TEMPLATE,
+    aurora_bootstrap_resources,
+)
+from src.cfn.persistence.aurora_maintenance import (
+    PARAMETER_GROUP,
+    pg_cron_parameter_group,
+)
 
 # Pinned to a minor AWS still offers AND cfn-lint's catalog knows: 16.4 was withdrawn
 # and every commercial CreateStack failed with "Cannot find version 16.4" (e2e,
@@ -15,23 +25,9 @@ from typing import Final
 # `aws rds describe-db-engine-versions --engine aurora-postgresql` and cfn-lint.
 ENGINE_VERSION: Final[str] = "16.13"
 SECONDS_UNTIL_AUTO_PAUSE: Final[int] = 300  # 5 min idle → auto-pause
-MASTER_USERNAME: Final[str] = "ems_master"
 DB_PASSWORD_PARAM: Final[str] = (
     "DbPassword"  # noqa: S105  # nosec B105 — a parameter name
 )
-LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
-# Public psycopg2 layer for python3.13. Replace with self-published layer
-# once a stable arcnode-hosted layer is available; arn shown is a known
-# community publisher — region must be substituted at template-render time.
-PSYCOPG2_LAYER_ARN_TEMPLATE: Final[str] = (
-    "arn:${AWS::Partition}:lambda:${AWS::Region}:878287304298:layer:psycopg2-py313:1"
-)
-DEFAULT_LAMBDA_RUNTIME: Final[str] = "python3.13"
-
-
-def _load_lambda_source(filename: str) -> str:
-    """Read a Lambda source file as a string for embedding in CFN ZipFile."""
-    return (LAMBDA_CODE_DIR / filename).read_text()
 
 
 # Per-variant Aurora slice sets. Commercial keeps document + vector
@@ -144,97 +140,19 @@ def aurora_cluster_resources(
                 "DBInstanceClass": "db.serverless",
                 "Engine": "aurora-postgresql",
                 "EngineVersion": ENGINE_VERSION,
-            },
-        },
-        "AuroraBootstrapLambdaRole": {
-            "Type": "AWS::IAM::Role",
-            "Properties": {
-                "AssumeRolePolicyDocument": {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"Service": "lambda.amazonaws.com"},
-                            "Action": "sts:AssumeRole",
-                        }
-                    ],
-                },
-                "ManagedPolicyArns": [
-                    {
-                        "Fn::Sub": "arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole",
-                    },
-                ],
-                "Policies": [
-                    {
-                        "PolicyName": "aurora-bootstrap-secrets",
-                        "PolicyDocument": {
-                            "Version": "2012-10-17",
-                            "Statement": [
-                                {
-                                    "Effect": "Allow",
-                                    "Action": [
-                                        "secretsmanager:GetSecretValue",
-                                        "secretsmanager:PutSecretValue",
-                                    ],
-                                    "Resource": "*",
-                                }
-                            ],
-                        },
-                    }
-                ],
-            },
-        },
-        "AuroraBootstrapLambda": {
-            "Type": "AWS::Lambda::Function",
-            "Properties": {
-                "Runtime": lambda_runtime,
-                "Handler": "index.handler",
-                "Role": {"Fn::GetAtt": ["AuroraBootstrapLambdaRole", "Arn"]},
-                "Timeout": 300,
-                "Code": {"ZipFile": _load_lambda_source("aurora_bootstrap.py")},
-                "VpcConfig": {
-                    "SubnetIds": [{"Ref": "EmsSubnet"}],
-                    "SecurityGroupIds": [{"Ref": "EmsSecurityGroup"}],
-                },
                 **(
-                    {"Layers": [{"Fn::Sub": psycopg2_layer_arn_template}]}
-                    if psycopg2_layer_arn_template is not None
+                    {"DBParameterGroupName": {"Ref": PARAMETER_GROUP}}
+                    if "timeseries" in slices
                     else {}
                 ),
             },
         },
-        "AuroraBootstrapCustomResource": {
-            "Type": "Custom::AuroraBootstrap",
-            # DeletionPolicy + UpdateReplacePolicy = Retain: CFN does NOT
-            # invoke the Lambda on stack delete. The Aurora cluster is being
-            # deleted anyway, so the per-slice DBs + app users go with it —
-            # the Delete handler is a no-op in our code. Skipping it dodges
-            # an upstream Lambda-in-VPC bug where the Hyperplane ENI loses
-            # its route to the S3 CFN ResponseURL after sitting idle ~20min
-            # post-create, causing the Lambda to time out and CFN to hang
-            # ~1hr before declaring DELETE_FAILED. Verified live 2026-05-17:
-            # CREATE works in 4s, DELETE timed out at 246s on same ENI.
-            "DeletionPolicy": "Retain",
-            "UpdateReplacePolicy": "Retain",
-            # Lambda writes connection URLs into the slice secrets via
-            # PutSecretValue → they must exist before invoke.
-            "DependsOn": [
-                "AuroraInstance",
-                *(f"AuroraSlice{s.title()}Secret" for s in slices),
-            ],
-            "Properties": {
-                "ServiceToken": {"Fn::GetAtt": ["AuroraBootstrapLambda", "Arn"]},
-                "ClusterEndpoint": {
-                    "Fn::GetAtt": ["AuroraCluster", "Endpoint.Address"]
-                },
-                "MasterSecretArn": {"Ref": "AuroraMasterSecret"},
-                "MasterUsername": MASTER_USERNAME,
-                "DeploymentUuid": {"Ref": "AWS::StackName"},
-                # Per-variant slice list — Lambda creates one db per slice and
-                # writes its connection string to arcnode-ems-{STACK}/<slice>-url.
-                "Slices": list(slices),
-            },
-        },
+        **(pg_cron_parameter_group(ENGINE_VERSION) if "timeseries" in slices else {}),
+        **aurora_bootstrap_resources(
+            lambda_runtime=lambda_runtime,
+            psycopg2_layer_arn_template=psycopg2_layer_arn_template,
+            slices=slices,
+        ),
     }
 
 

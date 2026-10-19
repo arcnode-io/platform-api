@@ -99,7 +99,8 @@ class FakeRunner:
             ),
             "-u arcnode_": ok(""),
             "logs telemetry-writer": ok(
-                "measurements bootstrap done\nsubscribed to sites/+/devices/+/measurements/# (reason_code=Success)\n"
+                "measurements bootstrap done\nmeasurements retention: 7 days\n"
+                "subscribed to sites/+/devices/+/measurements/# (reason_code=Success)\n"
             ),
             "logs prometheus": ok(
                 'level=INFO msg="Server is ready to receive web requests."\n'

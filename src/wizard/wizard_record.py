@@ -108,6 +108,12 @@ def check_complexity(value: str) -> str:
     return value
 
 
+class TelemetryRequest(BaseModel):
+    """POST /api/telemetry body — how many days of measurements to keep."""
+
+    retention_days: int = Field(ge=1)
+
+
 class PasswordRequest(BaseModel):
     """POST /api/postgres, /api/neo4j body — the daemon's admin password.
 

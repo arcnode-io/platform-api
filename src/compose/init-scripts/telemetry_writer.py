@@ -7,8 +7,10 @@ Subscribes to ``sites/+/devices/+/measurements/+/+`` per the topic
 contract in system_adr §9 and writes one row per publish.
 
 Env contract (compose env_file: /opt/arcnode/secrets.env):
-    TIMESERIES_URL  - postgres://user:pass@host:port/dbname
-    BROKER          - broker hostname on the compose network (default: hivemq)
+    TIMESERIES_URL    - postgres://user:pass@host:port/dbname
+    BROKER            - broker hostname on the compose network (default: hivemq)
+    CFG_CUSTOMER_PATH - the deployment's overlay; ``retention_days`` is how
+                        long measurements are kept (the customer picks it)
 """
 
 import json
@@ -16,8 +18,9 @@ import os
 
 import paho.mqtt.client as mqtt
 import psycopg2
+import yaml
+from psycopg2.extensions import connection
 
-TIMESERIES_URL = os.environ["TIMESERIES_URL"]
 BROKER = os.environ.get("BROKER", "hivemq")
 # Broker runs File RBAC since v1 — authenticate as the arcnode_telemetry_writer
 # identity (sub measurements). Password from env; anonymous is rejected.
@@ -31,7 +34,7 @@ INSERT_SQL = (
     "VALUES (%s::timestamptz, %s, %s, %s, %s, %s::jsonb)"
 )
 
-# Idempotent schema bootstrap — runs every restart, three-tier safe.
+# Idempotent schema bootstrap — runs every restart, on every deployment.
 # Defense uses Aurora + pg_partman (no TimescaleDB), so the hypertable
 # call must be conditional on the extension being present. Tiger Cloud
 # ships TimescaleDB preinstalled; on-prem operators install it on
@@ -89,7 +92,7 @@ def on_connect(
 
 def on_message(
     _client: mqtt.Client,
-    _userdata: object,
+    conn: connection,
     msg: mqtt.MQTTMessage,
     _properties: object = None,
 ) -> None:
@@ -118,26 +121,76 @@ def on_message(
         print(f"insert failed on {msg.topic}: {e}", flush=True)
 
 
-conn = psycopg2.connect(TIMESERIES_URL)
-conn.autocommit = True
-# Per-statement try: on defense the Aurora bootstrap Lambda already
-# created the table + index as the master user, and telemetry-writer
-# connects as ems_ts_app (GRANT ALL, but not the owner). Postgres
-# requires ownership for CREATE INDEX even with IF NOT EXISTS — log
-# and continue. On commercial (Tiger) + on-prem (self-hosted) the
-# writer creates first → owns → all statements succeed.
-with conn.cursor() as _cur:
-    for _stmt in SCHEMA_SQL:
-        try:
-            _cur.execute(_stmt)
-        except psycopg2.Error as _e:
-            print(f"schema bootstrap skip: {_e}", flush=True)
-print("measurements bootstrap done", flush=True)
-# paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
-# supported callback shape for new code (extra `properties` arg, etc.).
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client.on_connect = on_connect
-client.on_message = on_message
-client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-client.connect(BROKER, 1883, keepalive=60)
-client.loop_forever()
+def bootstrap_schema(conn: connection) -> None:
+    """Create measurements if it's missing. On defense the Aurora bootstrap
+    Lambda already made it (partitioned), so every statement is a no-op there."""
+    with conn.cursor() as cur:
+        for stmt in SCHEMA_SQL:
+            cur.execute(stmt)
+    print("measurements bootstrap done", flush=True)
+
+
+def apply_retention(conn: connection, days: int) -> None:
+    """Keep `days` of measurements; older rows get dropped by the database itself.
+
+    TimescaleDB (commercial, on-prem) runs a retention job; pg_partman (defense)
+    drops expired partitions when its pg_cron maintenance runs. Re-applied on
+    every start, so a changed window takes over from the old one.
+    """
+    window = f"{days} days"
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT extname FROM pg_extension "
+            "WHERE extname IN ('timescaledb', 'pg_partman')"
+        )
+        extensions = {row[0] for row in cur.fetchall()}
+        if "timescaledb" in extensions:
+            # Reason: add_retention_policy won't change an existing policy's window.
+            cur.execute(
+                "SELECT remove_retention_policy('measurements', if_exists => true)"
+            )
+            cur.execute(
+                "SELECT add_retention_policy('measurements', drop_after => %s::interval)",
+                (window,),
+            )
+        elif "pg_partman" in extensions:
+            cur.execute(
+                "UPDATE partman.part_config "
+                "SET retention = %s, retention_keep_table = false "
+                "WHERE parent_table = 'public.measurements'",
+                (window,),
+            )
+            if cur.rowcount != 1:
+                raise RuntimeError("measurements isn't registered with pg_partman")
+        else:
+            raise RuntimeError(
+                "no retention for measurements: the database has neither "
+                "TimescaleDB nor pg_partman, so old rows would fill the disk"
+            )
+    print(f"measurements retention: {window}", flush=True)
+
+
+def load_retention_days(path: str) -> int:
+    """`retention_days` from the deployment's overlay."""
+    with open(path) as f:
+        return int(yaml.safe_load(f)["retention_days"])
+
+
+def main() -> None:
+    """Bootstrap the table, apply the retention window, then bridge MQTT → DB forever."""
+    conn = psycopg2.connect(os.environ["TIMESERIES_URL"])
+    conn.autocommit = True
+    bootstrap_schema(conn)
+    apply_retention(conn, load_retention_days(os.environ["CFG_CUSTOMER_PATH"]))
+    # paho-mqtt v2 — VERSION1 callback API would warn at runtime, VERSION2 is the
+    # supported callback shape for new code (extra `properties` arg, etc.).
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=conn)
+    client.on_connect = on_connect
+    client.on_message = on_message
+    client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    client.connect(BROKER, 1883, keepalive=60)
+    client.loop_forever()
+
+
+if __name__ == "__main__":
+    main()

@@ -40,12 +40,9 @@ build:
     - docker push public.ecr.aws/y1d2j6a8/platform-api
 
 build_telemetry_writer:
-  # Canonical owner of public.ecr.aws/y1d2j6a8/ems-telemetry-writer.
-  # Same image consumed by commercial + defense composes (this repo) AND
-  # the appliance compose (platform-ems-iso). Replaces the previous
-  # runtime `pip install paho-mqtt psycopg2-binary` pattern that
-  # restart-loops on offline reboot — bug for airgapped appliance,
-  # resilience gap for cloud variants.
+  # Canonical owner of public.ecr.aws/y1d2j6a8/ems-telemetry-writer, used by
+  # the commercial and defense composes (on-prem runs the commercial one).
+  # Deps are baked in, so an offline reboot never needs pypi.
   stage: publish
   script:
     - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws

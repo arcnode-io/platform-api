@@ -22,10 +22,10 @@ from dataclasses import dataclass, field
 from typing import Final
 
 from src.cfn.persistence.aoss_resources import aoss_resources
+from src.cfn.persistence.aurora_bootstrap_resources import PSYCOPG2_LAYER_ARN_TEMPLATE
 from src.cfn.persistence.aurora_resources import (
     COMMERCIAL_SLICES,
     DEFENSE_SLICES,
-    PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
     aurora_parameters,
 )

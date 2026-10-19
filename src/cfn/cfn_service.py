@@ -29,6 +29,7 @@ from src.cfn.persistence.bedrock_preflight_resources import (
 )
 from src.cfn.persistence.persistence_service import PersistenceService
 from src.cfn.site_callback import SiteCallback
+from src.customer_inputs import TELEMETRY_RETENTION_DAYS
 from src.orders.configurator_payload import DeploymentContext
 
 
@@ -89,7 +90,15 @@ class CfnService:
                 f"ARCNODE EMS deployment — {deployment_uuid}"
                 f"{description_prereq_clause()}"
             ),
-            "Parameters": persistence.parameters,
+            "Parameters": {
+                **persistence.parameters,
+                TELEMETRY_RETENTION_DAYS.cfn_param: {
+                    "Type": "Number",
+                    "Default": TELEMETRY_RETENTION_DAYS.default,
+                    "MinValue": 1,
+                    "Description": "Days of telemetry to keep; older measurements are deleted.",
+                },
+            },
             "Resources": {
                 **network_resources(),
                 **iam_resources(short=short, deployment_context=deployment_context),

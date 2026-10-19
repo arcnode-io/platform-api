@@ -576,6 +576,9 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [siteInfo, setSiteInfo] = useStateW(null);
   // Checked by default: key-only SSH is the recommended end state.
   const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
+  // Days of measurements the telemetry writer keeps; 7 matches the cloud stack's
+  // TelemetryRetentionDays default (src/customer_inputs.py).
+  const [retentionDays, setRetentionDays] = useStateW('7');
   // One password per MQTT broker account, keyed as the API expects.
   const [brokerPasswords, setBrokerPasswords] = useStateW({});
   // The Device API's signing key and login passwords.
@@ -799,7 +802,8 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {shown === 'telemetry' && (
             <StepTelemetry t={t} page={pageOf('telemetry')}
-              onApply={() => applyStep('telemetry', '/api/telemetry', {})}/>
+              retentionDays={retentionDays} onRetentionDays={setRetentionDays}
+              onApply={() => applyStep('telemetry', '/api/telemetry', { retention_days: Number(retentionDays) })}/>
           )}
           {shown === 'hivemq' && (
             <StepHivemq t={t} page={pageOf('hivemq')} passwords={brokerPasswords}

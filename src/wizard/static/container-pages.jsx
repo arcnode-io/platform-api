@@ -123,18 +123,36 @@ function StepHivemq({ t, page, passwords, onPassword, onApply }) {
 }
 
 // ─── Telemetry writer ────────────────────────────────────────────────
-// No input: it reuses the broker password and the database URL the earlier pages saved.
-function StepTelemetry({ t, page, onApply }) {
+// One input, how long measurements are kept; the broker password and the
+// database URL come from the earlier pages.
+function StepTelemetry({ t, page, retentionDays, onRetentionDays, onApply }) {
   const isApplying = page.state === 'applying';
   const isDone     = page.state === 'done';
+  const badDays    = !/^[1-9]\d*$/.test(retentionDays);
+  const canApply   = !isApplying && !isDone && !badDays;
   const buttonLabel = isApplying ? 'Verifying'
     : page.state === 'unverified' ? 'Try again' : 'Start & verify';
   return (
     <StepShellW t={t} title="Telemetry writer"
       blurb="Starts the service that saves every measurement from the broker into the timeseries database. It needs the HiveMQ and PostgreSQL pages finished first.">
+      <FieldLabelW t={t} required>DAYS OF TELEMETRY TO KEEP</FieldLabelW>
+      <input type="text" inputMode="numeric" value={retentionDays} disabled={isApplying || isDone}
+        onChange={e => onRetentionDays(e.target.value)} aria-label="Days of telemetry to keep"
+        style={{
+          width: 120, height: 40, padding: '0 12px', boxSizing: 'border-box',
+          background: t.bg, color: t.text, outline: 'none',
+          border: `1px solid ${badDays ? t.statusAlarm : t.border}`, borderRadius: RADIUS[2],
+          fontFamily: t.fontLabel, fontSize: 13,
+        }}/>
+      <div style={{ marginBottom: SPACE[4] }}>
+        <HelperW t={t} error={badDays}>
+          {badDays ? 'A whole number of days, 1 or more.'
+            : 'Older measurements are deleted to keep the disk from filling.'}
+        </HelperW>
+      </div>
       {!isDone && (
-        <button onClick={isApplying ? undefined : onApply} disabled={isApplying}
-          style={primaryBtnStyle(t, isApplying)}>
+        <button onClick={canApply ? onApply : undefined} disabled={!canApply}
+          style={primaryBtnStyle(t, !canApply)}>
           {isApplying && <SpinnerW color={t.onPrimary} size={13}/>}
           {buttonLabel}
         </button>

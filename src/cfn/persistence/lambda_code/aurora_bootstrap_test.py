@@ -55,7 +55,9 @@ def test_measurements_schema_creates_partitioned_table_and_partman_parent() -> N
     assert "PARTITION BY RANGE (ts)" in sql_block
     assert "partman.create_parent" in sql_block
     assert "p_interval     => '1 hour'" in sql_block
-    assert "retention = '7 days'" in sql_block
+    # The window is the customer's; telemetry-writer sets it, not the Lambda.
+    assert "retention" not in sql_block
+    assert "infinite_time_partitions = true" in sql_block
     # Q3 lock: JSONB value column, not DOUBLE PRECISION
     assert "value       JSONB" in sql_block
 
@@ -89,3 +91,18 @@ def test_put_secret_overwrites_cfn_placeholder_not_creates() -> None:
         "SecretId": "arcnode-ems-stack/vector-url",
         "SecretString": "postgres://x",
     }
+
+
+def test_partition_maintenance_runs_hourly_in_the_timeseries_db() -> None:
+    """pg_cron (in the postgres db) runs pg_partman's maintenance in ems_timeseries:
+    it makes the next partitions and drops the expired ones."""
+    # Arrange + Act
+    mod = _load_module()
+    sql_block = "\n".join(mod.PARTITION_MAINTENANCE_SQL)
+
+    # Assert
+    assert "CREATE EXTENSION IF NOT EXISTS pg_cron" in sql_block
+    assert "cron.schedule_in_database" in sql_block
+    assert "'@hourly'" in sql_block
+    assert "CALL partman.run_maintenance_proc()" in sql_block
+    assert "'ems_timeseries'" in sql_block

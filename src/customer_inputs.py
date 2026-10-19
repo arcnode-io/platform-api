@@ -28,3 +28,17 @@ GRAFANA_ADMIN: Final[CustomerSecret] = CustomerSecret(
 JWT_SECRET: Final[CustomerSecret] = CustomerSecret(
     "auth-jwt-secret", "AUTH_JWT_SECRET", "AuthJwtSecret"
 )
+
+
+class CustomerSetting(NamedTuple):
+    """One non-secret value the customer sets, with the default both installs offer."""
+
+    cfg_key: str  # the key in the service's cfg.customer.yml
+    cfn_param: str  # the stack parameter the cloud asks for
+    default: int
+
+
+# How many days of measurements telemetry-writer keeps.
+TELEMETRY_RETENTION_DAYS: Final[CustomerSetting] = CustomerSetting(
+    "retention_days", "TelemetryRetentionDays", 7
+)

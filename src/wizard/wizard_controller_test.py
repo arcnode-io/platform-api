@@ -88,7 +88,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
 
     # Act: the last page
     hivemq = client.post("/api/hivemq", json=BROKER_PASSWORDS)
-    telemetry = client.post("/api/telemetry")
+    telemetry = client.post("/api/telemetry", json={"retention_days": 7})
     prometheus = client.post("/api/prometheus")
     mlflow = client.post("/api/mlflow")
     analyst_model = client.post("/api/analyst-model")

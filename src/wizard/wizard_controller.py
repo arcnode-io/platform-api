@@ -65,6 +65,7 @@ from src.wizard.wizard_record import (
     SshAccount,
     SshLockdownRequest,
     StepResult,
+    TelemetryRequest,
 )
 from src.wizard.wizard_steps import StepAlreadyDoneError, StepTracker
 
@@ -252,10 +253,10 @@ class WizardController:
         except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    def telemetry(self) -> StepResult:
+    def telemetry(self, request: TelemetryRequest) -> StepResult:
         """The on-prem Telemetry writer page — see TelemetryWriterService.apply."""
         try:
-            return self._telemetry.apply()
+            return self._telemetry.apply(request)
         except StepAlreadyDoneError as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 

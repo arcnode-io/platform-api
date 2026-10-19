@@ -185,3 +185,31 @@ def test_bootstrap_lambda_embeds_source_via_zipfile() -> None:
     assert "SLICE_SPECS" in code["ZipFile"]
     assert "ems_document" in code["ZipFile"]
     assert "ems_vector" in code["ZipFile"]
+
+
+def test_the_timeseries_cluster_loads_pg_cron() -> None:
+    """Defense's partition maintenance runs on pg_cron, which must be preloaded."""
+    # Arrange + Act
+    resources = aurora_cluster_resources(slices=DEFENSE_SLICES)
+
+    # Assert
+    group = resources["AuroraParameterGroup"]
+    assert group["Type"] == "AWS::RDS::DBParameterGroup"
+    assert group["Properties"]["Family"] == "aurora-postgresql16"
+    # Reason: setting the list replaces Aurora's default, so keep pg_stat_statements.
+    assert group["Properties"]["Parameters"] == {
+        "shared_preload_libraries": "pg_stat_statements,pg_cron"
+    }
+    assert resources["AuroraInstance"]["Properties"]["DBParameterGroupName"] == {
+        "Ref": "AuroraParameterGroup"
+    }
+
+
+def test_a_cluster_without_timeseries_keeps_the_default_parameters() -> None:
+    """Commercial keeps its timeseries in Tiger, so nothing needs pg_cron."""
+    # Arrange + Act
+    resources = aurora_cluster_resources(slices=COMMERCIAL_SLICES)
+
+    # Assert
+    assert "AuroraParameterGroup" not in resources
+    assert "DBParameterGroupName" not in resources["AuroraInstance"]["Properties"]

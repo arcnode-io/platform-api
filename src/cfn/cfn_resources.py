@@ -7,7 +7,13 @@ out keeps the service file thin and lets unit tests target each block.
 from typing import Final
 
 from src.cfn.persistence.auth_secrets import MQTT_SERVICE_SLOT
-from src.customer_inputs import GRAFANA_ADMIN, JWT_SECRET, OPERATOR_LOGIN, VIEWER_LOGIN
+from src.customer_inputs import (
+    GRAFANA_ADMIN,
+    JWT_SECRET,
+    OPERATOR_LOGIN,
+    TELEMETRY_RETENTION_DAYS,
+    VIEWER_LOGIN,
+)
 from src.cfn.site_callback import SiteCallback
 from src.cfn.bedrock_models import all_invoke_resources
 from src.orders.configurator_payload import DeploymentContext
@@ -797,6 +803,10 @@ def build_userdata(
         "cat > /opt/arcnode/analyst-model-cfg.customer.yml <<YML\n"
         f"site_id: {site_id}\n"
         "mlflow_tracking_uri: http://mlflow:5000\n"
+        "YML\n"
+        # telemetry-writer's overlay: the customer's retention window.
+        "cat > /opt/arcnode/telemetry-writer-cfg.customer.yml <<YML\n"
+        f"{TELEMETRY_RETENTION_DAYS.cfg_key}: ${{{TELEMETRY_RETENTION_DAYS.cfn_param}}}\n"
         "YML\n"
         # der-control-api's per-site overlay. publicBaseUrl is the ingress the
         # utility reaches, on the Elastic IP. utilityMirrorUrl is left out until the order carries one.

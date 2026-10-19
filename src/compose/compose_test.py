@@ -75,7 +75,8 @@ def test_telemetry_writer_uses_baked_image_not_runtime_pip(
     # CI job; see src/compose/images/telemetry-writer/Dockerfile.
     assert svc["image"] == "public.ecr.aws/y1d2j6a8/ems-telemetry-writer:latest"
     assert "command" not in svc, "image has CMD baked in; no override needed"
-    assert "volumes" not in svc, "script lives in image; no bind-mount needed"
+    # The script lives in the image; the only mount is the deployment's overlay.
+    assert all(not v.endswith(".py:ro") for v in svc["volumes"])
 
 
 @pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
@@ -334,3 +335,17 @@ def test_the_ingress_serves_acme_challenges_on_80_before_redirecting() -> None:
     assert "location /.well-known/acme-challenge/" in port_80
     assert "root /var/www/acme;" in port_80
     assert "return 301 https://$host$request_uri;" in port_80
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_telemetry_writer_reads_the_customers_retention(variant_path: Path) -> None:
+    """telemetry-writer takes retention_days from a per-deployment overlay."""
+    # Arrange + Act
+    service = yaml.safe_load(variant_path.read_text())["services"]["telemetry-writer"]
+
+    # Assert
+    assert service["environment"]["CFG_CUSTOMER_PATH"] == "/app/cfg.customer.yml"
+    assert (
+        "/opt/arcnode/telemetry-writer-cfg.customer.yml:/app/cfg.customer.yml:ro"
+        in service["volumes"]
+    )
