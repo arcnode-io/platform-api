@@ -11,10 +11,14 @@
 # All images: public.ecr.aws/y1d2j6a8/<service>:latest (anonymous pull
 # from customer's EC2; arcnode publishes to ECR Public on release).
 
+# raw: values reach the container exactly as written — no $ interpolation, no
+# quote handling — so any password the customer types survives.
 x-env-files: &env-files
   env_file:
-    - /opt/arcnode/config.env
-    - /opt/arcnode/secrets.env
+    - path: /opt/arcnode/config.env
+      format: raw
+    - path: /opt/arcnode/secrets.env
+      format: raw
 
 services:
   hivemq:

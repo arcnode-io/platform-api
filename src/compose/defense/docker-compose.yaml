@@ -15,10 +15,14 @@
 # Connection URLs sourced from /opt/arcnode/secrets.env (UserData
 # writes from CFN-managed Secrets Manager).
 
+# raw: values reach the container exactly as written — no $ interpolation, no
+# quote handling — so any password the customer types survives.
 x-env-files: &env-files
   env_file:
-    - /opt/arcnode/config.env
-    - /opt/arcnode/secrets.env
+    - path: /opt/arcnode/config.env
+      format: raw
+    - path: /opt/arcnode/secrets.env
+      format: raw
 
 services:
   hivemq:

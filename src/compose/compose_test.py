@@ -198,7 +198,7 @@ def test_all_services_consume_split_env_files(variant_path: Path) -> None:
     for name, svc in services.items():
         if name.startswith("mock-"):
             continue  # protocol fixtures have no env config
-        env_files = svc.get("env_file", [])
+        env_files = [entry["path"] for entry in svc.get("env_file", [])]
         assert (
             "/opt/arcnode/config.env" in env_files
         ), f"{variant_path.name}: {name} missing config.env"
@@ -348,3 +348,18 @@ def test_telemetry_writer_reads_the_customers_retention(variant_path: Path) -> N
         "/opt/arcnode/telemetry-writer-cfg.customer.yml:/app/cfg.customer.yml:ro"
         in service["volumes"]
     )
+
+
+@pytest.mark.parametrize("variant_path", [COMMERCIAL_COMPOSE, DEFENSE_COMPOSE])
+def test_env_files_pass_customer_passwords_through_untouched(
+    variant_path: Path,
+) -> None:
+    """Compose reads secrets.env raw: a customer password holding $, quotes or
+    backslashes reaches the container as typed, never interpolated."""
+    # Arrange + Act
+    services = yaml.safe_load(variant_path.read_text())["services"]
+
+    # Assert
+    for name, service in services.items():
+        for entry in service.get("env_file", []):
+            assert entry["format"] == "raw", f"{name}: {entry}"
