@@ -8,11 +8,12 @@ Reads ``Slices`` from the CFN custom resource properties (e.g.
      ``pg_database`` first).
   2. Installs the per-slice extension when needed (``pgvector`` for vector,
      ``pg_partman`` for timeseries).
-  3. Creates a least-privilege per-slice app user with a generated password.
-  4. For timeseries: hardcoded SQL creates the ``measurements`` parent table
+  3. For timeseries: hardcoded SQL creates the ``measurements`` parent table
      (partitioned by RANGE on ``ts``) and registers it with pg_partman.
-  5. Writes each slice's connection URL to Secrets Manager under
-     ``arcnode-ems-{STACK}/<slice>-url``.
+  4. Writes each slice's connection URL to Secrets Manager under
+     ``arcnode-ems-{STACK}/<slice>-url``. Every URL logs in as the master
+     user with the customer's database password, same as on-prem: one
+     password, no per-service roles.
 
 Not imported by application code — the source is read as text by
 ``aurora_resources.py`` and embedded in CFN as ``Code.ZipFile``.
@@ -23,20 +24,20 @@ into the runtime.
 """
 
 import json
-import secrets
+import urllib.parse
 import urllib.request
 
 import boto3  # type: ignore[import-untyped]
 import psycopg2  # type: ignore[import-untyped]
 
-# Slice → (db_name, app_user, extension or None).
-SLICE_SPECS: dict[str, tuple[str, str, str | None]] = {
-    "document": ("ems_document", "ems_doc_app", None),
-    "vector": ("ems_vector", "ems_vec_app", "vector"),
-    "timeseries": ("ems_timeseries", "ems_ts_app", "pg_partman"),
+# Slice → (db_name, extension or None).
+SLICE_SPECS: dict[str, tuple[str, str | None]] = {
+    "document": ("ems_document", None),
+    "vector": ("ems_vector", "vector"),
+    "timeseries": ("ems_timeseries", "pg_partman"),
     # ems-der-control-api's DB. No extension — Hibernate ddl-auto=update builds
     # the schema on first boot, same as device-api does in the document slice.
-    "dercontrol": ("ems_dercontrol", "ems_dercontrol_app", None),
+    "dercontrol": ("ems_dercontrol", None),
 }
 
 # measurements — the broker-ingest landing table. Every MQTT publish a
@@ -99,65 +100,38 @@ def handler(event: dict, context: object) -> None:
 def _create(event: dict) -> dict:
     props = event["ResourceProperties"]
     cluster_endpoint = props["ClusterEndpoint"]
-    master_secret_arn = props["MasterSecretArn"]
+    master_user = props["MasterUsername"]
     deployment_uuid = props["DeploymentUuid"]
     slices: list[str] = props["Slices"]
 
     sm = boto3.client("secretsmanager")
-    master = json.loads(sm.get_secret_value(SecretId=master_secret_arn)["SecretString"])
+    # The customer's DbPassword parameter, held as a plain string.
+    master_pw = sm.get_secret_value(SecretId=props["MasterSecretArn"])["SecretString"]
 
-    # Phase 1 — connect to the cluster's admin db and create the per-slice
-    # database + app user. CREATE DATABASE must run outside any transaction,
-    # so we manage the connection by hand and force autocommit.
+    # Phase 1 — create the per-slice databases. CREATE DATABASE must run
+    # outside any transaction, so force autocommit.
     admin_conn = psycopg2.connect(
-        host=cluster_endpoint,
-        user=master["username"],
-        password=master["password"],
-        dbname="postgres",
+        host=cluster_endpoint, user=master_user, password=master_pw, dbname="postgres"
     )
     admin_conn.autocommit = True
-    slice_passwords: dict[str, str] = {}
     try:
         with admin_conn.cursor() as cur:
             for slice_name in slices:
-                db_name, app_user, _ext = SLICE_SPECS[slice_name]
-                pw = secrets.token_urlsafe(32)
-                slice_passwords[slice_name] = pw
+                db_name, _ext = SLICE_SPECS[slice_name]
                 _create_db_if_missing(cur, db_name)
-                _create_user_if_missing(cur, app_user, pw)
-                cur.execute(f"GRANT ALL PRIVILEGES ON DATABASE {db_name} TO {app_user}")
     finally:
         admin_conn.close()
 
     # Phase 2 — connect to each slice's own db and install extensions /
-    # bootstrap the timeseries schema. Each connection is independent;
-    # autocommit so CREATE EXTENSION takes effect immediately.
+    # bootstrap the timeseries schema.
     for slice_name in slices:
-        db_name, app_user, ext = SLICE_SPECS[slice_name]
+        db_name, ext = SLICE_SPECS[slice_name]
         slice_conn = psycopg2.connect(
-            host=cluster_endpoint,
-            user=master["username"],
-            password=master["password"],
-            dbname=db_name,
+            host=cluster_endpoint, user=master_user, password=master_pw, dbname=db_name
         )
         slice_conn.autocommit = True
         try:
             with slice_conn.cursor() as cur:
-                # Postgres 15+ revokes CREATE on public schema from PUBLIC.
-                # The per-slice app user owns its slice's data, so make it
-                # owner of public + grant on the bootstrap schema.
-                cur.execute(f"ALTER SCHEMA public OWNER TO {app_user}")
-                cur.execute(f"GRANT ALL ON SCHEMA public TO {app_user}")
-                # Default privileges so any future tables (partman child
-                # partitions, app migrations) auto-grant to the app user.
-                cur.execute(
-                    f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
-                    f"GRANT ALL ON TABLES TO {app_user}"
-                )
-                cur.execute(
-                    f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
-                    f"GRANT ALL ON SEQUENCES TO {app_user}"
-                )
                 if ext == "pg_partman":
                     # pg_partman publishes its functions in a dedicated
                     # schema; create it first so the extension lands there
@@ -171,25 +145,17 @@ def _create(event: dict) -> dict:
                 if slice_name == "timeseries":
                     for stmt in MEASUREMENTS_SCHEMA_SQL:
                         cur.execute(stmt)
-                # Grant on tables created above (measurements + partman
-                # child partitions, pgvector tables, etc.) — these were
-                # created as the master user, so app_user has no perms
-                # by default. Default-privileges only catches future
-                # tables, not this batch.
-                cur.execute(f"GRANT ALL ON ALL TABLES IN SCHEMA public TO {app_user}")
-                cur.execute(
-                    f"GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO {app_user}"
-                )
         finally:
             slice_conn.close()
 
-    # Phase 3 — write per-slice connection URLs to Secrets Manager. Naming
-    # follows the Q4 lock: arcnode-ems-{STACK}/<slice>-url.
+    # Phase 3 — write per-slice connection URLs to Secrets Manager.
+    # Reason: the customer picks the password, so it's percent-encoded to survive the URL.
+    user = urllib.parse.quote(master_user, safe="")
+    pw = urllib.parse.quote(master_pw, safe="")
     secret_names: dict[str, str] = {}
     for slice_name in slices:
-        db_name, app_user, _ext = SLICE_SPECS[slice_name]
-        pw = slice_passwords[slice_name]
-        url = f"postgres://{app_user}:{pw}@{cluster_endpoint}:5432/{db_name}"
+        db_name, _ext = SLICE_SPECS[slice_name]
+        url = f"postgres://{user}:{pw}@{cluster_endpoint}:5432/{db_name}"
         name = f"arcnode-ems-{deployment_uuid}/{slice_name}-url"
         _put_secret(sm, name, url)
         secret_names[slice_name] = name
@@ -206,20 +172,12 @@ def _create_db_if_missing(cur: Any, db_name: str) -> None:
         cur.execute(f"CREATE DATABASE {db_name}")
 
 
-def _create_user_if_missing(cur: Any, user: str, password: str) -> None:
-    cur.execute("SELECT 1 FROM pg_user WHERE usename = %s", (user,))
-    if cur.fetchone() is None:
-        cur.execute(f"CREATE USER {user} WITH PASSWORD '{password}'")
-    else:
-        cur.execute(f"ALTER USER {user} WITH PASSWORD '{password}'")
-
-
 def _put_secret(sm: Any, name: str, value: str) -> None:
     """Overwrite the CFN-created secret's placeholder with the real URL.
 
     The per-slice secrets are declared as CFN AWS::SecretsManager::Secret
-    resources in aurora_resources.py — created with a GenerateSecretString
-    placeholder before the bootstrap Lambda runs. This call only writes
+    resources in aurora_resources.py — created with a fixed placeholder
+    before the bootstrap Lambda runs. This call only writes
     the real value; CFN owns the lifecycle (delete cleans automatically,
     no orphans).
     """

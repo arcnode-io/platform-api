@@ -6,7 +6,8 @@ out keeps the service file thin and lets unit tests target each block.
 
 from typing import Final
 
-from src.customer_inputs import GRAFANA_ADMIN, OPERATOR_LOGIN, VIEWER_LOGIN
+from src.cfn.persistence.auth_secrets import MQTT_SERVICE_SLOT
+from src.customer_inputs import GRAFANA_ADMIN, JWT_SECRET, OPERATOR_LOGIN, VIEWER_LOGIN
 from src.cfn.site_callback import SiteCallback
 from src.cfn.bedrock_models import all_invoke_resources
 from src.orders.configurator_payload import DeploymentContext
@@ -49,18 +50,18 @@ DEFENSE_ONLY_SSM_PARAMS: Final[tuple[tuple[str, str], ...]] = (
     ("neptune-loader-role-arn", "NEPTUNE_LOADER_ROLE_ARN"),
     ("aoss-host", "AOSS_HOST"),
 )
-# Broker File RBAC + device-api auth secrets. Variant-agnostic (File RBAC runs
-# in every deployment) → fetched into secrets.env on both. The mqtt-* pws also
-# feed credentials.xml (the broker's auth store). See auth_secrets.py.
+# Broker File RBAC + device-api auth secrets, all customer-set (auth_secrets.py).
+# Fetched into secrets.env on both variants; the broker ones also feed credentials.xml.
 AUTH_SLOTS: Final[tuple[tuple[str, str], ...]] = (
     # The four service accounts share one secret; each service still reads its own env name.
-    ("mqtt-service-password", "MQTT_GATEWAY_PASSWORD"),
-    ("mqtt-operator-password", "MQTT_OPERATOR_PASSWORD"),
-    ("mqtt-viewer-password", "MQTT_VIEWER_PASSWORD"),
-    ("mqtt-service-password", "MQTT_DEVICE_API_PASSWORD"),
-    ("mqtt-service-password", "MQTT_TELEMETRY_WRITER_PASSWORD"),
-    ("mqtt-service-password", "MQTT_DER_CONTROL_API_PASSWORD"),
-    ("auth-jwt-secret", "AUTH_JWT_SECRET"),
+    (MQTT_SERVICE_SLOT, "MQTT_GATEWAY_PASSWORD"),
+    (MQTT_SERVICE_SLOT, "MQTT_DEVICE_API_PASSWORD"),
+    (MQTT_SERVICE_SLOT, "MQTT_TELEMETRY_WRITER_PASSWORD"),
+    (MQTT_SERVICE_SLOT, "MQTT_DER_CONTROL_API_PASSWORD"),
+    # Same as on-prem: each HMI role's broker password is its login password.
+    (OPERATOR_LOGIN.slot, "MQTT_OPERATOR_PASSWORD"),
+    (VIEWER_LOGIN.slot, "MQTT_VIEWER_PASSWORD"),
+    (JWT_SECRET.slot, JWT_SECRET.env_name),
     (OPERATOR_LOGIN.slot, OPERATOR_LOGIN.env_name),
     (VIEWER_LOGIN.slot, VIEWER_LOGIN.env_name),
     (GRAFANA_ADMIN.slot, GRAFANA_ADMIN.env_name),
@@ -579,30 +580,34 @@ def build_userdata(
         "--secret-id arcnode-ems-${AWS::StackName}/der-control-lfdi-allowlist "
         "--query SecretString --output text | tr '\\n' ' ')\" >> /opt/arcnode/secrets.env\n"
     )
-    # Broker File RBAC store. The 3 random machine pws (also in secrets.env)
-    # are fetched into shell vars and written into credentials.xml, which the
-    # hivemq image bind-mounts into the File RBAC extension. Topic ACL is
-    # static (system_adr §9 topic shape); only the <password> values vary.
-    # ${{AWS::StackName}} is CFN-substituted; $GW_PW/$OP_PW/$VW_PW are bash
-    # vars (no braces → Fn::Sub leaves them for the unquoted heredoc to expand).
+    # Broker File RBAC store: the shared template the on-prem wizard also fills
+    # (src/wizard/hivemq_credentials.py). Customer passwords can hold any character,
+    # so python3 (stock on AL2023) XML-escapes them instead of a sed replace.
+    # ${{AWS::StackName}} is CFN-substituted; the quoted heredoc keeps bash off the script.
     credentials_block = (
-        "SVC_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-service-password "
+        "export SVC_PW=$(aws secretsmanager get-secret-value "
+        f"--secret-id arcnode-ems-${{AWS::StackName}}/{MQTT_SERVICE_SLOT} "
         "--query SecretString --output text)\n"
-        "OP_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-operator-password "
+        "export OP_PW=$(aws secretsmanager get-secret-value "
+        f"--secret-id arcnode-ems-${{AWS::StackName}}/{OPERATOR_LOGIN.slot} "
         "--query SecretString --output text)\n"
-        "VW_PW=$(aws secretsmanager get-secret-value "
-        "--secret-id arcnode-ems-${AWS::StackName}/mqtt-viewer-password "
+        "export VW_PW=$(aws secretsmanager get-secret-value "
+        f"--secret-id arcnode-ems-${{AWS::StackName}}/{VIEWER_LOGIN.slot} "
         "--query SecretString --output text)\n"
-        # Same template the on-prem wizard fills (src/wizard/hivemq_credentials.py).
-        # Cloud passwords exclude / & and \\, so they're safe as sed replacements.
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/compose/credentials.template.xml "
         "-o /opt/arcnode/credentials.xml\n"
-        'sed -i -e "s/__GATEWAY_PASSWORD__/$SVC_PW/" -e "s/__OPERATOR_PASSWORD__/$OP_PW/" '
-        '-e "s/__VIEWER_PASSWORD__/$VW_PW/" -e "s/__DEVICE_API_PASSWORD__/$SVC_PW/" '
-        '-e "s/__TELEMETRY_WRITER_PASSWORD__/$SVC_PW/" -e "s/__DER_CONTROL_API_PASSWORD__/$SVC_PW/" '
-        "/opt/arcnode/credentials.xml\n"
+        "python3 - <<'PY'\n"
+        "import os\n"
+        "from xml.sax.saxutils import escape\n"
+        "path = '/opt/arcnode/credentials.xml'\n"
+        "accounts = (('GATEWAY', 'SVC_PW'), ('DEVICE_API', 'SVC_PW'), ('TELEMETRY_WRITER', 'SVC_PW'),\n"
+        "            ('DER_CONTROL_API', 'SVC_PW'), ('OPERATOR', 'OP_PW'), ('VIEWER', 'VW_PW'))\n"
+        "xml = open(path).read()\n"
+        "for account, var in accounts:\n"
+        "    xml = xml.replace('__' + account + '_PASSWORD__', escape(os.environ[var]))\n"
+        "open(path, 'w').write(xml)\n"
+        "PY\n"
+        "unset SVC_PW OP_PW VW_PW\n"
         "chmod 600 /opt/arcnode/credentials.xml\n"
     )
     # Defense graph block — fetch SSM params into shell vars, append to

@@ -1,5 +1,7 @@
 """Tests for PersistenceService variant routing."""
 
+import pytest
+
 from src.cfn.persistence.persistence_service import (
     PersistenceBuild,
     PersistenceService,
@@ -43,9 +45,12 @@ def test_commercial_build_declares_required_parameters() -> None:
         "GraphConnectionUrl",
         "OpenweathermapApiKey",
         "GridstatusApiKey",
+        "MqttServicePw",
+        "AuthJwtSecret",
         "AuthOperatorPw",
         "AuthViewerPw",
         "GrafanaAdminPw",
+        "DbPassword",
     }
 
 
@@ -67,12 +72,10 @@ def test_commercial_build_lists_ems_instance_dependencies() -> None:
         "OpenweathermapApiKeySecret",
         "GridstatusApiKeySecret",
         "CustomerUrlPreflightCustomResource",
-        "MqttServicePasswordSecret",
-        "MqttOperatorPasswordSecret",
-        "MqttViewerPasswordSecret",
+        "MqttServicePwSecret",
         "DerControlTruststoreSecret",
         "DerControlLfdiAllowlistSecret",
-        "AuthJwtSecret",
+        "AuthJwtSecretSecret",
         "AuthOperatorPwSecret",
         "AuthViewerPwSecret",
         "GrafanaAdminPwSecret",
@@ -114,13 +117,16 @@ def test_defense_build_declares_agent_api_key_parameters() -> None:
         deployment_context=DeploymentContext.DEFENSE_FORWARD, short="abcd1234"
     )
 
-    # Assert — agent keys + the two customer-set login passwords
+    # Assert — agent keys + the customer-set passwords
     assert set(build.parameters.keys()) == {
         "OpenweathermapApiKey",
         "GridstatusApiKey",
+        "MqttServicePw",
+        "AuthJwtSecret",
         "AuthOperatorPw",
         "AuthViewerPw",
         "GrafanaAdminPw",
+        "DbPassword",
     }
 
 
@@ -144,12 +150,10 @@ def test_defense_build_lists_ems_instance_dependencies() -> None:
         "NeptuneHostParam",
         "NeptuneLoaderRoleArnParam",
         "AossHostParam",
-        "MqttServicePasswordSecret",
-        "MqttOperatorPasswordSecret",
-        "MqttViewerPasswordSecret",
+        "MqttServicePwSecret",
         "DerControlTruststoreSecret",
         "DerControlLfdiAllowlistSecret",
-        "AuthJwtSecret",
+        "AuthJwtSecretSecret",
         "AuthOperatorPwSecret",
         "AuthViewerPwSecret",
         "GrafanaAdminPwSecret",
@@ -173,3 +177,43 @@ def test_sovereign_government_routes_to_defense_build() -> None:
     # Assert
     assert set(sovereign.resources.keys()) == set(defense.resources.keys())
     assert sovereign.parameters == defense.parameters
+
+
+@pytest.mark.parametrize(
+    "context", [DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD]
+)
+def test_the_template_makes_up_no_password(context: DeploymentContext) -> None:
+    """The customer sets every password, same as on-prem: no secret is a CFN-random value."""
+    # Arrange
+    service = PersistenceService()
+
+    # Act
+    build = service.build(deployment_context=context, short="abcd1234")
+
+    # Assert
+    generated = [
+        name
+        for name, resource in build.resources.items()
+        if "GenerateSecretString" in resource.get("Properties", {})
+    ]
+    assert generated == []
+
+
+@pytest.mark.parametrize(
+    "context", [DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD]
+)
+def test_the_customer_sets_the_broker_token_and_database_passwords(
+    context: DeploymentContext,
+) -> None:
+    """Mirrors the on-prem wizard: one broker service password, the session-token
+    key, and one database password, each a NoEcho parameter."""
+    # Arrange
+    service = PersistenceService()
+
+    # Act
+    build = service.build(deployment_context=context, short="abcd1234")
+
+    # Assert
+    for name in ("MqttServicePw", "AuthJwtSecret", "DbPassword"):
+        assert build.parameters[name]["NoEcho"] is True, name
+    assert build.parameters["AuthJwtSecret"]["MinLength"] == 32

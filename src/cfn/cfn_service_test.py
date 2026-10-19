@@ -401,25 +401,24 @@ def test_userdata_does_not_emit_arcnode_variant_flag() -> None:
 
 
 def test_auth_secrets_and_params_in_both_variants() -> None:
-    """Broker + human auth secrets are variant-agnostic (File RBAC runs in
-    every deployment), so both commercial and defense render all six secrets
-    plus the two customer-set login-password params."""
+    """Broker + device-api auth secrets are variant-agnostic (File RBAC runs in
+    every deployment), so both commercial and defense render every secret
+    plus the customer-set params behind them."""
     # Arrange + Act
     for ctx in (DeploymentContext.COMMERCIAL, DeploymentContext.DEFENSE_FORWARD):
         rendered = _render(ctx)
 
-        # Assert — four generated + two param-sourced secrets
+        # Assert — one secret per customer-set param
         for logical in (
-            "MqttServicePasswordSecret",
-            "MqttOperatorPasswordSecret",
-            "MqttViewerPasswordSecret",
-            "AuthJwtSecret",
+            "MqttServicePwSecret",
+            "AuthJwtSecretSecret",
             "AuthOperatorPwSecret",
             "AuthViewerPwSecret",
             "GrafanaAdminPwSecret",
         ):
             assert logical in rendered, f"{logical} missing in {ctx}"
         # NoEcho params the customer pastes
+        assert "MqttServicePw" in rendered
         assert "AuthOperatorPw" in rendered
         assert "AuthViewerPw" in rendered
         assert "GrafanaAdminPw" in rendered
@@ -436,17 +435,17 @@ def test_userdata_writes_broker_credentials_xml() -> None:
     # compose mounts it, and every placeholder gets its password
     assert "/compose/credentials.template.xml" in rendered
     assert "/opt/arcnode/credentials.xml" in rendered
-    for placeholder in (
-        "__GATEWAY_PASSWORD__",
-        "__OPERATOR_PASSWORD__",
-        "__VIEWER_PASSWORD__",
-        "__DEVICE_API_PASSWORD__",
-        "__TELEMETRY_WRITER_PASSWORD__",
-        "__DER_CONTROL_API_PASSWORD__",
+    for account in (
+        "'GATEWAY', 'SVC_PW'",
+        "'OPERATOR', 'OP_PW'",
+        "'VIEWER', 'VW_PW'",
+        "'DEVICE_API', 'SVC_PW'",
+        "'TELEMETRY_WRITER', 'SVC_PW'",
+        "'DER_CONTROL_API', 'SVC_PW'",
     ):
-        assert placeholder in rendered, f"{placeholder} not filled"
+        assert account in rendered, f"{account} not filled"
     assert "MQTT_DER_CONTROL_API_PASSWORD" in rendered
-    # Reason: the four service accounts share one generated secret, fetched once.
+    # Reason: the four service accounts share one customer-set secret, fetched once.
     assert "arcnode-ems-${AWS::StackName}/mqtt-service-password" in rendered
     assert "mqtt-gateway-password" not in rendered
 

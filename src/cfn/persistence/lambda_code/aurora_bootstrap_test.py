@@ -30,33 +30,18 @@ def test_module_loads_and_exposes_handler() -> None:
 
 
 def test_slice_specs_cover_all_slices() -> None:
-    """SLICE_SPECS maps each supported slice → (db_name, app_user, extension)."""
+    """SLICE_SPECS maps each supported slice → (db_name, extension)."""
     # Arrange + Act
     mod = _load_module()
 
     # Assert
-    assert set(mod.SLICE_SPECS.keys()) == {
-        "document",
-        "vector",
-        "timeseries",
-        "dercontrol",
+    assert mod.SLICE_SPECS == {
+        "document": ("ems_document", None),
+        "vector": ("ems_vector", "vector"),
+        "timeseries": ("ems_timeseries", "pg_partman"),
+        # Hibernate ddl-auto owns the dercontrol schema, so no extension.
+        "dercontrol": ("ems_dercontrol", None),
     }
-    # document has no extension
-    assert mod.SLICE_SPECS["document"] == ("ems_document", "ems_doc_app", None)
-    # vector installs pgvector
-    assert mod.SLICE_SPECS["vector"] == ("ems_vector", "ems_vec_app", "vector")
-    # timeseries installs pg_partman
-    assert mod.SLICE_SPECS["timeseries"] == (
-        "ems_timeseries",
-        "ems_ts_app",
-        "pg_partman",
-    )
-    # dercontrol: plain DB, no extension — Hibernate ddl-auto owns the schema
-    assert mod.SLICE_SPECS["dercontrol"] == (
-        "ems_dercontrol",
-        "ems_dercontrol_app",
-        None,
-    )
 
 
 def test_measurements_schema_creates_partitioned_table_and_partman_parent() -> None:

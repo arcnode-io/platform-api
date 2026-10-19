@@ -25,6 +25,8 @@ LAMBDA_PATH = (
     / "aurora_bootstrap.py"
 )
 DEPLOYMENT_UUID = "abcd1234-5678-90ef-1234-567890abcdef"
+# Aurora forbids / " @ and spaces; everything else a customer types must survive the URL.
+CUSTOMER_DB_PW = "p:ss#w%rd?&x"
 
 
 def _load_module():
@@ -50,18 +52,18 @@ def _ctx(resp: _FakeResp) -> MagicMock:
     return m
 
 
-def test_create_provisions_databases_extension_users_and_secrets() -> None:
+def test_create_provisions_databases_extension_and_secrets() -> None:
     """End-to-end: real postgres + LocalStack secrets manager.
 
     Asserts:
     - ems_document and ems_vector databases exist after handler runs
     - vector extension installed on ems_vector
-    - app users ems_doc_app and ems_vec_app can connect with their conn strings
-    - aurora-document + aurora-vector secrets land in Secrets Manager
+    - each slice URL connects as the master user with the customer's password,
+      even when that password holds URL-special characters
     """
-    # Arrange — pgvector image (master pw + db = "test")
+    # Arrange — pgvector image; the customer's password needs URL-escaping
     with (
-        start_postgres(password="test", image="pgvector/pgvector:pg16") as pg,
+        start_postgres(password=CUSTOMER_DB_PW, image="pgvector/pgvector:pg16") as pg,
         start_localstack(services=("secretsmanager",)) as ls,
     ):
         # First: write the Aurora master secret to LocalStack (the bootstrap
@@ -75,7 +77,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
         )
         master_secret = sm_client.create_secret(
             Name="aurora-master-secret-test",
-            SecretString=json.dumps({"username": "postgres", "password": "test"}),
+            SecretString=CUSTOMER_DB_PW,
         )
         master_arn = master_secret["ARN"]
 
@@ -98,6 +100,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
             "ResourceProperties": {
                 "ClusterEndpoint": pg.host,
                 "MasterSecretArn": master_arn,
+                "MasterUsername": "postgres",
                 "DeploymentUuid": DEPLOYMENT_UUID,
                 # Commercial-shape slice list — document + vector. Defense
                 # adds "timeseries" but that needs pg_partman which the bare
@@ -149,7 +152,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
                 host=pg.host,
                 port=pg.port,
                 user="postgres",
-                password="test",
+                password=CUSTOMER_DB_PW,
                 dbname="postgres",
             ) as conn:
                 with conn.cursor() as cur:
@@ -165,7 +168,7 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
                     host=pg.host,
                     port=pg.port,
                     user="postgres",
-                    password="test",
+                    password=CUSTOMER_DB_PW,
                     dbname="ems_vector",
                 ) as conn,
                 conn.cursor() as cur,
@@ -182,10 +185,16 @@ def test_create_provisions_databases_extension_users_and_secrets() -> None:
             vec_secret = sm_client.get_secret_value(
                 SecretId=f"arcnode-ems-{DEPLOYMENT_UUID}/vector-url"
             )["SecretString"]
-            assert "ems_doc_app" in doc_secret
-            assert "ems_document" in doc_secret
-            assert "ems_vec_app" in vec_secret
-            assert "ems_vector" in vec_secret
+            for url, db_name in (
+                (doc_secret, "ems_document"),
+                (vec_secret, "ems_vector"),
+            ):
+                with (
+                    real_connect(url.replace(":5432/", f":{pg.port}/")) as conn,
+                    conn.cursor() as cur,
+                ):
+                    cur.execute("SELECT current_database(), current_user")
+                    assert cur.fetchone() == (db_name, "postgres")
 
             # Assert: CFN callback was SUCCESS
             cfn_call = urlopen.call_args

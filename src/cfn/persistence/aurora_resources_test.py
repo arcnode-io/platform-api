@@ -79,16 +79,18 @@ def test_instance_uses_db_serverless_class() -> None:
     assert instance["Properties"]["DBInstanceClass"] == "db.serverless"
 
 
-def test_master_secret_is_aws_secretsmanager_secret() -> None:
-    """Master credentials live in Secrets Manager, referenced from the cluster."""
+def test_the_master_password_is_the_customers_db_password() -> None:
+    """The cluster and the bootstrap Lambda both use the customer's DbPassword."""
     # Arrange + Act
-    secret = aurora_cluster_resources()["AuroraMasterSecret"]
+    resources = aurora_cluster_resources()
 
     # Assert
-    assert secret["Type"] == "AWS::SecretsManager::Secret"
-    gen = secret["Properties"]["GenerateSecretString"]
-    assert gen["SecretStringTemplate"] == '{"username": "ems_master"}'
-    assert gen["GenerateStringKey"] == "password"
+    assert resources["AuroraMasterSecret"]["Properties"]["SecretString"] == {
+        "Ref": "DbPassword"
+    }
+    assert resources["AuroraCluster"]["Properties"]["MasterUserPassword"] == {
+        "Fn::Sub": "{{resolve:secretsmanager:${AuroraMasterSecret}}}"
+    }
 
 
 def test_slice_secrets_cfn_native_per_slice() -> None:
@@ -110,8 +112,8 @@ def test_slice_secrets_cfn_native_per_slice() -> None:
             f"arcnode-ems-${{AWS::StackName}}/{slice_name}-url"
             in secret["Properties"]["Name"]["Fn::Sub"]
         )
-        # GenerateSecretString placeholder — Lambda overwrites it.
-        assert "GenerateSecretString" in secret["Properties"]
+        # Fixed placeholder — Lambda overwrites it.
+        assert secret["Properties"]["SecretString"] == "set by AuroraBootstrapLambda"
 
 
 def test_bootstrap_custom_resource_depends_on_slice_secrets() -> None:

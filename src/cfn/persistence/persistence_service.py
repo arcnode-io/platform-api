@@ -27,6 +27,7 @@ from src.cfn.persistence.aurora_resources import (
     DEFENSE_SLICES,
     PSYCOPG2_LAYER_ARN_TEMPLATE,
     aurora_cluster_resources,
+    aurora_parameters,
 )
 from src.cfn.persistence.customer_url_preflight_resources import (
     customer_url_preflight_resources,
@@ -39,9 +40,8 @@ from src.cfn.persistence.vendor_secrets import (
     vendor_url_secrets,
 )
 from src.cfn.persistence.auth_secrets import (
-    auth_human_parameters,
-    auth_human_secrets,
-    auth_machine_secrets,
+    auth_parameters,
+    auth_secrets,
     der_control_lfdi_allowlist_secret,
     der_control_truststore_secret,
 )
@@ -116,8 +116,7 @@ class PersistenceService:
             ),
             **vendor_url_secrets(),
             **agent_api_key_secrets(),
-            **auth_machine_secrets(),
-            **auth_human_secrets(),
+            **auth_secrets(),
             **der_control_truststore_secret(),
             **der_control_lfdi_allowlist_secret(),
         }
@@ -135,8 +134,7 @@ class PersistenceService:
             "GridstatusApiKeySecret",
             # Broker + human auth secrets — UserData reads them at boot to
             # write credentials.xml + secrets.env.
-            *auth_machine_secrets(),
-            *auth_human_secrets(),
+            *auth_secrets(),
             *der_control_truststore_secret(),
             *der_control_lfdi_allowlist_secret(),
         ]
@@ -147,7 +145,8 @@ class PersistenceService:
             parameters={
                 **commercial_url_parameters(),
                 **agent_api_key_parameters(),
-                **auth_human_parameters(),
+                **auth_parameters(),
+                **aurora_parameters(),
             },
             ems_instance_depends_on=depends_on,
         )
@@ -165,8 +164,7 @@ class PersistenceService:
                     slices=DEFENSE_SLICES,
                 ),
                 **agent_api_key_secrets(),
-                **auth_machine_secrets(),
-                **auth_human_secrets(),
+                **auth_secrets(),
                 **der_control_truststore_secret(),
                 **der_control_lfdi_allowlist_secret(),
                 **neptune_resources(),
@@ -174,7 +172,8 @@ class PersistenceService:
             },
             parameters={
                 **agent_api_key_parameters(),
-                **auth_human_parameters(),
+                **auth_parameters(),
+                **aurora_parameters(),
             },
             ems_instance_depends_on=[
                 "AuroraBootstrapCustomResource",
@@ -186,8 +185,7 @@ class PersistenceService:
                 "NeptuneLoaderRoleArnParam",
                 "AossHostParam",
                 # Broker + human auth secrets (variant-agnostic).
-                *auth_machine_secrets(),
-                *auth_human_secrets(),
+                *auth_secrets(),
                 *der_control_truststore_secret(),
                 *der_control_lfdi_allowlist_secret(),
             ],

@@ -25,3 +25,6 @@ VIEWER_LOGIN: Final[CustomerSecret] = CustomerSecret(
 GRAFANA_ADMIN: Final[CustomerSecret] = CustomerSecret(
     "grafana-admin-pw", "GF_SECURITY_ADMIN_PASSWORD", "GrafanaAdminPw"
 )
+JWT_SECRET: Final[CustomerSecret] = CustomerSecret(
+    "auth-jwt-secret", "AUTH_JWT_SECRET", "AuthJwtSecret"
+)

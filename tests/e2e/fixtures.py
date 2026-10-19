@@ -46,18 +46,21 @@ STACK_READY_TIMEOUT_S: Final[int] = 1500
 STACK_DELETE_TIMEOUT_S: Final[int] = 1800
 POLL_INTERVAL_S: Final[int] = 30
 
-# Human login passwords for the v1 auth chain (operator can dispatch, viewer is
-# read-only). Required NoEcho params on every stack since the broker-auth flip.
-# The broker-auth e2e (test_broker_auth.py / test_hmi_browser.py) log in with
-# these — import them, don't hardcode.
+# Customer-set passwords, required NoEcho params on every stack. Operator can
+# dispatch, viewer is read-only; the broker-auth e2e (test_broker_auth.py /
+# test_hmi_browser.py) log in with these — import them, don't hardcode.
 PIPELINE_ID: Final[str] = os.environ.get("CI_PIPELINE_ID", "local")
 E2E_OPERATOR_PW: Final[str] = "e2e-operator-pw"
 E2E_VIEWER_PW: Final[str] = "e2e-viewer-pw"
 E2E_GRAFANA_PW: Final[str] = "e2e-grafana-pw"
 _AUTH_PARAMS: Final[list[ParameterTypeDef]] = [
+    {"ParameterKey": "MqttServicePw", "ParameterValue": "e2e-mqtt-service-pw"},
+    {"ParameterKey": "AuthJwtSecret", "ParameterValue": "e2e-jwt-secret-" + "x" * 32},
     {"ParameterKey": "AuthOperatorPw", "ParameterValue": E2E_OPERATOR_PW},
     {"ParameterKey": "AuthViewerPw", "ParameterValue": E2E_VIEWER_PW},
     {"ParameterKey": "GrafanaAdminPw", "ParameterValue": E2E_GRAFANA_PW},
+    # Reason: URL-special characters prove the slice URLs are escaped end to end.
+    {"ParameterKey": "DbPassword", "ParameterValue": "e2e-db:pw#1?"},
 ]
 
 

@@ -16,6 +16,9 @@ from typing import Final
 ENGINE_VERSION: Final[str] = "16.13"
 SECONDS_UNTIL_AUTO_PAUSE: Final[int] = 300  # 5 min idle → auto-pause
 MASTER_USERNAME: Final[str] = "ems_master"
+DB_PASSWORD_PARAM: Final[str] = (
+    "DbPassword"  # noqa: S105  # nosec B105 — a parameter name
+)
 LAMBDA_CODE_DIR: Final[Path] = Path(__file__).parent / "lambda_code"
 # Public psycopg2 layer for python3.13. Replace with self-published layer
 # once a stable arcnode-hosted layer is available; arn shown is a known
@@ -61,11 +64,10 @@ def aurora_cluster_resources(
     from real AWS (Pro-only feature). Prod always sets the layer.
     """
     # Per-slice connection-URL secrets, CFN-native. Pre-creating them as
-    # CFN resources (with a placeholder value generated at CREATE) lets the
-    # stack OWN their lifecycle — delete cleans automatically, no orphans.
-    # The bootstrap Lambda overwrites the placeholder via PutSecretValue
-    # with the real `postgres://app_user:pw@endpoint:5432/db` URL once
-    # Aurora is up and the per-slice DB + app user are provisioned.
+    # CFN resources (with a fixed placeholder) lets the stack OWN their
+    # lifecycle — delete cleans automatically, no orphans. The bootstrap
+    # Lambda overwrites the placeholder via PutSecretValue with the real
+    # `postgres://master:pw@endpoint:5432/db` URL once the slice DB exists.
     #
     # Naming: `arcnode-ems-{STACK}/<slice>-url` — UserData curls these by
     # name into /opt/arcnode/secrets.env.
@@ -80,10 +82,7 @@ def aurora_cluster_resources(
                     f"Aurora {slice_name} slice connection URL "
                     "(populated by AuroraBootstrapLambda PutSecretValue)."
                 ),
-                "GenerateSecretString": {
-                    "PasswordLength": 16,
-                    "ExcludePunctuation": True,
-                },
+                "SecretString": "set by AuroraBootstrapLambda",
             },
         }
         for slice_name in slices
@@ -93,13 +92,8 @@ def aurora_cluster_resources(
         "AuroraMasterSecret": {
             "Type": "AWS::SecretsManager::Secret",
             "Properties": {
-                "Description": "Aurora master credentials (managed rotation)",
-                "GenerateSecretString": {
-                    "SecretStringTemplate": f'{{"username": "{MASTER_USERNAME}"}}',
-                    "GenerateStringKey": "password",
-                    "PasswordLength": 32,
-                    "ExcludeCharacters": '"@/\\',
-                },
+                "Description": "Aurora master password (the customer's DbPassword).",
+                "SecretString": {"Ref": DB_PASSWORD_PARAM},
             },
         },
         "AuroraSubnetGroup": {
@@ -132,7 +126,7 @@ def aurora_cluster_resources(
                 "EngineVersion": ENGINE_VERSION,
                 "MasterUsername": MASTER_USERNAME,
                 "MasterUserPassword": {
-                    "Fn::Sub": "{{resolve:secretsmanager:${AuroraMasterSecret}::password}}"
+                    "Fn::Sub": "{{resolve:secretsmanager:${AuroraMasterSecret}}}"
                 },
                 "DBSubnetGroupName": {"Ref": "AuroraSubnetGroup"},
                 "VpcSecurityGroupIds": [{"Ref": "AuroraSecurityGroup"}],
@@ -234,10 +228,28 @@ def aurora_cluster_resources(
                     "Fn::GetAtt": ["AuroraCluster", "Endpoint.Address"]
                 },
                 "MasterSecretArn": {"Ref": "AuroraMasterSecret"},
+                "MasterUsername": MASTER_USERNAME,
                 "DeploymentUuid": {"Ref": "AWS::StackName"},
                 # Per-variant slice list — Lambda creates one db per slice and
                 # writes its connection string to arcnode-ems-{STACK}/<slice>-url.
                 "Slices": list(slices),
             },
+        },
+    }
+
+
+def aurora_parameters() -> dict[str, dict]:
+    """The customer's database password: Aurora's master login, and the password
+    in every slice URL. One password, same as the on-prem Postgres page."""
+    return {
+        DB_PASSWORD_PARAM: {
+            "Type": "String",
+            "NoEcho": True,
+            "MinLength": 8,
+            "MaxLength": 128,
+            # Reason: Aurora rejects / " @ and spaces in a master password.
+            "AllowedPattern": '^[^/"@ ]+$',
+            "ConstraintDescription": '8-128 characters, no / " @ or spaces.',
+            "Description": "Database password for every EMS database.",
         },
     }
