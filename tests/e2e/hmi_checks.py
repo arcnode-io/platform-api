@@ -136,7 +136,8 @@ def check_spa_and_runtime_config(stack: dict[str, str]) -> None:
 
 
 def check_login_cred_exchange(stack: dict[str, str]) -> None:
-    """login → JWT → /mqtt-credentials returns the operator File-RBAC cred."""
+    """login → JWT → /mqtt-credentials returns the operator File-RBAC cred.
+    Same as on-prem: the operator's broker password is their login password."""
     # Arrange
     ip = stack["public_ip"]
     _wait_for_hmi(ip)
@@ -146,8 +147,7 @@ def check_login_cred_exchange(stack: dict[str, str]) -> None:
     cred = _mqtt_credentials(ip, token)
 
     # Assert
-    assert cred["username"] == "arcnode_operator"
-    assert len(cred["password"]) >= 16
+    assert (cred["username"], cred["password"]) == ("arcnode_operator", E2E_OPERATOR_PW)
 
 
 def check_anonymous_rejected(stack: dict[str, str]) -> None:
