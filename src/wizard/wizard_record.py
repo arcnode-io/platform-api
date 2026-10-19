@@ -108,6 +108,39 @@ def check_complexity(value: str) -> str:
     return value
 
 
+# One DNS label: letters, digits, inner hyphens.
+_DNS_LABEL = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+
+
+class SigningRequest(BaseModel):
+    """POST /api/https/request body — the box's name on the customer's network."""
+
+    hostname: str
+
+    @field_validator("hostname")
+    @classmethod
+    def must_be_a_dns_name(cls, value: str) -> str:
+        """A name IT can issue a certificate for; an IP address isn't one."""
+        labels = value.split(".")
+        if not all(_DNS_LABEL.match(label) for label in labels):
+            raise ValueError("must be a DNS name like ems.plant.local")
+        if labels[-1].isdigit():
+            raise ValueError("must be a name, not an IP address")
+        return value.lower()
+
+
+class SigningRequestResult(BaseModel):
+    """The certificate signing request for the customer's IT; the key stays on the box."""
+
+    csr_pem: str
+
+
+class HttpsCertificate(BaseModel):
+    """POST /api/https body — the signed certificate, followed by any intermediates."""
+
+    certificate_pem: str = Field(pattern=r"-----BEGIN CERTIFICATE-----")
+
+
 class TelemetryRequest(BaseModel):
     """POST /api/telemetry body — how many days of measurements to keep."""
 

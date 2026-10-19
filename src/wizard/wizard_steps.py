@@ -25,6 +25,9 @@ STEPS: Final[tuple[str, ...]] = (
     "der_control_api",
     "industrial_gateway",
     "hmi",
+    # Optional: a certificate from the customer's own CA for the HMI's name. Right
+    # after the HMI page so the customer sees the operator screen secured next.
+    "https",
     "mlflow",
     "analyst_model",
     "analyst_server",

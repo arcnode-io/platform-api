@@ -36,6 +36,7 @@ def test_der_control_writes_its_overlay_and_verifies(tmp_path: Path) -> None:
         ("DER control API running", True),
         ("DER control API healthy", True),
         ("Saved for the DER control API", True),
+        ("DER ingress listening on 8443", True),
     ]
     assert result.verified
     assert tracker(tmp_path).is_done("der_control_api")

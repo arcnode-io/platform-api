@@ -24,6 +24,10 @@ services:
   hmi:
     ports:
       - "80:80"
+  # Only 443: http://<ip>/ stays on the hmi itself, so it keeps working.
+  https-ingress:
+    ports: !override
+      - "443:443"
 """
 
 

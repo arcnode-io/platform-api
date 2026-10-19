@@ -49,6 +49,26 @@ module and rack from edp-api's templates.
   installer (UID 1000), then the wizard 404s for good. Hardware minimums and
   Ollama models come from `/etc/arcnode/wizard-cfg.yml`, which `setup.sh` writes.
 
+## HTTPS with your own certificate
+
+The HMI always answers on `http://<box ip>/`. For a name your laptops trust, the
+wizard's optional **HTTPS certificate** page makes the key and a signing request on
+the box; your IT signs it with your internal CA and you paste back the certificate.
+Nothing calls ArcNode, then or later.
+
+Your IT can do the same by hand:
+
+```bash
+# the signed certificate, followed by any intermediates, and its key
+sudo install -m 0644 chain.pem   /opt/arcnode/tls/server.pem
+sudo install -m 0600 server.key  /opt/arcnode/tls/server-key.pem
+# the utility-facing DER ingress (8443) serves the same certificate
+sudo install -m 0644 chain.pem   /opt/arcnode/der-control-tls/cert.pem
+sudo install -m 0600 server.key  /opt/arcnode/der-control-tls/key.pem
+cd /opt/arcnode
+sudo docker compose -f docker-compose.yaml -f docker-compose.onprem.yaml up -d --force-recreate https-ingress der-control-ingress
+```
+
 ## Build + flash
 
 ```sh

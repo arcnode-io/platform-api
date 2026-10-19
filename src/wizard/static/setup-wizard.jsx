@@ -20,12 +20,13 @@ const ALL_STEPS = [
   { id: 'der_control_api', n: 10, title: 'DER control API', sub: 'Utility link' },
   { id: 'industrial_gateway', n: 11, title: 'Industrial gateway', sub: 'Device bridge' },
   { id: 'hmi',      n: 12, title: 'HMI',        sub: 'Operator screen' },
-  { id: 'mlflow',   n: 13, title: 'MLflow',     sub: 'Experiment tracking' },
-  { id: 'analyst_model', n: 14, title: 'Analyst model', sub: 'Daily forecast' },
-  { id: 'analyst_server', n: 15, title: 'Analyst server', sub: 'Chat + weather keys' },
-  { id: 'prometheus', n: 16, title: 'Prometheus', sub: 'Metrics' },
-  { id: 'grafana',  n: 17, title: 'Grafana',    sub: 'Dashboards' },
-  { id: 'ssh_lockdown', n: 18, title: 'SSH lockdown', sub: 'Key-only login' },
+  { id: 'https',    n: 13, title: 'HTTPS certificate', sub: 'Optional · your CA' },
+  { id: 'mlflow',   n: 14, title: 'MLflow',     sub: 'Experiment tracking' },
+  { id: 'analyst_model', n: 15, title: 'Analyst model', sub: 'Daily forecast' },
+  { id: 'analyst_server', n: 16, title: 'Analyst server', sub: 'Chat + weather keys' },
+  { id: 'prometheus', n: 17, title: 'Prometheus', sub: 'Metrics' },
+  { id: 'grafana',  n: 18, title: 'Grafana',    sub: 'Dashboards' },
+  { id: 'ssh_lockdown', n: 19, title: 'SSH lockdown', sub: 'Key-only login' },
 ];
 
 // ─── Inline icons ────────────────────────────────────────────────────
@@ -576,6 +577,23 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
   const [siteInfo, setSiteInfo] = useStateW(null);
   // Checked by default: key-only SSH is the recommended end state.
   const [lockdownPasswords, setLockdownPasswords] = useStateW(true);
+  // The HTTPS page: the box's name, its signing request, and the certificate IT signed.
+  const [https, setHttps] = useStateW({ hostname: '', csr: '', certificate: '', requesting: false, error: null });
+  const updateHttps = (patch) => setHttps(h => ({ ...h, ...patch }));
+  const requestSigning = () => {
+    updateHttps({ requesting: true, error: null });
+    fetch('/api/https/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hostname: https.hostname }),
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(formatApplyError(body.detail) || `HTTP ${r.status}`);
+        updateHttps({ csr: body.csr_pem, requesting: false });
+      })
+      .catch(err => updateHttps({ requesting: false, error: String(err.message || err) }));
+  };
   // Days of measurements the telemetry writer keeps; 7 matches the cloud stack's
   // TelemetryRetentionDays default (src/customer_inputs.py).
   const [retentionDays, setRetentionDays] = useStateW('7');
@@ -770,6 +788,12 @@ function SetupWizardBody({ t, isDark, onToggleTheme }) {
           )}
           {shown === 'hmi' && (
             <StepHmi t={t} page={pageOf('hmi')} onApply={() => applyStep('hmi', '/api/hmi', {})}/>
+          )}
+          {shown === 'https' && (
+            <StepHttps t={t} page={pageOf('https')} address={window.location.hostname}
+              https={https} onHttps={updateHttps} onRequest={requestSigning}
+              onApply={() => applyStep('https', '/api/https', { certificate_pem: https.certificate })}
+              onSkip={() => applyStep('https', '/api/https/skip', {})}/>
           )}
           {shown === 'ssh_lockdown' && (
             <StepSshLockdown t={t} page={pageOf('ssh_lockdown')} checked={lockdownPasswords} onChecked={setLockdownPasswords}

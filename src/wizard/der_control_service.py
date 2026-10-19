@@ -1,7 +1,7 @@
 """The on-prem DER control API page: write its per-site overlay (the order's
 site, the box's address for the utility, and the DERMS URL if the customer
-gives one), start the service, verify its health. The DER ingress in front of
-it is a separate page."""
+gives one), start the service and the DER ingress in front of it (8443, where
+the utility posts), verify both."""
 
 import base64
 import hashlib
@@ -11,6 +11,7 @@ from typing import Final
 import yaml
 
 from src.wizard.box_address import box_address
+from src.wizard.der_control_ingress import start_der_ingress
 from src.wizard.containers_compose import compose_command, wait_for_log
 from src.wizard.docker_verify import DOCKER_NETWORK
 from src.wizard.ems_cfg import DER_CONTROL_CFG_FILE, DerControlCfg, write_yaml
@@ -69,9 +70,10 @@ class DerControlService:
         site = OrderSite.model_validate(
             yaml.safe_load((self._order_dir / SITE_FILE).read_text())
         )
+        address = box_address(self._run)
         expected = DerControlCfg(
             site_id=site.site_id,
-            public_base_url=f"https://{box_address(self._run)}:{INGRESS_PORT}",
+            public_base_url=f"https://{address}:{INGRESS_PORT}",
             utility_mirror_url=request.utility_mirror_url,
         )
         write_yaml(self._ems_dir / DER_CONTROL_CFG_FILE, expected)
@@ -90,6 +92,9 @@ class DerControlService:
             self._running_check(),
             self._health_check(),
             self._saved_check(expected),
+            start_der_ingress(
+                self._run, self._ems_dir, address, request.utility_ca_pem
+            ),
         ]
         if request.device_cert_pem:
             checks.append(self._identity_check(request.device_cert_pem))

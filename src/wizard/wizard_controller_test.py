@@ -97,6 +97,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     der_control = client.post("/api/der-control", json={"utility_mirror_url": None})
     gateway = client.post("/api/industrial-gateway")
     hmi = client.post("/api/hmi")
+    https = client.post("/api/https/skip")
     grafana = client.post("/api/grafana", json={"password": "Grafana-pw-1!"})
     lockdown = client.post("/api/ssh-lockdown", json={"disable_password_login": True})
 
@@ -108,6 +109,7 @@ def test_wizard_closes_once_every_on_prem_page_is_done(tmp_path: Path) -> None:
     assert site.json()["verified"] is True
     assert hivemq.json()["verified"] is True
     assert telemetry.json()["verified"] is True
+    assert https.json()["verified"] is True
     assert prometheus.json()["verified"] is True
     assert mlflow.json()["verified"] is True
     assert analyst_model.json()["verified"] is True

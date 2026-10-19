@@ -18,6 +18,8 @@ from src.wizard.der_control_service import DerControlService
 from src.wizard.analyst_server_service import AnalystServerService
 from src.wizard.mlflow_service import MlflowService
 from src.wizard.preflight_service import PreflightService
+from src.wizard.https_controller import HttpsController
+from src.wizard.https_service import HttpsService
 from src.wizard.prometheus_service import PrometheusService
 from src.wizard.site_service import SiteService
 from src.wizard.telemetry_writer_service import TelemetryWriterService
@@ -170,3 +172,8 @@ class WizardModule:
             tracker=tracker,
             account=account,
         ).router
+        self.router.include_router(
+            HttpsController(
+                https=HttpsService(tracker=tracker, ems_dir=ems_dir, run=run)
+            ).router
+        )

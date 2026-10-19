@@ -10,6 +10,25 @@ from src.wizard.containers_compose import ONPREM_OVERRIDE, wait_for_log
 from src.wizard.wizard_record import Command, CommandOutput
 
 EMS_DIR = Path("/opt/arcnode")
+
+
+class ComposeLoader(yaml.SafeLoader):
+    """safe_load plus compose's `!override` tag (replace the base list, don't append)."""
+
+
+ComposeLoader.add_constructor(
+    "!override", lambda loader, node: loader.construct_sequence(node)
+)
+
+
+def _override() -> dict[str, dict]:
+    # ComposeLoader is a SafeLoader subclass, so this is as safe as safe_load.
+    return yaml.load(
+        ONPREM_OVERRIDE,
+        Loader=ComposeLoader,  # noqa: S506  # nosec B506
+    )
+
+
 GATEWAY = "industrial-gateway"
 SUBSCRIBED = "MQTT subscriptions established"
 
@@ -19,22 +38,32 @@ def test_override_puts_every_service_on_the_arcnode_network() -> None:
     expected = {"default": {"name": "arcnode", "external": True}}
 
     # Act
-    actual = yaml.safe_load(ONPREM_OVERRIDE)["networks"]
+    actual = _override()["networks"]
 
     # Assert
     assert actual == expected
 
 
 def test_override_publishes_the_hmi_on_port_80() -> None:
-    """On-prem there is no ingress: browsers reach the HMI at http://<box>/ directly."""
+    """http://<box>/ reaches the HMI directly; HTTPS, when set up, is the 443 front end."""
     # Arrange
     expected = ["80:80"]
 
     # Act
-    actual = yaml.safe_load(ONPREM_OVERRIDE)["services"]["hmi"]["ports"]
+    actual = _override()["services"]["hmi"]["ports"]
 
     # Assert
     assert actual == expected
+
+
+def test_override_publishes_https_on_443_only() -> None:
+    """The HTTPS front end leaves port 80 to the hmi, so http://<box>/ keeps working."""
+    # Act
+    actual = _override()
+
+    # Assert
+    assert actual["services"]["https-ingress"]["ports"] == ["443:443"]
+    assert "!override" in ONPREM_OVERRIDE
 
 
 class ScriptedRunner:

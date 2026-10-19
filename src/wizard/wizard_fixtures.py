@@ -74,6 +74,7 @@ class FakeRunner:
             "curl": ok(""),
             "mkdir": ok(""),
             "sed": ok(""),
+            "openssl": ok(""),
             # Neo4j's bolt port, on the arcnode gateway only (java's v4-mapped socket)
             "ss": ok("LISTEN 0      4096   [::ffff:172.23.0.1]:7687 *:*\n"),
         }
@@ -126,6 +127,8 @@ class FakeRunner:
                 "initial spec fetched\nMQTT subscriptions established\n"
             ),
             "logs hmi": ok("start worker processes\n"),
+            "logs https-ingress": ok("start worker processes\n"),
+            "logs der-control-ingress": ok("start worker processes\n"),
             # The host-side HTTP probe through the HMI's published port 80.
             "http://127.0.0.1/": ok("200"),
             "curlimages/curl -fsS -o": ok("200"),
