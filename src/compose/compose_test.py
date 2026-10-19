@@ -110,11 +110,10 @@ def test_der_control_ingress_terminates_mtls_in_front_of_der_control_api(
     assert svc["ports"] == ["8443:8443"]
     assert "der-control-api" in svc["depends_on"]
 
-    # Assert — cert/key/truststore/conf all bind-mounted read-only, nothing baked
+    # Assert — cert/key/truststore as one directory (so a renewed certificate is
+    # seen on reload; a single-file mount keeps the replaced file), conf read-only
     volumes = svc["volumes"]
-    assert any(v.endswith(":/etc/nginx/tls/cert.pem:ro") for v in volumes)
-    assert any(v.endswith(":/etc/nginx/tls/key.pem:ro") for v in volumes)
-    assert any(v.endswith(":/etc/nginx/tls/truststore.pem:ro") for v in volumes)
+    assert "/opt/arcnode/der-control-tls:/etc/nginx/tls:ro" in volumes
     assert any(v.endswith(":/etc/nginx/conf.d/default.conf:ro") for v in volumes)
 
 

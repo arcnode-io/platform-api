@@ -530,7 +530,7 @@ def test_userdata_writes_der_control_ingress_tls_assets() -> None:
     # Assert — truststore fetched from the placeholder secret, not secrets.env
     # (it's a PEM bundle, not a KEY=VALUE line)
     assert "der-control-truststore-pem" in rendered
-    assert "/opt/arcnode/der-control-truststore.pem" in rendered
+    assert "/opt/arcnode/der-control-tls/truststore.pem" in rendered
     # Assert — static nginx config fetched from arcnode-public, same pattern
     # as the observability configs
     assert f"{ARCNODE_PUBLIC_BASE_URL}/der-control-ingress/nginx.conf" in rendered
@@ -604,6 +604,16 @@ def test_commercial_userdata_writes_der_control_cfg() -> None:
     assert "publicBaseUrl: https://${EmsEip}:8443" in block
     assert "siteId:" in block
     assert "utilityMirrorUrl" not in block
+
+
+def test_a_named_site_advertises_its_der_control_ingress_by_name() -> None:
+    """With a DNS name, the utility is told the name its certificate is issued for."""
+    # Arrange + Act
+    rendered = _render(site_callback=CALLBACK)
+
+    # Assert
+    block = rendered.split("der-control-cfg.customer.yml <<YML")[1].split("YML\n")[0]
+    assert f"publicBaseUrl: https://{CALLBACK.hostname}:8443" in block
 
 
 def test_cloud_instance_is_m7i_2xlarge() -> None:

@@ -5,8 +5,9 @@
 #                        box's address, wait for the DNS name to resolve to it, get a certificate
 #   site-cert.sh renew   weekly: renew if due, install if it changed
 #
-# Until `issue` succeeds the box keeps the self-signed certificate it booted with. The HTTPS
-# ingress reads /opt/arcnode/tls/server{,-key}.pem.
+# Until `issue` succeeds the box keeps the self-signed certificates it booted with. The HTTPS
+# ingress reads /opt/arcnode/tls/server{,-key}.pem; the DER control ingress (8443, where the
+# utility posts) reads /opt/arcnode/der-control-tls/{cert,key}.pem. Both get the same certificate.
 # Settings come from /etc/arcnode/site-cert.env (UserData writes it):
 #   SITE_HOST, SITE_ADDRESS, SITE_CALLBACK_URL, SITE_TOKEN
 set -euo pipefail
@@ -15,6 +16,7 @@ set -euo pipefail
 source /etc/arcnode/site-cert.env
 
 TLS_DIR=/opt/arcnode/tls
+DER_CONTROL_TLS_DIR=/opt/arcnode/der-control-tls
 LETSENCRYPT_DIR=/opt/arcnode/letsencrypt
 WEBROOT=/opt/arcnode/acme
 LIVE="$LETSENCRYPT_DIR/live/$SITE_HOST"
@@ -37,8 +39,21 @@ wait_for_dns() {
   done
 }
 
+# The running container whose name contains $1, or nothing.
+container_named() {
+  docker ps --format '{{.Names}}' | grep "$1" | head -n 1 || true
+}
+
 ingress_container() {
-  docker ps --format '{{.Names}}' | grep 'https-ingress' | head -n 1 || true
+  container_named 'https-ingress'
+}
+
+reload_nginx() {
+  local container
+  container="$(container_named "$1")"
+  if [ -n "$container" ]; then
+    docker exec "$container" nginx -s reload
+  fi
 }
 
 # Port 80 is free before the stack starts (standalone); once the ingress holds it, it serves
@@ -63,12 +78,11 @@ install_certificate() {
   fi
   install -m 0644 "$LIVE/fullchain.pem" "$TLS_DIR/server.pem"
   install -m 0600 "$LIVE/privkey.pem" "$TLS_DIR/server-key.pem"
-  # The ingress reads its certificate at reload.
-  local ingress
-  ingress="$(ingress_container)"
-  if [ -n "$ingress" ]; then
-    docker exec "$ingress" nginx -s reload
-  fi
+  install -m 0644 "$LIVE/fullchain.pem" "$DER_CONTROL_TLS_DIR/cert.pem"
+  install -m 0600 "$LIVE/privkey.pem" "$DER_CONTROL_TLS_DIR/key.pem"
+  # Each ingress reads its certificate at reload.
+  reload_nginx 'https-ingress'
+  reload_nginx 'der-control-ingress'
   echo "installed the certificate for $SITE_HOST"
 }
 

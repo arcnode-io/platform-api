@@ -653,13 +653,12 @@ def build_userdata(
         f"-o /opt/arcnode/observability/{f}"
         for f in observability_files
     )
-    # der-control-ingress TLS assets: self-signed server cert/key (same
-    # openssl shape as the ISO appliance's own TLS role — no ACM/real-CA
-    # story yet, that's a later hardening pass), the ops-populated
-    # truststore secret written straight to a file (it's a PEM bundle, not
-    # a KEY=VALUE line — doesn't belong in secrets.env), and the static
-    # nginx mTLS config (no per-order variability, fetched like
-    # observability/prometheus.yml rather than templated in this heredoc).
+    # der-control-ingress TLS assets, all in /opt/arcnode/der-control-tls: a
+    # self-signed server cert/key that serves until site-cert.sh installs the
+    # site's Let's Encrypt certificate, the ops-populated truststore secret
+    # written straight to a file (it's a PEM bundle, not a KEY=VALUE line —
+    # doesn't belong in secrets.env), plus the static nginx mTLS config (no
+    # per-order variability, fetched like observability/prometheus.yml).
     der_control_ingress_block = (
         "openssl req -x509 -newkey rsa:2048 -nodes "
         "-keyout /opt/arcnode/der-control-tls/key.pem "
@@ -669,14 +668,14 @@ def build_userdata(
         "aws secretsmanager get-secret-value "
         "--secret-id arcnode-ems-${AWS::StackName}/der-control-truststore-pem "
         "--query SecretString --output text "
-        "> /opt/arcnode/der-control-truststore.pem\n"
-        "chmod 600 /opt/arcnode/der-control-truststore.pem\n"
+        "> /opt/arcnode/der-control-tls/truststore.pem\n"
+        "chmod 600 /opt/arcnode/der-control-tls/truststore.pem\n"
         f"curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused {ARCNODE_PUBLIC_BASE_URL}/der-control-ingress/nginx.conf "
         "-o /opt/arcnode/der-control-ingress.conf\n"
     )
     # https-ingress: the static TLS terminator in front of the HMI (same file as
     # the ISO installs) and a self-signed cert for the Elastic IP, so port 443
-    # serves the HMI from first boot. A real cert for <site-id>.arcnode.io comes later.
+    # serves the HMI from first boot, until site-cert.sh installs the site's real one.
     https_ingress_block = (
         "openssl req -x509 -newkey rsa:2048 -nodes "
         "-keyout /opt/arcnode/tls/server-key.pem "
@@ -691,6 +690,9 @@ def build_userdata(
     # (token-gated), waits for the name to resolve, and gets the certificate. It runs as a service
     # so slow DNS or ACME never holds up CFN's CreationPolicy; until it succeeds the self-signed
     # certificate serves. A weekly timer renews.
+    der_control_host = (
+        site_callback.hostname if site_callback is not None else "${EmsEip}"
+    )
     site_cert_block = ""
     if site_callback is not None:
         site_cert_block = (
@@ -809,10 +811,11 @@ def build_userdata(
         f"{TELEMETRY_RETENTION_DAYS.cfg_key}: ${{{TELEMETRY_RETENTION_DAYS.cfn_param}}}\n"
         "YML\n"
         # der-control-api's per-site overlay. publicBaseUrl is the ingress the
-        # utility reaches, on the Elastic IP. utilityMirrorUrl is left out until the order carries one.
+        # utility reaches: the site's DNS name (its certificate's name) when it has
+        # one, else the Elastic IP. utilityMirrorUrl is left out until the order carries one.
         "cat > /opt/arcnode/der-control-cfg.customer.yml <<YML\n"
         f"siteId: {site_id}\n"
-        "publicBaseUrl: https://${EmsEip}:8443\n"
+        f"publicBaseUrl: https://{der_control_host}:8443\n"
         "YML\n"
         # HMI runtime-config overlay. Unlike gateway/analyst (env-merged via
         # CFG_CUSTOMER_PATH), the HMI is a static SPA — its container's nginx

@@ -82,9 +82,8 @@ services:
     ports:
       - "8443:8443"
     volumes:
-      - /opt/arcnode/der-control-tls/cert.pem:/etc/nginx/tls/cert.pem:ro
-      - /opt/arcnode/der-control-tls/key.pem:/etc/nginx/tls/key.pem:ro
-      - /opt/arcnode/der-control-truststore.pem:/etc/nginx/tls/truststore.pem:ro
+      # cert.pem, key.pem, truststore.pem. A directory, so a renewed cert shows on reload.
+      - /opt/arcnode/der-control-tls:/etc/nginx/tls:ro
       - /opt/arcnode/der-control-ingress.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       der-control-api:
