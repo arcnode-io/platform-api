@@ -1,4 +1,5 @@
-"""Integration test for arcnode-motd-ip.sh's network-wait placeholder.
+"""Integration test for the console login message: the network wait, the
+setup address while the wizard is unfinished, and the HMI address after.
 
 Runs the real script (parsed from src/iso/phases/motd.sh, never a copy) inside
 a plain Debian container — this logic is pure shell + figlet + `ip route
@@ -8,9 +9,9 @@ need for the heavier Vagrant/QEMU VM the daemon-layer test uses.
 `ip` itself is faked: the race-handling behavior (the `ip monitor route`
 wake-up loop, the 169.254.x.x link-local rejection) was already proven
 separately via real netns reproduction during development. This test's
-job is narrower — does the script show an honest "still waiting" state
-instead of silence while no route exists, without adding noise once a
-route already exists on the very first check.
+job is narrower — what a login shows: an honest "still waiting" state while
+no route exists, an unmissable setup address until the wizard is finished,
+and the operator screen's address after.
 """
 
 import time
@@ -49,6 +50,7 @@ def _extract_heredoc(write_target: str) -> str:
 
 
 MOTD_IP_SCRIPT = _extract_heredoc("/usr/local/sbin/arcnode-motd-ip.sh")
+LOGIN_SCRIPT = _extract_heredoc("/etc/update-motd.d/50-arcnode")
 
 
 def _write_file(
@@ -69,17 +71,22 @@ def _reset_and_deploy(container: DockerContainer) -> None:
         [
             "sh",
             "-c",
-            "rm -f /etc/motd /var/log/arcnode-motd-ip.log /tmp/fake-route-state /tmp/fake-route-addr",
+            "rm -rf /run/arcnode-box-ip /etc/arcnode /var/log/arcnode-motd-ip.log /tmp/fake-route-state /tmp/fake-route-addr",
         ]
     )
     _write_file(container, "/usr/local/bin/ip", FAKE_IP_SCRIPT, executable=True)
     _write_file(
         container, "/usr/local/sbin/arcnode-motd-ip.sh", MOTD_IP_SCRIPT, executable=True
     )
+    container.exec(["mkdir", "-p", "/etc/update-motd.d"])
+    _write_file(
+        container, "/etc/update-motd.d/50-arcnode", LOGIN_SCRIPT, executable=True
+    )
 
 
 def _read_motd(container: DockerContainer) -> str:
-    exit_code, output = container.exec(["cat", "/etc/motd"])
+    """What a login shows: pam_motd runs /etc/update-motd.d at every login."""
+    exit_code, output = container.exec(["/etc/update-motd.d/50-arcnode"])
     return output.decode() if exit_code == 0 else ""
 
 
@@ -141,6 +148,7 @@ def test_shows_waiting_placeholder_before_route_then_final_banner_once_ready() -
         )
 
         final_motd = _wait_until(container, lambda c: "http://" in c, timeout=15.0)
+        assert "SETUP IS NOT FINISHED" in final_motd
         assert "http://10.0.0.55:8080\n" in final_motd
     finally:
         container.stop()
@@ -168,5 +176,31 @@ def test_skips_placeholder_when_route_already_exists() -> None:
         final_motd = _read_motd(container)
         assert "http://10.0.0.77:8080\n" in final_motd
         assert "waiting for network" not in final_motd
+    finally:
+        container.stop()
+
+
+def test_a_finished_setup_shows_the_operator_screen() -> None:
+    """Arrange: the wizard's last page is done. Assert: the next login shows
+    the HMI's address, not the setup link that no longer answers."""
+    container = _start_container()
+    try:
+        _reset_and_deploy(container)
+        container.exec(
+            [
+                "sh",
+                "-c",
+                "echo 10.0.0.77 > /tmp/fake-route-addr && echo up > /tmp/fake-route-state"
+                " && mkdir -p /etc/arcnode/steps && touch /etc/arcnode/steps/ssh_lockdown.done",
+            ]
+        )
+
+        exit_code, output = container.exec(["/usr/local/sbin/arcnode-motd-ip.sh"])
+        assert exit_code == 0, output
+
+        final_motd = _read_motd(container)
+        assert "http://10.0.0.77/\n" in final_motd
+        assert ":8080" not in final_motd
+        assert "SETUP IS NOT FINISHED" not in final_motd
     finally:
         container.stop()
