@@ -84,18 +84,16 @@ MEASUREMENTS_SCHEMA_SQL: tuple[str, ...] = (
 
 
 # pg_partman only makes and drops partitions when its maintenance runs. pg_cron
-# keeps its jobs in the postgres db (Aurora's cron.database_name) and runs this
-# one in ems_timeseries. Same job name → re-running updates it, no duplicate.
+# keeps its jobs in the postgres db (Aurora's cron.database_name). pg_cron revokes
+# schedule_in_database from all but a true superuser, and Aurora's master is only
+# rds_superuser, so the job is scheduled here and then pointed at ems_timeseries
+# (the route AWS documents). Same job name → re-running updates it, no duplicate.
 PARTITION_MAINTENANCE_SQL: tuple[str, ...] = (
     "CREATE EXTENSION IF NOT EXISTS pg_cron",
-    """
-    SELECT cron.schedule_in_database(
-        'partman-maintenance',
-        '@hourly',
-        'CALL partman.run_maintenance_proc()',
-        'ems_timeseries'
-    )
-    """,
+    "SELECT cron.schedule('partman-maintenance', '@hourly', "
+    "'CALL partman.run_maintenance_proc()')",
+    "UPDATE cron.job SET database = 'ems_timeseries' "
+    "WHERE jobname = 'partman-maintenance'",
 )
 
 

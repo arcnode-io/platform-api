@@ -102,7 +102,12 @@ def test_partition_maintenance_runs_hourly_in_the_timeseries_db() -> None:
 
     # Assert
     assert "CREATE EXTENSION IF NOT EXISTS pg_cron" in sql_block
-    assert "cron.schedule_in_database" in sql_block
-    assert "'@hourly'" in sql_block
+    # Reason: pg_cron revokes schedule_in_database from everyone but a true
+    # superuser; Aurora's master is rds_superuser, so it schedules, then retargets.
+    assert "schedule_in_database" not in sql_block
+    assert "cron.schedule('partman-maintenance', '@hourly'" in sql_block
     assert "CALL partman.run_maintenance_proc()" in sql_block
-    assert "'ems_timeseries'" in sql_block
+    assert (
+        "UPDATE cron.job SET database = 'ems_timeseries' "
+        "WHERE jobname = 'partman-maintenance'"
+    ) in sql_block
